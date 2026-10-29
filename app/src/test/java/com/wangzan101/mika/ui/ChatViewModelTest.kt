@@ -1344,4 +1344,82 @@ class ChatViewModelTest {
         assertEquals("a", vm.ui.value.conversationId)
         assertEquals(listOf("查天气", "胶囊里说的"), vm.ui.value.exchanges.map { it.goal })
     }
+
+    // ---- 别处开始的任务,按服务里真实的先后:先显示(状态送出),再登记进任务列表 ----
+
+    private val goals = mutableMapOf<String, String>()
+    private val endedRun = MutableStateFlow<String?>(null)
+
+    private fun TestScope.registryVm(store: ConversationStore, parallel: Boolean) = ChatViewModel(
+        backgroundScope, state, stage, actions, store, appLabel = { if (it == "com.chat") "聊天" else it }, endedRunId = endedRun, parallelFlag = { parallel },
+        shownTask = shown, activeConversations = active, runGoal = goals::get, steers = steerFlow, activities = acts,
+    ).also { runCurrent() }
+
+    /** 服务开始一个任务:先显示它(带编号的状态、状态),之后才登记进任务列表(对话、原话)。 */
+    private fun TestScope.startedElsewhere(conversationId: String, goal: String) {
+        val s = TaskState.Running(0, "正在准备")
+        shown.value = conversationId to s
+        state.value = s
+        runCurrent()
+        goals[conversationId] = goal
+        active.value = active.value + conversationId
+        runCurrent()
+    }
+
+    // 屏上这个对话里别处(悬浮胶囊)发的话:在跑时就显示那句话和步骤,和在这里发的一样
+    @Test fun runStartedElsewhereShowsMessageWhileRunning() = runTest {
+        for (parallel in listOf(false, true)) {
+            val store = ConversationStore(tmp.newFolder())
+            store.append("a", Turn("查天气", "晴", "succeeded", runId = "r1"))
+            val vm = registryVm(store, parallel)
+            vm.openConversation("a")
+            startedElsewhere("a", "胶囊里说的")
+            assertEquals("parallel=$parallel", listOf("查天气", "胶囊里说的"), vm.ui.value.exchanges.map { it.goal })
+            assertEquals(ComposerMode.Busy, vm.ui.value.composer)
+            shown.value = "a" to TaskState.Running(1, "打开设置", "phone_launch_app")
+            state.value = shown.value!!.second
+            runCurrent()
+            did(1, "act", "phone_launch_app", "com.chat")
+            assertEquals(listOf("打开 App · 聊天"), vm.ui.value.exchanges.last().steps.map { it.text })
+            // 回到前台再接一次:不另起一条
+            vm.refresh()
+            assertEquals(2, vm.ui.value.exchanges.size)
+            assertEquals("胶囊里说的", vm.ui.value.exchanges.last().goal)
+            endedRun.value = "r2-$parallel"
+            serve("a", TaskState.Succeeded("好了"))
+            store.append("a", Turn("胶囊里说的", "好了", "succeeded", runId = "r2-$parallel"))
+            runCurrent()
+            assertEquals(listOf("查天气", "胶囊里说的"), vm.ui.value.exchanges.map { it.goal })
+            active.value = emptyList(); acts.value = emptyList(); goals.clear(); calls.clear()
+        }
+    }
+
+    // 屏上还没有对话时接上别处开始的任务:那句话也在
+    @Test fun adoptedRunShowsItsMessage() = runTest {
+        val vm = registryVm(ConversationStore(tmp.newFolder()), parallel = false)
+        startedElsewhere("a", "胶囊里说的")
+        assertEquals("a", vm.ui.value.conversationId)
+        assertEquals(listOf("胶囊里说的"), vm.ui.value.exchanges.map { it.goal })
+    }
+
+    // 别处在新对话里开始的任务:侧栏列在进行中;打开它(回到 Mika)就看到那句话和在跑的状态
+    @Test fun runInNewConversationElsewhereOpensWithMessage() = runTest {
+        for (parallel in listOf(false, true)) {
+            val store = ConversationStore(tmp.newFolder())
+            store.append("a", Turn("查天气", "晴", "succeeded", runId = "r1"))
+            val vm = registryVm(store, parallel)
+            vm.openConversation("a")
+            startedElsewhere("n", "新对话里说的")
+            assertEquals(listOf("查天气"), vm.ui.value.exchanges.map { it.goal })
+            assertEquals(listOf("n"), vm.otherRunning.value)
+            val sections = drawerSections(store.list(), CurrentConversation("a", false, "查天气", ""), vm.otherRunning.value, vm::runningGoal, vm.canSwitch(), 0L)
+            assertEquals(listOf("新对话里说的"), sections.running.map { it.title })
+            vm.openConversation("n")
+            assertEquals("n", vm.ui.value.conversationId)
+            assertEquals(listOf("新对话里说的"), vm.ui.value.exchanges.map { it.goal })
+            assertEquals(ExchangeStatus.Working, vm.ui.value.exchanges.single().status)
+            serve("n", TaskState.Succeeded("好了"))
+            active.value = emptyList(); goals.clear(); calls.clear()
+        }
+    }
 }

@@ -242,10 +242,11 @@ class TaskService : Service() {
                 r.run.mcpExternalId = mcpExternalId
                 taskState._busy.value = true
                 taskState._conversationId.value = conversationId
+                // 先登记再显示:界面收到它的状态时,任务列表里已经有它(对话、原话)
+                publishRuns()
                 // 清空成功标准、运行编号,显示排队
                 if (center.running().none { it.conversationId == conversationId }) r.run.show()
                 r.run.queue(r.position)
-                publishRuns()
                 keepForeground()
             }
             is StartResult.Started -> {
@@ -262,8 +263,9 @@ class TaskService : Service() {
                     center.store.save(it.copy(triggerWindowKey = triggerKey))
                 }
                 run.mcpExternalId = mcpExternalId
-                run.show()
+                // 先登记再显示:界面收到它的状态时,任务列表里已经有它(对话、原话)
                 publishRuns()
+                run.show()
                 val fg = foreground
                 if (fg != null && fg !== run && fg in center.running()) keepForeground()
                 else {
@@ -388,8 +390,8 @@ class TaskService : Service() {
     private fun onRunEnded(run: TaskRun, store: ConversationStore) {
         val wasShown = taskState.shownRun === run
         val started = center.onEnded(run)
-        if (wasShown) started.firstOrNull { it.conversationId == run.conversationId }?.show()
         publishRuns()
+        if (wasShown) started.firstOrNull { it.conversationId == run.conversationId }?.show()
         // 对话空出来就开始留给它的话,不等别的对话的任务
         val ready = center.takeReady()
         if (center.runs().isEmpty()) {

@@ -386,6 +386,8 @@ class ChatViewModel(
         scope.launch { runNotes.collect { notes -> _ui.update { ui -> ui.copy(exchanges = ui.exchanges.map { withNotes(it, notes) }) } } }
         scope.launch { activities.collect { if (ownTask()) onActivities(it) } }
         scope.launch { steers.collect { if (ownTask()) onSteers(it) } }
+        // 任务登记进任务列表(原话可以取了)可能晚于它的第一个状态:那时接上的那一问一答补上原话
+        scope.launch { activeConversations.collect { fillGoal() } }
         scope.launch { summarizing.collect { set -> _ui.update { ui -> ui.copy(exchanges = ui.exchanges.map { withSummarizing(it, set) }) } } }
     }
 
@@ -868,7 +870,7 @@ class ChatViewModel(
         }
         _ui.update { ui ->
             val old = ui.exchanges[liveIndex]
-            val ex = reduce(old, s, appLabel, toolLabels::label).let {
+            val ex = reduce(withGoal(old, ui.conversationId), s, appLabel, toolLabels::label).let {
                 if (it.status.active() || !old.status.active()) it
                 // 收尾时还没交到任务手里的插话:服务把它当成这个对话的下一件事
                 else withSummarizing(withNotes(it.copy(runId = endedRunFor(ui.conversationId), elapsedMs = elapsedOf(old),
@@ -896,6 +898,18 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    /** 正在跟的那一问一答还没有原话(接上别处开始的任务时它还没登记):按屏上这个对话的任务补上。 */
+    private fun fillGoal() = _ui.update { ui ->
+        val ex = ui.exchanges.getOrNull(liveIndex) ?: return@update ui
+        val filled = withGoal(ex, ui.conversationId)
+        if (filled === ex) ui else ui.copy(exchanges = ui.exchanges.toMutableList().also { it[liveIndex] = filled })
+    }
+
+    private fun withGoal(ex: Exchange, conversationId: String?): Exchange {
+        if (ex.goal.isNotEmpty() || !ex.status.active()) return ex
+        return conversationId?.let(runGoal)?.takeIf(String::isNotEmpty)?.let { ex.copy(goal = it) } ?: ex
     }
 
     private fun elapsedOf(ex: Exchange): Long? = ex.startedAt.takeIf { it > 0 }?.let { (clock() - it).coerceAtLeast(0) }
