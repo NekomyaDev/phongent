@@ -44,7 +44,9 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 你用一句话交代一件事，Mika 在手机上替你办。
 
-### 操作 App，不占你的屏幕
+### 操作任何 App，不占你的屏幕
+
+手机上装的 App 都能操作，不用事先适配：Mika 像人一样看屏幕、找按钮、点击输入，看得到就能操作。
 
 - 在一块单独的后台屏上打开 App、读界面、点击、输入、滚动，你照常用手机；对话页上的小画面实时显示它在做什么。
 - 能逐屏读长列表和聊天记录，比如「帮我总结一下某个群今天都聊了些啥」。
@@ -55,7 +57,7 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 ### 内置浏览器
 
-- 在后台打开网页，用真实的点击和键盘输入操作页面，默认按电脑版网页打开。
+- 任何网站都能打开：在后台打开网页，用真实的点击和键盘输入操作页面，默认按电脑版网页打开。
 - 能读页面正文，也能读页面自己收到的数据；支持下载、上传。
 - 登录过的网站保持登录；侧栏「浏览器」里可以自己浏览，在这里登录的网站 Mika 办事时也能直接用。
 - 翻页有节奏：同一个网站连着换页会停一停，对限制浏览快慢的网站停得更久；认得出风控拦截页，交给你处理而不是硬闯。
@@ -83,11 +85,11 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 - 记住你明确说过的事实、偏好和做事方式（做事方式要你批准），可以查看、修改、删除；只从你自己说的话里记，密码、验证码、卡号这类不记。记忆加密保存在手机上。
 
-### 常用 App 和网站的知识
+### 熟悉的 App 和网站，做得更快更稳
 
-内置常用 App 和网站的使用知识（入口在哪、常见做法、要注意什么），以及几类事情的通用做法，Mika 用到时自动查阅。比如进了聊天 App 知道怎么找联系人、翻聊天记录；打开招聘网站知道怎么筛岗位、打招呼。知识持续增加，人人可以补充：它们是放在 [`core/src/main/resources/knowledge/`](core/src/main/resources/knowledge/) 和 [`core/src/main/resources/skills/`](core/src/main/resources/skills/) 下的纯文本文件，[欢迎补充](#参与贡献)。
+没有任何说明，Mika 也能看着屏幕把事办成。有些 App 和网站另外写了使用知识（入口在哪、常见做法、要注意什么），Mika 用到时自动查阅，少走弯路。比如进了聊天 App 直接知道怎么找联系人、翻聊天记录；打开招聘网站知道怎么筛岗位、打招呼。另有几类事情的通用做法。知识持续增加，人人可以补充：它们是放在 [`core/src/main/resources/knowledge/`](core/src/main/resources/knowledge/) 和 [`core/src/main/resources/skills/`](core/src/main/resources/skills/) 下的纯文本文件，[欢迎补充](#参与贡献)。
 
-现在内置的有：
+已经写了使用知识的（没写到的 App 和网站照样能用）：
 
 <!-- generated:knowledge:start -->
 <!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
