@@ -52,10 +52,10 @@ class CapsuleModelTest {
         assertEquals(CapsuleView.Hidden, model.update(inputs(mode = CapsuleMode.Always, interactive = false), 0))
     }
 
-    @Test fun modeParsesWithDuringTasksDefault() {
-        assertEquals(CapsuleMode.DuringTasks, CapsuleMode.DEFAULT)
-        assertEquals(CapsuleMode.DuringTasks, CapsuleMode.parse(null))
-        assertEquals(CapsuleMode.DuringTasks, CapsuleMode.parse("something-old"))
+    @Test fun modeParsesWithAlwaysDefault() {
+        assertEquals(CapsuleMode.Always, CapsuleMode.DEFAULT)
+        assertEquals(CapsuleMode.Always, CapsuleMode.parse(null))
+        assertEquals(CapsuleMode.Always, CapsuleMode.parse("something-old"))
         CapsuleMode.entries.forEach { assertEquals(it, CapsuleMode.parse(it.name)) }
     }
 

@@ -12,27 +12,27 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FeatureFlagsCapsuleTest {
-    @Test fun capsuleDefaultsToDuringTasks() {
-        assertEquals(CapsuleMode.DuringTasks, FeatureFlags(MemoryPrefs()).capsuleMode())
+    @Test fun capsuleDefaultsToAlways() {
+        assertEquals(CapsuleMode.Always, FeatureFlags(MemoryPrefs()).capsuleMode())
     }
 
     @Test fun capsuleChoiceIsKeptAndUnknownFallsBack() {
         val prefs = MemoryPrefs()
-        FeatureFlags(prefs).setCapsuleMode(CapsuleMode.Always)
-        assertEquals(CapsuleMode.Always, FeatureFlags(prefs).capsuleMode())
+        FeatureFlags(prefs).setCapsuleMode(CapsuleMode.Off)
+        assertEquals(CapsuleMode.Off, FeatureFlags(prefs).capsuleMode())
         prefs.edit().putString("capsule_mode", "Sometimes").commit()
-        assertEquals(CapsuleMode.DuringTasks, FeatureFlags(prefs).capsuleMode())
+        assertEquals(CapsuleMode.Always, FeatureFlags(prefs).capsuleMode())
     }
 
     @Test fun changesEmitCurrentThenEachChange() = runTest {
         val flags = FeatureFlags(MemoryPrefs())
-        assertEquals(CapsuleMode.DuringTasks, flags.capsuleModeChanges().first())
+        assertEquals(CapsuleMode.Always, flags.capsuleModeChanges().first())
         val seen = mutableListOf<CapsuleMode>()
         val job = launch { flags.capsuleModeChanges().take(2).toList(seen) }
         runCurrent()
         flags.setCapsuleMode(CapsuleMode.Off)
         job.join()
-        assertEquals(listOf(CapsuleMode.DuringTasks, CapsuleMode.Off), seen)
+        assertEquals(listOf(CapsuleMode.Always, CapsuleMode.Off), seen)
     }
 
     /** 内存里的设置,改动时同步通知监听者(和系统实现一样在写入后回调)。 */

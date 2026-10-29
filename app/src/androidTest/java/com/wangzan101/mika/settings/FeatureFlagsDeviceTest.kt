@@ -29,13 +29,13 @@ class FeatureFlagsDeviceTest {
         }
     }
 
-    @Test fun capsuleDefaultsToDuringTasksAndKeepsChoice() {
+    @Test fun capsuleDefaultsToAlwaysAndKeepsChoice() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences("feature_flags_capsule_test", Context.MODE_PRIVATE)
         try {
             prefs.edit().clear().commit()
             val flags = FeatureFlags(prefs)
-            assertEquals(CapsuleMode.DuringTasks, flags.capsuleMode())
+            assertEquals(CapsuleMode.Always, flags.capsuleMode())
             flags.setCapsuleMode(CapsuleMode.Off)
             assertEquals(CapsuleMode.Off, FeatureFlags(prefs).capsuleMode())
         } finally {
