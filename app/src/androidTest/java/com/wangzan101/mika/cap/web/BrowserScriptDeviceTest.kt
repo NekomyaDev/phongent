@@ -254,12 +254,12 @@ class BrowserScriptDeviceTest {
         assertEquals("$SCRIPT_MAX_ACTIONS", page("window.clicks"))
     }
 
-    // 页上列着带「元」的价钱:这里的发送按花钱算,询问时脚本里不做
+    // 「提交订单」要花钱:询问时脚本里不做
     @Test
     fun irreversibleTapIsNotRun() = runBlocking<Unit> {
         val r = script("""
             const s = await mika.snapshot();
-            await mika.tap(s.elements.find(e => e.name === '发送'));
+            await mika.tap(s.elements.find(e => e.name === '提交订单'));
             return 'after';
         """.trimIndent())
         assertEquals(r.toString(), "confirmation_required", r.s("error"))
