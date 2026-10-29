@@ -44,7 +44,7 @@ class ScriptStepsTest {
     private fun shop() = FakeWebPort().apply {
         elements = listOf(
             UiElement("@e1", "button", "搜索", 540, 120, listOf(0, 0, 999, 100), "#go", true, false, false),
-            UiElement("@e2", "button", "发送", 540, 600, listOf(0, 200, 999, 300), "#send", true, false, false),
+            UiElement("@e2", "button", "提交订单", 540, 600, listOf(0, 200, 999, 300), "#order", true, false, false),
         )
     }
 

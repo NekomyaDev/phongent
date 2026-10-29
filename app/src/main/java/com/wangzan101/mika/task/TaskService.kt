@@ -187,11 +187,7 @@ class TaskService : Service() {
             }
             ACTION_APPROVE, ACTION_DECLINE -> {
                 val key = if (intent.hasExtra(ConfirmationNotifier.EXTRA_REQUEST)) intent.getIntExtra(ConfirmationNotifier.EXTRA_REQUEST, 0) else null
-                // 通知上的「同意」不带选择:只同意这一次
-                val choice = if (intent.action == ACTION_APPROVE) {
-                    ConfirmChoice.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_CHOICE) }?.takeIf { it.approved } ?: ConfirmChoice.Once
-                } else ConfirmChoice.Deny
-                run?.confirm(choice, key)
+                run?.confirm(if (intent.action == ACTION_APPROVE) ConfirmChoice.Once else ConfirmChoice.Deny, key)
             }
         }
         if (!taskState._busy.value) stopSelf(startId)
@@ -738,7 +734,6 @@ class TaskService : Service() {
         private const val EXTRA_ANSWER = "answer"
         /** 通知按钮所属任务的编号([TaskRun.key])。 */
         const val EXTRA_RUN = "com.wangzan101.mika.task.RUN"
-        const val EXTRA_CHOICE = "com.wangzan101.mika.task.CHOICE"
         /** 等用户回答确认最多这么久,到时按不同意(不在手机旁时任务不会一直挂着,也绝不自动同意)。 */
         const val CONFIRM_TIMEOUT_MS = 15 * 60_000L
         private const val KEY_REPLY = "reply"
@@ -835,17 +830,15 @@ class TaskService : Service() {
         }
 
         /** 同意编号为 [key] 的那次申报([ConfirmationNotifier.requestKey]);已经换成别的申报时不算数。 */
-        fun approve(context: Context, key: Int, runKey: String? = null, choice: ConfirmChoice = ConfirmChoice.Once) =
-            confirm(context, ACTION_APPROVE, key, runKey, choice)
+        fun approve(context: Context, key: Int, runKey: String? = null) = confirm(context, ACTION_APPROVE, key, runKey)
 
         /** 不同意:Agent 不再尝试这个操作,汇报现状后结束。 */
         fun decline(context: Context, key: Int, runKey: String? = null) = confirm(context, ACTION_DECLINE, key, runKey)
 
-        private fun confirm(context: Context, action: String, key: Int, runKey: String?, choice: ConfirmChoice = ConfirmChoice.Deny) {
+        private fun confirm(context: Context, action: String, key: Int, runKey: String?) {
             if (!stateFor(context, runKey).isActive()) return
             context.startService(
                 Intent(context, TaskService::class.java).setAction(action).putExtra(ConfirmationNotifier.EXTRA_REQUEST, key)
-                    .putExtra(EXTRA_CHOICE, choice.name)
                     .apply { if (runKey != null) putExtra(EXTRA_RUN, runKey) },
             )
         }

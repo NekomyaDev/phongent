@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.run
 
 import com.wangzan101.mika.core.action.ConfirmChoice
 
-/** 渠道入站在这里验主人、问题编号与底线权限；普通新消息始终新开任务。 */
+/** 渠道入站在这里验主人、问题编号与确认权限；普通新消息始终新开任务。 */
 class ChannelGateway(
     private val owners: OwnerIdentity,
     private val activeAsk: (String) -> Delivery.Ask?,
@@ -31,9 +31,7 @@ class ChannelGateway(
             }
             is ChannelInput.Confirm -> {
                 val ask = activeAsk(input.peer.threadId)
-                if (ask?.askId == input.askId && ask.kind == Delivery.Ask.Kind.Confirm &&
-                    channel.confirmationReach != ConfirmationReach.None &&
-                    (!ask.floor || channel.confirmationReach == ConfirmationReach.All)) {
+                if (ask?.askId == input.askId && ask.kind == Delivery.Ask.Kind.Confirm && channel.confirms) {
                     route.confirm(input.peer.threadId, ask.askId, input.choice)
                 }
             }

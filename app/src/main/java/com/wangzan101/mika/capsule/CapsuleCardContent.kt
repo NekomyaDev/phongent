@@ -79,7 +79,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wangzan101.mika.core.action.ConfirmChoice
+import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.core.userscreen.CapturedScreen
 import com.wangzan101.mika.ui.MarkdownText
 import com.wangzan101.mika.ui.ScreenCopy
@@ -115,12 +115,8 @@ object CardCopy {
     const val STOP = "停止"
     const val TAKE_OVER = "我来处理"
     const val RESUME = "继续"
-    const val APPROVE = "同意"
     const val APPROVE_ONCE_ONLY = "只同意这一次"
     const val DECLINE = "不同意"
-    const val ALLOW_TASK = "这个任务都允许"
-    const val ALLOW_ALWAYS = "以后都允许"
-    const val FLOOR_NOTE = "这类操作每次都要你同意。"
     const val SEE_PROCESS = "回到 Mika 看完整过程"
     const val BACK_TO_MIKA = "回到 Mika"
     const val SEND = "发送"
@@ -140,7 +136,7 @@ interface CardActions {
     fun takeOver(runKey: String)
     fun resume(runKey: String)
     fun answer(runKey: String, text: String)
-    fun approve(runKey: String, requestKey: Int, choice: ConfirmChoice)
+    fun approve(runKey: String, requestKey: Int)
     fun decline(runKey: String, requestKey: Int)
     fun openMika(conversationId: String)
     fun zoom(on: Boolean)
@@ -503,7 +499,7 @@ private fun Detail(
                             is CardContent.Confirm -> {
                                 Text(content.title, style = Strong, color = c.warn)
                                 Text(content.body, style = Body, color = c.ink2)
-                                Text(if (content.floor) CardCopy.FLOOR_NOTE else "「以后都允许」：${content.scope}", style = Sub, color = c.ink3)
+                                Text(ConfirmationCopy.NOTE, style = Sub, color = c.ink3)
                             }
                             is CardContent.Question -> Text(content.prompt, style = Body, color = c.ink)
                             is CardContent.Held -> Text(content.why, style = Body, color = c.ink2)
@@ -534,14 +530,8 @@ private fun Pinned(content: CardContent?, key: String, actions: CardActions) {
             }
             is CardContent.Confirm -> {
                 Spacer(Modifier.height(0.dp))
-                Action(if (content.floor) CardCopy.APPROVE_ONCE_ONLY else CardCopy.APPROVE, ButtonKind.Primary) {
-                    actions.approve(key, content.key, ConfirmChoice.Once)
-                }
+                Action(CardCopy.APPROVE_ONCE_ONLY, ButtonKind.Primary) { actions.approve(key, content.key) }
                 Action(CardCopy.DECLINE, ButtonKind.Tonal) { actions.decline(key, content.key) }
-                if (!content.floor) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    TextLink(CardCopy.ALLOW_TASK) { actions.approve(key, content.key, ConfirmChoice.Task) }
-                    TextLink(CardCopy.ALLOW_ALWAYS) { actions.approve(key, content.key, ConfirmChoice.Always) }
-                }
             }
             is CardContent.Question -> if (content.options.isNotEmpty()) {
                 Spacer(Modifier.height(0.dp))

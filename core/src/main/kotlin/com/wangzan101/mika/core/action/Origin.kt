@@ -12,7 +12,7 @@ enum class RefusalStyle { Model, Script, Code }
  */
 data class OriginPolicy(
     val source: String,
-    /** 能用用户的同意放行不可逆操作;其余来源命中就停,从不假设用户同意过。 */
+    /** 能用用户的同意放行付款;其余来源碰到付款就停,交还模型,从不假设用户同意过。 */
     val usesGrant: Boolean,
     /** 没配确认关卡时也判不可逆:子步命中就停,不靠关卡。 */
     val judgeWithoutGate: Boolean,
@@ -32,14 +32,9 @@ data class OriginPolicy(
     /** 被确认关卡拦下的这次调用本身就是交给模型的结果,照常记进运行记录。 */
     val recordsRefusal: Boolean,
     val refusals: RefusalStyle,
-    /** 对外的动作按不松于这个的模式判:用户选了更松的模式,这一来源也照它问。 */
-    val minMode: ApprovalMode,
 )
 
-/**
- * 一次动作从哪来;[step] 是它所在的循环轮次。以后的 MCP 调用、远程和定时任务也作为一种来源加在这里,
- * 它们的 [OriginPolicy.minMode] 不松于 SMART。
- */
+/** 一次动作从哪来;[step] 是它所在的循环轮次。 */
 sealed interface Origin {
     val step: Int
     val policy: OriginPolicy
@@ -74,33 +69,33 @@ sealed interface Origin {
         /** 一个页面脚本动作的上限:打开网址最多等 20 秒加载,再留余量等页面安静。 */
         const val SCRIPT_ACTION_CAP_MS = 40_000L
 
-        // 只有模型单步能经用户同意放行;其余来源对外的动作至少照 SMART 停下交还
+        // 只有模型单步能经用户同意放行付款;其余来源碰到付款就停下交还
         private val MODEL = OriginPolicy(
             "model", usesGrant = true, judgeWithoutGate = false, refuseUnresolved = false, stopOnGuardWarning = false,
             gatedByCaller = false, isolatedReads = false, actionCapMs = null, frames = Frames.Caller, routeTargets = true,
-            recordsRefusal = true, refusals = RefusalStyle.Model, minMode = ApprovalMode.HANDS_OFF,
+            recordsRefusal = true, refusals = RefusalStyle.Model,
         )
         private val BATCH = OriginPolicy(
             "batch", usesGrant = false, judgeWithoutGate = true, refuseUnresolved = true, stopOnGuardWarning = false,
             gatedByCaller = false, isolatedReads = false, actionCapMs = null, frames = Frames.WhenChanged, routeTargets = true,
-            recordsRefusal = false, refusals = RefusalStyle.Code, minMode = ApprovalMode.SMART,
+            recordsRefusal = false, refusals = RefusalStyle.Code,
         )
         // 脚本是网页上的一段程序,不能作为路线的一步回放
         private val SCRIPT = OriginPolicy(
             "script", usesGrant = false, judgeWithoutGate = true, refuseUnresolved = true, stopOnGuardWarning = false,
             gatedByCaller = false, isolatedReads = true, actionCapMs = SCRIPT_ACTION_CAP_MS, frames = Frames.WhenChanged, routeTargets = false,
-            recordsRefusal = false, refusals = RefusalStyle.Script, minMode = ApprovalMode.SMART,
+            recordsRefusal = false, refusals = RefusalStyle.Script,
         )
         // 回放与模型单步一致:没配确认关卡时不判
         private val REPLAY = OriginPolicy(
             "replay", usesGrant = false, judgeWithoutGate = false, refuseUnresolved = true, stopOnGuardWarning = true,
             gatedByCaller = true, isolatedReads = false, actionCapMs = null, frames = Frames.None, routeTargets = true,
-            recordsRefusal = false, refusals = RefusalStyle.Code, minMode = ApprovalMode.SMART,
+            recordsRefusal = false, refusals = RefusalStyle.Code,
         )
         private val MCP_TOOL = OriginPolicy(
             "mcp_tool", usesGrant = false, judgeWithoutGate = true, refuseUnresolved = true, stopOnGuardWarning = true,
             gatedByCaller = false, isolatedReads = false, actionCapMs = null, frames = Frames.None, routeTargets = false,
-            recordsRefusal = true, refusals = RefusalStyle.Code, minMode = ApprovalMode.SMART,
+            recordsRefusal = true, refusals = RefusalStyle.Code,
         )
     }
 }

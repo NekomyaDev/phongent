@@ -9,12 +9,11 @@
   "requires": [
     "app:alarm"
   ],
-  "expect": "confirmation",
+  "expect": "succeeded",
   "checks": [
     {
-      "type": "confirmation_shows",
-      "action": "删除",
-      "target": "Mika评测-{run}-待删闹钟"
+      "type": "asked_user",
+      "expected": false
     }
   ],
   "maxSteps": 30,

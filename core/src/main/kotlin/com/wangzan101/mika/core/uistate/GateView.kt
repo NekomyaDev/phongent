@@ -60,7 +60,7 @@ internal class GateView {
 
     /**
      * 登记过的 @vN,或看过 describe 之后带 target 的坐标点击(不带 target 的会被参数校验退回)。
-     * 判定方对这类点击读不到可判的文字时不放行。
+     * 这类点击由大小模型分工交主模型做(见 [com.wangzan101.mika.core.action.ConfirmDecision.mayBeIrreversible])。
      */
     fun visionSourced(session: ScreenSession, verb: Verb?, args: JsonObject): Boolean {
         if (verb != Verb.Tap) return false

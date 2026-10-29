@@ -23,6 +23,8 @@ object ConfirmationCopy {
     const val CONTENT_MAX = 60
     /** 展开的卡片和通知里内容最多显示的字数(和申报时的上限一致)。 */
     const val DETAIL_MAX = 200
+    /** 确认卡片上的说明:只有花钱的操作要你同意,每次只同意这一次。 */
+    const val NOTE = "花钱的操作每次都要你同意。"
 
     fun actionLabel(action: IrrevAction): String = when (action) {
         IrrevAction.send -> "发送"
@@ -37,12 +39,6 @@ object ConfirmationCopy {
 
     /** 收起的一行:「在 <App 名> · 对象:<对谁> · 内容:<前 60 字> · 金额:<多少>」;空的字段不写。 */
     fun body(r: ConfirmationRequest, appName: String): String = fields(r, appName, CONTENT_MAX).joinToString(" · ")
-
-    /** 任务内、长期授权覆盖的范围:同一 App 或网站、同一个对象、同一类操作。 */
-    fun scope(r: ConfirmationRequest, appName: String): String {
-        val target = plain(r.target).takeIf { it.isNotEmpty() }?.let { "对「$it」" }.orEmpty()
-        return "在「${plain(appName)}」里${target}的${actionLabel(r.action)}"
-    }
 
     /** 展开的卡片和通知大字:一行一个字段,内容显示完整(最多 200 字)。 */
     fun detail(r: ConfirmationRequest, appName: String): String = fields(r, appName, DETAIL_MAX).joinToString("\n")

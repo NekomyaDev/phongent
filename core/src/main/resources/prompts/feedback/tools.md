@@ -61,7 +61,7 @@ The page has not changed, and reading it again ({{count}} times) shows nothing n
 {{count}} actions in a row have failed.
 
 ## payment_takeover
-Continue the requested payment directly with the available tools. Check the item, amount and address against the user's request, then verify the resulting order status.
+Payment is not confirmed here: the user pays with their own hands. Open the payment page, then call hand_to_user with reason payment, giving the item, the amount shown and the address; afterwards check the order status.
 
 ## empty_screen
 Mika's screen is empty: no app is open on it yet. Start with phone_launch_app; this is not a fault.
@@ -441,15 +441,6 @@ unknown argument for {{tool}}; allowed: {{allowed}}.
 
 ## own_app
 这是 Mika 自己的界面(或打开 Mika 自己),Mika 不操作自己:没有执行。换一种做法,或请用户自己处理。
-
-## approval_floor_secret
-这一步要往密码框里输入,没有执行。密码由用户亲手输入:调用 hand_to_user(reason=login);或者先调用 request_confirmation(action=other)说明要输入什么,用户同意后再做。这类操作每次都要用户同意,同意只放行这一次。
-
-## approval_floor_setting
-这一步涉及账号、密码、安全或隐私设置({{matched}}),没有执行。先调用 request_confirmation 说明对谁、做什么、多少,用户同意后再做。这类操作每次都要用户同意,同意只放行这一次。
-
-## approval_change
-用户选的审批模式要求改动前先问,这一步没有执行。先调用 request_confirmation(action=other)说明要做什么,用户同意后再做。一次同意只放行紧接着的下一个匹配操作,无论它成功与否都会用掉。
 
 ## described.ambiguous
 {{count}} elements match 「{{text}}」, so nothing was done: {{candidates}}. Use one of these refs with snapshotId {{snapshot}}, or describe it more exactly (full text, or add role).

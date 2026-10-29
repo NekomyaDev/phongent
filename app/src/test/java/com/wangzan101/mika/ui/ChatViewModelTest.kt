@@ -516,8 +516,7 @@ class ChatViewModelTest {
         val waiting = TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.send, "张三", "明天见", null, "com.chat"))
         emit(waiting)
         val ex = vm.ui.value.exchanges.last()
-        assertEquals(ExchangeStatus.NeedsConfirmation("要你同意:发送", "在 聊天\n对象:张三\n内容:明天见", ConfirmationNotifier.requestKey(waiting),
-            scope = "在「聊天」里对「张三」的发送"), ex.status)
+        assertEquals(ExchangeStatus.NeedsConfirmation("要你同意:发送", "在 聊天\n对象:张三\n内容:明天见", ConfirmationNotifier.requestKey(waiting)), ex.status)
         assertEquals(StepState.Wait, ex.steps.last().state)
         assertEquals(PipMode.NeedsYou, vm.ui.value.pip.mode)
         assertEquals("等你同意", liveLine(ex))

@@ -18,7 +18,7 @@ sealed interface ActionOutcome {
     val before: List<GuardVerdict>
 
     /**
-     * 没有执行。[code]:guard_stopped / guard_warning / confirmation_required / confirmation_mismatch / target_unresolved / own_app。
+     * 没有执行。[code]:guard_stopped / guard_warning / confirmation_required / confirmation_mismatch / approval_unavailable / target_unresolved / own_app。
      * [content] 是交给这次调用方的结果(脚本子步、模型单步照它回;批和回放按 [code] 自己说明)。
      */
     data class Refused(
@@ -48,9 +48,6 @@ fun ActionOutcome.execution(): ToolExecution = when (this) {
     is ActionOutcome.Cancelled -> ToolExecution(buildJsonObject { put("ok", false); put("error", "cancelled"); put("executed", false) })
 }
 
-/** 为什么要问:[floor] 底线类别;[change] 是模式要求才问的改动。 */
-internal data class Ask(val floor: FloorKind?, val change: Boolean)
-
 /** 被拦下时交给调用方的说明,按来源的说法写。 */
 internal object Refusals {
     const val SINGLE_USE = "一次同意只放行紧接着的下一个匹配操作,无论它成功与否都会用掉。"
@@ -62,19 +59,19 @@ internal object Refusals {
         IrrevAction.order to "下单", IrrevAction.submit to "提交", IrrevAction.other to "其他",
     )
 
-    fun content(code: String, style: RefusalStyle, before: List<GuardVerdict>, hit: Irreversible?, reason: String?, ask: Ask? = null): JsonObject = when (style) {
+    fun content(code: String, style: RefusalStyle, before: List<GuardVerdict>, hit: Irreversible?, reason: String?): JsonObject = when (style) {
         // 模型单步被守卫叫停时任务就此结束,用不到说明
         RefusalStyle.Model -> if (hit == null) notRun(code, if (code == OWN_APP) Feedback["own_app"] else code) else {
-            val blocked = if (reason != null) mismatch(hit, reason) else required(hit, ask)
+            val blocked = if (reason != null) mismatch(hit, reason) else required(hit)
             if (before.isEmpty()) blocked else JsonObject(blocked + ("guard" to JsonArray(before.map { it.toJson() })))
         }
         RefusalStyle.Script -> {
             val message = when (code) {
                 "guard_stopped" -> "Mika's operation guard stopped the task."
                 "guard_warning" -> "Mika's operation guard flagged this action; it was not run."
-                "confirmation_required" -> "this is an irreversible action (${hit?.matched})"
-                "confirmation_mismatch" -> "this irreversible action (${hit?.matched}) does not match what the user approved ($reason)"
-                "approval_unavailable" -> "this run cannot obtain the required approval; the action was not run"
+                "confirmation_required" -> "this step spends money (${hit?.matched})"
+                "confirmation_mismatch" -> "this payment step (${hit?.matched}) does not match what the user approved ($reason)"
+                "approval_unavailable" -> "this step spends money and this run cannot get the user's approval; the action was not run"
                 "target_unresolved" -> "that ref is not on the latest snapshot; call mika.snapshot() again"
                 OWN_APP -> Feedback["own_app"]
                 else -> error("unknown refusal $code")
@@ -84,16 +81,11 @@ internal object Refusals {
         RefusalStyle.Code -> notRun(code, code)
     }
 
-    private fun required(hit: Irreversible, ask: Ask?) = buildJsonObject {
+    private fun required(hit: Irreversible) = buildJsonObject {
         put("ok", false); put("error", "confirmation_required")
         put("action", hit.action.name); put("matched", hit.matched)
-        put("message", when {
-            hit.action == IrrevAction.pay -> "这一步是付款,没有执行。$PAYMENT_TAKEOVER"
-            ask?.floor == FloorKind.Secret -> Feedback["approval_floor_secret"]
-            ask?.floor == FloorKind.Account || ask?.floor == FloorKind.Security -> Feedback.format("approval_floor_setting", "matched" to hit.matched)
-            ask?.change == true -> Feedback["approval_change"]
-            else -> "这一步是不可逆操作(${ACTION_LABELS[hit.action]})。先调用 request_confirmation 说明对谁、做什么、多少,用户同意后再做。$SINGLE_USE"
-        })
+        put("message", if (hit.action == IrrevAction.pay) "这一步是付款,没有执行。$PAYMENT_TAKEOVER"
+            else "这一步要花钱(${ACTION_LABELS[hit.action]}),没有执行。先调用 request_confirmation 说明在哪、买什么、多少钱,用户同意后再做。$SINGLE_USE")
         put("recoverable", true); put("counts_as_failure", false)
     }
 

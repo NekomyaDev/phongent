@@ -64,6 +64,6 @@ Recalled earlier screenshots, in the order of the view_past_screens result entri
 ### loop result 1.o2
 {"ok":false,"error":"parallel_tool_call_skipped","message":"Phone actions run one at a time. Observe the result of the first action, then try again."}
 ### loop result 1.c
-{"ok":false,"error":"confirmation_mismatch","message":"app com.y is not the app on screen now (com.x). Observe, then call request_confirmation again with the package of the app on screen.","recoverable":true}
+{"ok":false,"error":"invalid_arguments","message":"amount: required","recoverable":true}
 ### loop result 2.c
-{"ok":false,"error":"unknown_tool","tool":"request_confirmation","message":"request_confirmation is not available.","recoverable":true}
+{"ok":false,"error":"invalid_arguments","message":"amount: required","recoverable":true}

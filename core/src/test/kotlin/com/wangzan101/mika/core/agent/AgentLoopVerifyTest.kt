@@ -73,7 +73,7 @@ class AgentLoopVerifyTest {
     // 用户同意了一次操作,模型却没做就回了话:提醒一次照做或说明为什么不做;第二次照常收下,不再提醒
     @Test fun approvalThenTextIsNudgedOnce() = runTest {
         val main = FakeModel(
-            observe(), tools(call("request_confirmation", """{"action":"send","target":"张三","content":"明天见","app":"com.x"}""")),
+            observe(), tools(call("request_confirmation", """{"action":"send","target":"张三","content":"转账 ¥25","amount":"¥25","app":"com.x"}""")),
             text("好的,我现在去发送"), text("没有发出去:找不到发送按钮"),
         )
         val l = loop(main)

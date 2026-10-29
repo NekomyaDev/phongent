@@ -7,7 +7,6 @@ import com.wangzan101.mika.chat.SharedFile
 import com.wangzan101.mika.cap.sandbox.ImportResult
 import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.confirm.ConfirmationNotifier
-import com.wangzan101.mika.core.action.ConfirmChoice
 import com.wangzan101.mika.core.agent.Conversation
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.task.TaskGate
@@ -56,8 +55,6 @@ interface TaskActions {
     /** [key] 是卡片所属的那次申报。 */
     fun approve(key: Int)
     fun decline(key: Int)
-    /** 同意,并按 [choice] 记成这个任务都允许或以后都允许。 */
-    fun approveAs(key: Int, choice: ConfirmChoice) = approve(key)
     /** 并行任务时让服务显示这个对话的任务(只管显示:对外的状态流跟着它)。 */
     fun show(conversationId: String) {}
 
@@ -70,7 +67,6 @@ interface TaskActions {
     fun skipIn(conversationId: String) = skip()
     fun answerIn(conversationId: String, text: String) = answer(text)
     fun approveIn(conversationId: String, key: Int) = approve(key)
-    fun approveAsIn(conversationId: String, key: Int, choice: ConfirmChoice) = approveAs(key, choice)
     fun declineIn(conversationId: String, key: Int) = decline(key)
 }
 
@@ -95,10 +91,10 @@ sealed interface ExchangeStatus {
     ) : ExchangeStatus
     data class NeedsInput(val prompt: String, val options: List<String>?) : ExchangeStatus
     /**
-     * 等用户同意一次不可逆操作;[title]「要你同意:<动作>」,[body] 一行一个字段(App、对象、完整内容、金额)。
-     * [key] 是这次申报的编号,按钮带着它,点在旧卡片上不算数。[scope] 是「以后都允许」覆盖的范围;底线操作([floor])只能同意这一次。
+     * 等用户同意一次要花钱的操作(只能同意这一次);[title]「要你同意:<动作>」,[body] 一行一个字段(App、对象、完整内容、金额)。
+     * [key] 是这次申报的编号,按钮带着它,点在旧卡片上不算数。
      */
-    data class NeedsConfirmation(val title: String, val body: String, val key: Int, val floor: Boolean = false, val scope: String = "") : ExchangeStatus
+    data class NeedsConfirmation(val title: String, val body: String, val key: Int) : ExchangeStatus
     data class Paused(val why: String) : ExchangeStatus
     /**
      * [verified] 为 false 表示办完了但没能核实,[note] 是原因;这时不打绿勾。[unconfirmed] 是回答里核对后仍没找到出处的几处,
@@ -796,8 +792,6 @@ class ChatViewModel(
     fun skip() = act({ actions.skip() }) { actions.skipIn(it) }
     fun answer(text: String) = act({ actions.answer(text) }) { actions.answerIn(it, text) }
     fun approve(key: Int) = act({ actions.approve(key) }) { actions.approveIn(it, key) }
-    fun approve(key: Int, choice: ConfirmChoice) =
-        if (choice == ConfirmChoice.Once) approve(key) else act({ actions.approveAs(key, choice) }) { actions.approveAsIn(it, key, choice) }
     fun decline(key: Int) = act({ actions.decline(key) }) { actions.declineIn(it, key) }
 
     /**
@@ -988,7 +982,7 @@ class ChatViewModel(
                 draft = null,
                 status = ExchangeStatus.NeedsConfirmation(
                     ConfirmationCopy.title(s.request), ConfirmationCopy.detail(s.request, appLabel(s.request.app)),
-                    ConfirmationNotifier.requestKey(s), s.floor, ConfirmationCopy.scope(s.request, appLabel(s.request.app)),
+                    ConfirmationNotifier.requestKey(s),
                 ),
             )
             // 回答原样显示(不再有模型写的依据段);来源由运行记录里代码记下的那份给出

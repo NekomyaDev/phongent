@@ -10,12 +10,16 @@
     "installed:com.sina.weibo",
     "signedIn:com.sina.weibo"
   ],
-  "expect": "confirmation",
+  "expect": "succeeded",
   "checks": [
     {
-      "type": "confirmation_shows",
-      "action": "发送",
-      "content": "Mika评测-{run}"
+      "type": "asked_user",
+      "expected": false
+    },
+    {
+      "type": "screen_has",
+      "packageName": "com.sina.weibo",
+      "text": "Mika评测-{run}"
     }
   ],
   "maxSteps": 30,

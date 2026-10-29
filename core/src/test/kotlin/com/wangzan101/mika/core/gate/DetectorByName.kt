@@ -16,8 +16,5 @@ internal fun IrreversibleDetector.needsCheck(tool: String, args: JsonObject) = n
 internal fun IrreversibleDetector.classify(tool: String, args: JsonObject, snapshot: ScreenSnapshot?, fresh: ScreenSnapshot? = null) =
     classify(gateTargetOf(tool), args, snapshot, fresh)
 
-internal fun IrreversibleDetector.hasLabelAt(tool: String, args: JsonObject, snapshot: ScreenSnapshot?, fresh: ScreenSnapshot? = null) =
-    hasLabelAt(gateTargetOf(tool), args, snapshot, fresh)
-
 internal fun IrreversibleDetector.unresolved(tool: String, args: JsonObject, snapshot: ScreenSnapshot?, fresh: ScreenSnapshot? = null) =
     unresolved(gateTargetOf(tool), args, snapshot, fresh)

@@ -1,10 +1,6 @@
 package com.wangzan101.mika.core.gate
 
-import com.wangzan101.mika.core.action.Acted
-import com.wangzan101.mika.core.action.ClassifiedRisk
 import com.wangzan101.mika.core.action.ConfirmChoice
-import com.wangzan101.mika.core.action.GrantKey
-import com.wangzan101.mika.core.action.GrantScope
 import com.wangzan101.mika.core.risk.IrrevAction
 import com.wangzan101.mika.core.uistate.ScreenSnapshot
 import com.wangzan101.mika.core.uistate.UiElement
@@ -12,7 +8,7 @@ import java.math.BigDecimal
 import kotlin.math.abs
 import com.wangzan101.mika.core.tool.Verb
 
-/** 模型申报的一次不可逆操作;字段已去首尾空白、截短,界面上照此显示。[app] 是包名。 */
+/** 模型申报的一次要花钱的操作;字段已去首尾空白、截短,界面上照此显示。[app] 是包名。 */
 data class ConfirmationRequest(val action: IrrevAction, val target: String, val content: String, val amount: String?, val app: String)
 
 sealed interface DeclareResult {
@@ -34,26 +30,19 @@ sealed interface Permit {
 }
 
 /**
- * 用户对不可逆操作的同意:只放行紧接着的那一个匹配操作。
+ * 用户对一次要花钱的操作的同意(询问时只有付款要问):只放行紧接着的那一个匹配操作。
  * 同意绑定申报内容:同一前台 App、同类动作、对象出现在屏上(发送时在标题栏),发送时要发的字与申报相等,
- * 下单时申报的金额在屏上;
+ * 申报的金额在屏上;
  * 下一次命中的不可逆操作无论对不对得上都用掉它。中间做了打字以外的写操作(包括返回、打开 App)、
- * 或过了 [MAX_STEPS] 步,同意作废。只在一次任务内有效,任务开始和结束时 [reset]。
- * 用户选「这个任务都允许」「以后都允许」时,第一次真的放行那一步时按那一步绑定授权([bind]):任务内的记在这里,
- * 任务结束清空;底线申报([ClassifiedRisk.requestFloor])、底线动作只能同意这一次。任务循环和界面回答可能在不同线程,读写都加锁。
+ * 或过了 [MAX_STEPS] 步,同意作废。只能同意这一次;只在一次任务内有效,任务开始和结束时 [reset]。
+ * 任务循环和界面回答可能在不同线程,读写都加锁。
  */
 class ConfirmationGate {
-    private class Grant(val request: ConfirmationRequest, val step: Int, val scope: GrantScope)
+    private class Grant(val request: ConfirmationRequest, val step: Int)
 
     private var pending: ConfirmationRequest? = null
     private var grant: Grant? = null
-    /** 刚放行、还没绑定的那次同意。 */
-    private var used: Grant? = null
     private val declined = mutableSetOf<Pair<IrrevAction, String>>()
-    private val taskGrants = mutableListOf<GrantKey>()
-
-    /** 等着回答的申报是底线操作:按申报本身判。 */
-    val pendingFloor: Boolean @Synchronized get() = pending?.let(ClassifiedRisk::requestFloor) == true
 
     @Synchronized fun declare(req: ConfirmationRequest, foregroundApp: String?): DeclareResult {
         if (req.action == IrrevAction.pay) return DeclareResult.Unsupported
@@ -68,7 +57,7 @@ class ConfirmationGate {
         decide(if (approved) ConfirmChoice.Once else ConfirmChoice.Deny, step)
     }
 
-    /** 按用户的选择记一次性同意;选任务内或长期的,放行时再按那一步绑定。底线申报只记这一次。 */
+    /** 按用户的选择记一次性同意。 */
     @Synchronized fun decide(choice: ConfirmChoice, step: Int) {
         val req = pending ?: return
         pending = null
@@ -76,30 +65,8 @@ class ConfirmationGate {
             declined += req.action to req.app
             return
         }
-        val scope = when {
-            ClassifiedRisk.requestFloor(req) -> GrantScope.Once
-            choice == ConfirmChoice.Task -> GrantScope.Task
-            choice == ConfirmChoice.Always -> GrantScope.Standing
-            else -> GrantScope.Once
-        }
-        grant = Grant(req, step, scope)
+        grant = Grant(req, step)
     }
-
-    /**
-     * 刚放行的那次同意是任务内或长期的:按这一步实际作用的 [acted] 绑定([acted] 为 null 时是底线、看不清或认不出对象,不绑定)。
-     * 返回绑好的范围和它的有效期;任务内的已记下,长期的由调用方存。
-     */
-    @Synchronized fun bind(acted: Acted?): Pair<GrantKey, GrantScope>? {
-        val g = used ?: return null
-        used = null
-        if (g.scope == GrantScope.Once || acted == null) return null
-        val key = acted.bind(g.request) ?: return null
-        if (key !in taskGrants) taskGrants += key
-        return key to g.scope
-    }
-
-    /** 本任务里有一条任务内授权覆盖这一步。 */
-    @Synchronized fun taskCovers(acted: Acted): Boolean = taskGrants.any { it.covers(acted) }
 
     /**
      * [screen] 是此刻的一屏;[typing] 是这一步要输入并回车的文字(type_text 时)。
@@ -109,7 +76,6 @@ class ConfirmationGate {
     @Synchronized fun permits(hit: Irreversible, screen: ScreenSnapshot?, step: Int, typing: String? = null, seen: List<String> = emptyList()): Permit {
         val g = grant ?: return Permit.NoGrant
         grant = null
-        used = null
         val r = g.request
         val reason = when {
             hit.action == IrrevAction.pay -> "payment is never approved here"
@@ -118,11 +84,8 @@ class ConfirmationGate {
             screen?.packageName == null || screen.packageName != r.app -> "approved in ${r.app} but the screen shows ${screen?.packageName ?: "unknown"}"
             !targetShown(r, screen) && !(textless(screen) && seenShows(r, seen)) -> "the target \"${r.target}\" is not shown " + (if (r.action == IrrevAction.send) "in the title area" else "on the screen")
             r.action == IrrevAction.send && !contentMatches(r.content, screen, typing) && !(textless(screen) && seenShows(r, seen)) -> "the text to send is not exactly what was approved"
-            r.action == IrrevAction.order && !amountShown(r.amount, screen, hit.matched) -> "the approved amount ${r.amount ?: "(none)"} is not on the screen"
-            else -> {
-                used = g
-                return Permit.Allowed
-            }
+            !amountShown(r.amount, screen, hit.matched) -> "the approved amount ${r.amount ?: "(none)"} is not on the screen"
+            else -> return Permit.Allowed
         }
         return Permit.Mismatch(reason)
     }
@@ -151,9 +114,7 @@ class ConfirmationGate {
     @Synchronized fun reset() {
         pending = null
         grant = null
-        used = null
         declined.clear()
-        taskGrants.clear()
     }
 
     /**

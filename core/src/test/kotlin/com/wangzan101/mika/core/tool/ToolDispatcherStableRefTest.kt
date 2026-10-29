@@ -158,7 +158,7 @@ class ToolDispatcherStableRefTest {
             reply(Part.ToolCall("c", "phone_tap", """{"ref":"@e1","snapshotId":"p2"}""")),
             com.wangzan101.mika.core.testing.answerReply("没发"),
         )
-        val s = ScriptedScreen(listOf("发送", "返回"), listOf("新的", "发送", "返回"))
+        val s = ScriptedScreen(listOf("提交订单", "返回"), listOf("新的", "提交订单", "返回"))
         kotlinx.coroutines.runBlocking {
             AgentLoop(m, toolDispatcher(s, stableRefs = true), "BASE", sink = sink,
                 confirmations = com.wangzan101.mika.core.gate.ConfirmationGate()).run("看看")

@@ -26,7 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.wangzan101.mika.core.action.ConfirmChoice
+import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.ui.theme.MikaTheme
 import org.junit.Assert.assertEquals
@@ -45,7 +45,7 @@ class CapsuleCardContentTest {
         override fun takeOver(runKey: String) { calls += "takeOver $runKey" }
         override fun resume(runKey: String) { calls += "resume $runKey" }
         override fun answer(runKey: String, text: String) { calls += "answer $runKey $text" }
-        override fun approve(runKey: String, requestKey: Int, choice: ConfirmChoice) { calls += "approve $runKey $requestKey $choice" }
+        override fun approve(runKey: String, requestKey: Int) { calls += "approve $runKey $requestKey" }
         override fun decline(runKey: String, requestKey: Int) { calls += "decline $runKey $requestKey" }
         override fun openMika(conversationId: String) { calls += "open $conversationId" }
         override fun zoom(on: Boolean) { calls += "zoom $on" }
@@ -191,23 +191,14 @@ class CapsuleCardContentTest {
         compose.onNodeWithText(CardCopy.TAKE_OVER).assertDoesNotExist()
     }
 
-    @Test fun confirmOffersOnceDeclineAndWiderGrants() {
+    // 只有花钱的操作要同意:卡片上只有「只同意这一次」和「不同意」
+    @Test fun confirmOffersOnceOrDecline() {
         val r = run("a", TaskState.Idle, CapsuleKind.NeedConfirm)
-        show(CardView.Detail(r, CardContent.Confirm("要你同意:发送", "在 聊天\n内容:明天见", 7, floor = false, scope = "在「聊天」里的发送")))
-        compose.onNodeWithText(CardCopy.APPROVE).performClick()
-        compose.onNodeWithText(CardCopy.DECLINE).performClick()
-        compose.onNodeWithText(CardCopy.ALLOW_TASK).performClick()
-        compose.onNodeWithText(CardCopy.ALLOW_ALWAYS).performClick()
-        assertEquals(listOf("approve a 7 Once", "decline a 7", "approve a 7 Task", "approve a 7 Always"), calls)
-    }
-
-    @Test fun floorConfirmOnlyOnce() {
-        val r = run("a", TaskState.Idle, CapsuleKind.NeedConfirm)
-        show(CardView.Detail(r, CardContent.Confirm("要你同意:付款", "金额:¥19.9", 9, floor = true, scope = "")))
-        compose.onNodeWithText(CardCopy.FLOOR_NOTE).assertIsDisplayed()
-        compose.onNodeWithText(CardCopy.ALLOW_TASK).assertDoesNotExist()
+        show(CardView.Detail(r, CardContent.Confirm("要你同意:下单", "金额:¥19.9", 9)))
+        compose.onNodeWithText(ConfirmationCopy.NOTE).assertIsDisplayed()
         compose.onNodeWithText(CardCopy.APPROVE_ONCE_ONLY).performClick()
-        assertEquals(listOf("approve a 9 Once"), calls)
+        compose.onNodeWithText(CardCopy.DECLINE).performClick()
+        assertEquals(listOf("approve a 9", "decline a 9"), calls)
     }
 
     @Test fun questionOptionsAnswer() {

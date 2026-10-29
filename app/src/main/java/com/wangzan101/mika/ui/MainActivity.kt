@@ -328,14 +328,9 @@ private fun MikaRoot(store: ProviderStore, monitor: SystemStatusMonitor, activit
                 onLogout = { WebSites.login(context).logout(it) },
                 onLogoutAll = { WebSites.logoutAll(context) },
             )
-            val grants by app.approvals.standing.items.collectAsState()
-            val standing = StandingGrantsState(
-                grants, appLabel = { ConfirmationNotifier.appLabel(context, it) },
-                onRevoke = app.approvals.standing::revoke, onRevokeAll = app.approvals.standing::clear,
-            )
             val autonomous by app.approvals.autonomous.collectAsState()
             SettingsScreen(store, status, release, onFix, onBack = back, onOpenMemory = { nav.push(Route.Memory) },
-                onOpenModels = { nav.push(Route.Models) }, webSites = webSites, standingGrants = standing,
+                onOpenModels = { nav.push(Route.Models) }, webSites = webSites,
                 autonomous = autonomous, onAutonomous = app.approvalControl::setAutonomous,
                 updateVersion = updateState.update?.version, onOpenAbout = { nav.push(Route.About) })
         }

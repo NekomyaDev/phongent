@@ -149,7 +149,9 @@ class ToolDispatcherInteractTest {
 
     // ---------- 不可逆确认 ----------
 
-    private fun shop(vararg e: UiElement) = FakeWebPort().apply { elements = e.toList() }
+    /** 购物车页,屏上有应付金额:这里命中不可逆判定的动作都要花钱,询问时要先同意(只有花钱才问)。 */
+    private fun shop(vararg e: UiElement) = FakeWebPort().apply { elements = e.toList() + total }
+    private val total = UiElement("@e9", "text", "合计 ¥25", 300, 1700, listOf(0, 800, 600, 860), null, false, false, false)
     private val field = UiElement("@e1", "edit", "留言", 500, 500, listOf(0, 400, 999, 600), null, true, true, false, focused = true)
     private val trash = UiElement("@e2", "button", "删除", 900, 2300, listOf(700, 940, 990, 990), null, true, false, false)
 

@@ -3,7 +3,6 @@ package com.wangzan101.mika.core.mcp
 import com.wangzan101.mika.core.action.ActionExecutor
 import com.wangzan101.mika.core.action.ActionRecorder
 import com.wangzan101.mika.core.action.ApprovalSettings
-import com.wangzan101.mika.core.action.FixedApprovals
 import com.wangzan101.mika.core.action.Origin
 import com.wangzan101.mika.core.action.execution
 import com.wangzan101.mika.core.guard.OperationGuards
@@ -83,7 +82,7 @@ class McpServer(
     private val assemble: (RunSpec) -> ToolDispatcher,
     private val tasks: McpTaskHost,
     private val store: RunStore = MemoryRunStore(),
-    private val approvals: ApprovalSettings = FixedApprovals(),
+    private val approvals: ApprovalSettings = ApprovalSettings.ASK,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     fun openToolSession(threadId: String, attendance: Attendance = Attendance.Unattended): McpToolSession {

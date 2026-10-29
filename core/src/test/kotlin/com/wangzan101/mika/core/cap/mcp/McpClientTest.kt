@@ -1,10 +1,8 @@
 package com.wangzan101.mika.core.cap.mcp
 
 import com.wangzan101.mika.core.action.ActionRisk
-import com.wangzan101.mika.core.action.ApprovalMode
 import com.wangzan101.mika.core.action.ConfirmDecision
 import com.wangzan101.mika.core.action.Decision
-import com.wangzan101.mika.core.action.FixedApprovals
 import com.wangzan101.mika.core.action.Origin
 import com.wangzan101.mika.core.assembly.toolDispatcher
 import com.wangzan101.mika.core.model.Part
@@ -70,16 +68,16 @@ class McpClientTest {
         assertEquals(10, result.observations.single().text.length)
     }
 
-    @Test fun unattendedExternalMcpCallIsDeniedBeforeTransport() = runBlocking {
+    @Test fun unattendedExternalMcpCallIsNotAskedAndNotCalledByTheJudge() = runBlocking {
         val endpoint = FakeEndpoint().apply {
             offered = listOf(McpToolDescriptor("send", "Send", buildJsonObject { put("type", "object") },
                 McpAnnotations(openWorldHint = true)))
         }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
-        val decision = ConfirmDecision(tools, null, FixedApprovals(ApprovalMode.HANDS_OFF),
-            provenance = RunProvenance(RunOrigin.Trigger, Attendance.Unattended))
+        // 不花钱的对外调用:无人值守也直接做(只记审批),不在判定时就调服务端
+        val decision = ConfirmDecision(tools, null, provenance = RunProvenance(RunOrigin.Trigger, Attendance.Unattended))
             .judge("mcp_demo__send", buildJsonObject {}, Origin.Model(1))
-        assertEquals(Decision.Denied, decision)
+        assertEquals(Decision.Clear, decision)
         assertEquals(0, endpoint.calls)
     }
 }

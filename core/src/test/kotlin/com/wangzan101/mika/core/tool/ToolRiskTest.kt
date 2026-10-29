@@ -1,9 +1,7 @@
 package com.wangzan101.mika.core.tool
 
 import com.wangzan101.mika.core.gate.gateTargetOf
-import com.wangzan101.mika.core.gate.hasLabelAt
 import com.wangzan101.mika.core.risk.GateTarget
-import com.wangzan101.mika.core.gate.IrreversibleDetector
 import com.wangzan101.mika.core.model.Part
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -70,9 +68,6 @@ class ToolRiskTest {
         val old = perVerb.flatMap { (v, g) -> listOf("phone_$v" to g, "web_$v" to g) }.toMap() +
             mapOf("web_upload" to GateTarget.FileControl, "web_interact" to GateTarget.Interact)
         for (t in allTools().map { it.name } + "do_steps" + "unknown") assertEquals(t, old[t], gateTargetOf(t))
-        // 只有点击会是看图得来的点、会留「判不清」的痕
-        val any = JsonObject(emptyMap())
-        for (t in old.keys) assertEquals(t, !t.endsWith("_tap"), IrreversibleDetector.hasLabelAt(t, any, null))
     }
 
     @Test fun everyToolDeclaresOneGroupAndUniqueName() {

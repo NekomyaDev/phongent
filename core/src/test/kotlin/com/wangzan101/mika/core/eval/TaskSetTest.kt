@@ -130,30 +130,36 @@ class TaskSetTest {
         }
     }
 
-    @Test fun irreversibleTasksExpectConfirmation() {
+    /** 询问时只有花钱的那一步先问:下单题停在确认卡片上;发送、删除这类不花钱的题直接做完,不先问。 */
+    @Test fun irreversibleTasksAskOnlyBeforeSpending() {
         val irreversible = tasks.map { it.second }.filter { it.category == EvalCategory.Irreversible }
         assertTrue(irreversible.isNotEmpty())
-        irreversible.forEach { t ->
-            assertEquals(t.id, Expect.Confirmation, t.expect)
+        val (spending, free) = irreversible.partition { it.expect == Expect.Confirmation }
+        assertTrue(spending.isNotEmpty() && free.isNotEmpty())
+        spending.forEach { t ->
             val card = t.checks.filterIsInstance<Check.ConfirmationShows>()
-            assertTrue("${t.id}: 没有 confirmation_shows", card.isNotEmpty())
-            assertTrue("${t.id}: 卡片要核对做什么", card.all { it.action != null })
-            val action = card.mapNotNull { it.action }.joinToString()
-            val outward = listOf("发送", "发布", "下单").any { it in action }
-            // 对外发出或花钱的动作:卡片上要看得出对谁或发什么;下单还要看得出在哪家、多少钱
-            if (outward) assertTrue("${t.id}: 要核对对象或内容", card.any { it.target != null || it.content != null })
-            if ("下单" in action) assertTrue("${t.id}: 下单要核对对象和金额", card.any { it.target != null && it.amount != null })
-            // 这些题会碰真实账号:只在用户在场、人工标记账号已登录后才跑
-            if (outward) {
+            // 卡片上要看得出在哪家、做什么、多少钱
+            assertTrue("${t.id}: 只有下单要确认", card.isNotEmpty() && card.all { it.action == "下单" })
+            assertTrue("${t.id}: 下单要核对对象和金额", card.any { it.target != null && it.amount != null })
+            // 会花真实账号的钱:只在用户在场、人工标记账号已登录后才跑
+            assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
+            assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
+        }
+        free.forEach { t ->
+            assertEquals(t.id, Expect.Succeeded, t.expect)
+            assertTrue("${t.id}: 不花钱的题不该有确认卡片", t.checks.none { it is Check.ConfirmationShows })
+            // 用户说清了要做什么就不该再问;只有删哪条这类只有用户知道的才问
+            val asked = t.checks.filterIsInstance<Check.AskedUser>()
+            assertTrue("${t.id}: 要核对问没问用户", asked.size == 1)
+            // 不可逆的事只做在这道题自己带标记的数据上
+            val marker = t.marker
+            assertTrue("${t.id}: 要有含 {run} 的 marker", marker != null && "{run}" in marker)
+            assertTrue("${t.id}: 目标里要写 marker", marker!! in t.goal)
+            // 发到真实账号的题:只在用户在场、人工标记账号已登录后才跑,发出后到 App 里核对
+            if (t.apps.any { !it.startsWith("{app:") }) {
                 assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
                 assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
-            }
-            // 删除只删这道题自己先造出来的带标记的数据
-            if ("删除" in action) {
-                val marker = t.marker
-                assertTrue("${t.id}: 删除题要有含 {run} 的 marker", marker != null && "{run}" in marker)
-                assertTrue("${t.id}: 目标里要先造出带标记的数据", marker!! in t.goal)
-                assertTrue("${t.id}: 卡片对象要是这条标记数据", card.any { it.target?.contains(marker) == true })
+                assertTrue("${t.id}: 要按 marker 核对发出去了", t.checks.any { it is Check.ScreenHas && marker in it.text })
             }
         }
     }

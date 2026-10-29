@@ -23,13 +23,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 一屏:登录、两个关注、删除、一个搜索框;记下端口收到的动作。 */
+/** 一屏:登录、两个关注、删除、一个搜索框和「提交订单」;记下端口收到的动作。 */
 private class Shop : ScreenPort by FakeScreen() {
     val calls = mutableListOf<String>()
     private var reads = 0
     private val shown = listOf(
         button("@e1", "登录", y = 100), button("@e2", "关注", y = 300), button("@e3", "关注", y = 400),
         button("@e4", "删除", y = 500), field("@e5", "搜索商品", y = 700).copy(placeholder = "搜索商品"),
+        button("@e6", "提交订单", y = 900),
     )
     override suspend fun snapshot() = ScreenSnapshot("s${++reads}", "com.shop", shown, 1080, 2400)
     override suspend fun peek() = ScreenSnapshot("peek", "com.shop", shown, 1080, 2400)
@@ -79,11 +80,14 @@ class DescribedActionsTest {
 
     @Test fun describedTargetGoesThroughTheSameApproval() = runTest {
         val screen = Shop()
-        val o = run(executor(toolDispatcher(screen)), "phone_tap", """{"element":"删除"}""")
+        val o = run(executor(toolDispatcher(screen)), "phone_tap", """{"element":"提交订单"}""")
         o as ActionOutcome.Refused
         assertEquals("confirmation_required", o.code)
-        assertEquals(IrrevAction.delete, o.hit?.action)
+        assertEquals(IrrevAction.order, o.hit?.action)
         assertTrue(screen.calls.isEmpty())
+        // 删除不花钱:按描述找到就做
+        assertTrue(run(executor(toolDispatcher(screen)), "phone_tap", """{"element":"删除"}""") is ActionOutcome.Ran)
+        assertEquals(listOf("tap @e4"), screen.calls)
     }
 
     @Test fun descriptionWithARefIsRejected() = runTest {
@@ -150,18 +154,15 @@ class DescribedActionsTest {
         assertTrue(actions, "\"dialog\"" in actions)
     }
 
-    @Test fun pageDialogIsShownAndAnsweredThroughTheGate() = runTest {
+    @Test fun pageDialogIsShownAndAnsweredWithoutAskingWhenItSpendsNoMoney() = runTest {
         val web = FakeWebPort().apply { dialog = PageDialog(PageDialog.CONFIRM, "确定删除这条记录吗?") }
         val tools = toolDispatcher(FakeScreen(), web = web)
         val seen = tools.execute(Part.ToolCall("o", "web_observe", "{}")).content
         assertEquals(JsonPrimitive("确定删除这条记录吗?"), (seen["dialog"] as JsonObject)["message"])
         val e = executor(tools)
         val accept = run(e, "web_interact", """{"action":"dialog","answer":"accept"}""")
-        accept as ActionOutcome.Refused
-        assertEquals(IrrevAction.delete, accept.hit?.action)
-        assertTrue(web.calls.none { it.startsWith("dialog") })
-        run(e, "web_interact", """{"action":"dialog","answer":"dismiss"}""")
-        assertTrue(web.calls.toString(), "dialog false -" in web.calls)
+        assertTrue("$accept", accept is ActionOutcome.Ran)
+        assertTrue(web.calls.toString(), "dialog true -" in web.calls)
         val none = content(run(e, "web_interact", """{"action":"dialog","answer":"accept"}"""))
         assertEquals(JsonPrimitive("no_dialog"), none["error"])
     }

@@ -4,15 +4,13 @@ import com.wangzan101.mika.core.action.ConfirmChoice
 
 data class ChannelPeer(val channelId: String, val peerId: String, val threadId: String)
 
-enum class ConfirmationReach { None, NonFloor, All }
-
 sealed interface Delivery {
     val id: String
     val threadId: String
 
     data class Ask(
         override val id: String, override val threadId: String, val askId: String,
-        val kind: Kind, val text: String, val floor: Boolean = false,
+        val kind: Kind, val text: String,
     ) : Delivery {
         enum class Kind { Input, Confirm, Takeover }
     }
@@ -39,7 +37,8 @@ enum class SendOutcome { Delivered, Failed, Uncertain }
 /** 渠道负责收发，不决定谁是主人、谁能批准。 */
 interface Channel {
     val id: String
-    val confirmationReach: ConfirmationReach
+    /** 能在这个渠道里回答付款确认(只有付款要问,只在手机上同意)。 */
+    val confirms: Boolean
     fun isAlive(peer: ChannelPeer): Boolean = true
     fun start(sink: ChannelInputSink): AutoCloseable
     suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome

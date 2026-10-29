@@ -53,18 +53,17 @@ class ActionExecutor(
     val recorder: ActionRecorder,
     /** 不动屏幕的工具的守卫;没有为 null。 */
     private val offScreen: OffScreenGuard? = null,
-    approvals: ApprovalSettings = FixedApprovals(),
+    approvals: ApprovalSettings = ApprovalSettings.ASK,
     provenance: RunProvenance = RunProvenance(),
     selfPackage: String? = null,
-    reviewer: SmartReviewer? = null,
     autonomous: Boolean = false,
     /** 同一网站、App 里连着做对外动作(发送、提交)时两次之间的间隔(见 [OutwardPacing]);默认不等。 */
     private val pacing: OutwardPacing = OutwardPacing.Off,
 ) {
-    private val decision = ConfirmDecision(tools, confirmations, approvals, recorder = recorder, reviewer = reviewer, provenance = provenance, selfPackage = selfPackage, autonomous = autonomous)
+    private val decision = ConfirmDecision(tools, confirmations, approvals, recorder = recorder, provenance = provenance, selfPackage = selfPackage, autonomous = autonomous)
     private val pass = ActionPass()
 
-    /** 配了确认关卡(不可逆操作能经用户同意后做)。 */
+    /** 配了确认关卡(付款能经用户同意后做)。 */
     val confirms: Boolean = confirmations != null
 
     /** 不动屏幕的工具的守卫叫停的结论;没叫停为 null。 */
@@ -119,8 +118,8 @@ class ActionExecutor(
         // 没有可用的同意就不执行,也不计入失败熔断
         val d = decision.judge(call.name, args, origin)
         when (d) {
-            is Decision.Required -> return blocked(call, args, origin, before, d.hit, null, followUp, Ask(d.floor, d.change))
-            is Decision.Mismatch -> return blocked(call, args, origin, before, d.hit, d.reason, followUp, null)
+            is Decision.Required -> return blocked(call, args, origin, before, d.hit, null, followUp)
+            is Decision.Mismatch -> return blocked(call, args, origin, before, d.hit, d.reason, followUp)
             Decision.Denied -> return refuse("approval_unavailable", origin, before)
             Decision.Unresolved -> return refuse("target_unresolved", origin, before)
             Decision.OwnApp -> return ownApp(call, args, origin, before, followUp)
@@ -284,11 +283,10 @@ class ActionExecutor(
 
     private fun blocked(
         call: Part.ToolCall, args: JsonObject, origin: Origin, before: List<GuardVerdict>, hit: Irreversible, reason: String?, followUp: FollowUp,
-        ask: Ask?,
     ): ActionOutcome {
         recorder.confirmation(hit, if (reason != null) "mismatch" else "required")
         val code = if (reason != null) "confirmation_mismatch" else "confirmation_required"
-        val content = Refusals.content(code, origin.policy.refusals, before, hit, reason, ask)
+        val content = Refusals.content(code, origin.policy.refusals, before, hit, reason)
         if (origin.policy.recordsRefusal) {
             followUp.refused(content)
             recorder.result(origin.step, call.name, tools.verb(call.name), content, tools.portRecord(call.name, args), null, null, 0, origin.policy.source, call.id)

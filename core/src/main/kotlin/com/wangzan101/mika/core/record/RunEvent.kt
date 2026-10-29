@@ -175,20 +175,13 @@ sealed interface RunEvent {
     ) : RunEvent
 
     /**
-     * 一次对外、不可逆或底线动作的审批结论(代码判的,不是模型自述)。[source] 是谁发起的(model / batch / script / replay);
-     * [mode] 是用户此刻的审批模式;[decision] allowed / required / mismatch;[grant] 放行用的授权(once / task / standing),
-     * 模式本身放行时为 null;[floor] 是底线类别。
+     * 一次对外、不可逆或要花钱的动作的审批结论(代码判的,不是模型自述)。[source] 是谁发起的(model / batch / script / replay);
+     * [payment] 为 true 时这一步要花钱(询问时只有它要用户同意);[decision] allowed / required / mismatch / denied。
      */
     @Serializable @SerialName("approval")
     data class Approval(
         override val atMs: Long, val step: Int, val source: String, val tool: String, val action: String, val matched: String,
-        val risk: String, val floor: String?, val mode: String, val decision: String, val grant: String?,
-    ) : RunEvent
-
-    /** 授权的增减:[op] added / revoked / cleared;[scope] task / standing。 */
-    @Serializable @SerialName("grant")
-    data class Grant(
-        override val atMs: Long, val op: String, val action: String, val app: String, val target: String, val element: String, val scope: String,
+        val risk: String, val payment: Boolean = false, val decision: String,
     ) : RunEvent
 
     @Serializable @SerialName("takeover")

@@ -198,10 +198,10 @@ class BatchRunner(
                     put("error", "confirmation_required")
                     stop.extra.forEach { (k, v) -> put(k, v) }
                     val what = stop.extra["matched"]?.let { (it as JsonPrimitive).content }
-                    put("message", "Step ${stop.index + 1} of ${steps.size} is an irreversible action ($what). " +
-                        "It was not run, and the steps after it were not run either. Irreversible actions never go in do_steps: " +
-                        if (executor.confirms) "call request_confirmation first, and after the user agrees do that step on its own as your very next action."
-                        else "do not do it as part of a batch; decide on its own whether the task really needs it.")
+                    put("message", "Step ${stop.index + 1} of ${steps.size} spends money ($what). " +
+                        "It was not run, and the steps after it were not run either. Payment steps never go in do_steps: " +
+                        if (executor.confirms) "follow the step's message (request_confirmation, or hand_to_user for a payment), then do that step on its own as a single tool call."
+                        else "do it on its own as a single tool call, not as part of a batch.")
                     put("counts_as_failure", false)
                 }
                 NEW_MESSAGE -> {

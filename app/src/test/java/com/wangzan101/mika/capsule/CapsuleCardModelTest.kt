@@ -114,14 +114,13 @@ class CapsuleCardModelTest {
         assertNull((CapsuleCards.content(card("c", s, CapsuleKind.NeedTakeover)) as CardContent.Takeover).queueLine)
     }
 
-    @Test fun confirmUsesTheChatCardCopyAndFloor() {
-        val s = TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.pay, "店", "两支牙膏", "¥19.9", "com.shop"), floor = true)
-        val ex = Exchange("g", emptyList(), ExchangeStatus.NeedsConfirmation("要你同意:付款", "在 购物\n金额:¥19.9", 42, floor = true, scope = "s"), live = true)
-        assertEquals(CardContent.Confirm("要你同意:付款", "在 购物\n金额:¥19.9", 42, true, "s"), CapsuleCards.content(card("a", s, CapsuleKind.NeedConfirm, exchange = ex)))
+    @Test fun confirmUsesTheChatCardCopy() {
+        val s = TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.order, "店", "两支牙膏", "¥19.9", "com.shop"))
+        val ex = Exchange("g", emptyList(), ExchangeStatus.NeedsConfirmation("要你同意:下单", "在 购物\n金额:¥19.9", 42), live = true)
+        assertEquals(CardContent.Confirm("要你同意:下单", "在 购物\n金额:¥19.9", 42), CapsuleCards.content(card("a", s, CapsuleKind.NeedConfirm, exchange = ex)))
         // 还没有这一问一答时也能同意:编号和对话页、通知用的同一个
         val raw = CapsuleCards.content(card("a", s, CapsuleKind.NeedConfirm)) as CardContent.Confirm
         assertEquals(System.identityHashCode(s), raw.key)
-        assertTrue(raw.floor)
         assertTrue(raw.body.contains("金额:¥19.9"))
     }
 

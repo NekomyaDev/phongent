@@ -61,8 +61,8 @@ internal class UserExchange(
         activeAsk = null
     }
 
-    private fun ask(kind: Delivery.Ask.Kind, text: String, floor: Boolean = false): Delivery.Ask =
-        Delivery.Ask(UUID.randomUUID().toString(), threadId, UUID.randomUUID().toString(), kind, text, floor)
+    private fun ask(kind: Delivery.Ask.Kind, text: String): Delivery.Ask =
+        Delivery.Ask(UUID.randomUUID().toString(), threadId, UUID.randomUUID().toString(), kind, text)
 
     private suspend fun announce(ask: Delivery.Ask): DeliveryState {
         activeAsk = ask
@@ -194,16 +194,16 @@ internal class UserExchange(
             emit(event("declined_unattended"))
             return error("confirmation_declined", CONFIRMATION_DECLINED, recoverable = false)
         }
-        val pending = CompletableDeferred<ConfirmChoice>().also { confirmationReply = it }
-        val floor = g.pendingFloor
-        if (floor && provenance.origin != RunOrigin.Ui) {
+        // 付款只在手机上同意:渠道、定时、MCP 发起的任务不问
+        if (provenance.origin != RunOrigin.Ui) {
             g.decide(ConfirmChoice.Deny, step)
-            emit(event("declined_remote_floor"))
+            emit(event("declined_remote"))
             return error("confirmation_declined", CONFIRMATION_DECLINED, recoverable = false)
         }
-        val ask = ask(Delivery.Ask.Kind.Confirm, "${r.action.name}: ${r.target} ${r.content}", floor)
+        val pending = CompletableDeferred<ConfirmChoice>().also { confirmationReply = it }
+        val ask = ask(Delivery.Ask.Kind.Confirm, "${r.action.name}: ${r.target} ${r.content}")
         activeAsk = ask
-        setState(TaskState.WaitingConfirmation(r, floor))
+        setState(TaskState.WaitingConfirmation(r))
         emit(event(null))
         // 没人回答(不在手机旁)就按不同意,绝不自动同意
         val timeout = if (provenance.attendance == Attendance.Reachable) confirmTimeoutMs ?: 15 * 60_000L else confirmTimeoutMs
@@ -211,14 +211,11 @@ internal class UserExchange(
             if (announce(ask) == DeliveryState.Failed) null
             else if (timeout == null) pending.await() else withTimeoutOrNull(timeout) { pending.await() }
         } finally { confirmationReply = null; resolve(ask) }
-        // 底线操作只能同意这一次
-        val choice = answer?.let { if (floor && it.approved) ConfirmChoice.Once else it } ?: ConfirmChoice.Deny
+        val choice = answer ?: ConfirmChoice.Deny
         g.decide(choice, step)
         setState(running)
         emit(event(when {
             answer == null -> "timed_out"
-            choice == ConfirmChoice.Task -> "approved_task"
-            choice == ConfirmChoice.Always -> "approved_always"
             choice.approved -> "approved"
             else -> "declined"
         }))

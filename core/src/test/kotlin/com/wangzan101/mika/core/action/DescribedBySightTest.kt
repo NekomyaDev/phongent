@@ -74,13 +74,13 @@ class DescribedBySightTest {
         assertTrue(screen.calls.isEmpty())
     }
 
-    @Test fun boxFoundOnASendButtonGoesThroughTheIrreversibleCheck() = runTest {
+    @Test fun boxFoundOnASendButtonIsUsedWithoutAsking() = runTest {
+        // 判过不可逆:是发送,不花钱,不先问
         val screen = Blind()
         val vision = model("""{"bbox_2d":[800,880,999,940],"seen":"发送"}""", "是")
         val o = type(executor(screen, vision), """{"element":"右下角的框","text":"明天见"}""")
-        o as ActionOutcome.Refused
-        assertEquals("confirmation_required", o.code)
-        assertTrue(screen.calls.isEmpty())
+        assertTrue("$o", o is ActionOutcome.Ran)
+        assertTrue(screen.calls.isNotEmpty())
     }
 
     @Test fun readableTreeWithoutAMatchDoesNotLookBySight() = runTest {

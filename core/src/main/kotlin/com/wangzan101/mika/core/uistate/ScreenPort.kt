@@ -27,7 +27,7 @@ fun normalize(p: Int, size: Int): Int {
  * 屏幕上的一个元素。ref 形如 "@e3";center 为像素(端口内部用,交给模型前换成 0–999);bounds 为 [l,t,r,b],已归一到 0–999。
  * [hint]:输入框里显示的是提示语/预置词(name 就是它),不是已经输入的内容。
  * [focused]:有输入焦点(回车、空格作用在它上面)。
- * [secret]:密码框(往里打字每次都要用户同意)。
+ * [secret]:密码框。
  * [placeholder]:输入框自己的提示语(打了字之后也还在,和此刻显示的 [name] 无关);没有为 null。
  * [searchField]:控件按自己的语义就是搜索框(网页的 type=search、role=searchbox、回车键标成搜索;安卓的搜索框控件)。
  * [states]:控件此刻为真的状态([UiStates] 里的名字:选中、勾上、展开、按下、不可用);判动作效果时开关一拨就看得出。

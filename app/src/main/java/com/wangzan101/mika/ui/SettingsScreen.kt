@@ -59,7 +59,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** 设置里能进入的子页面;[Home] 是设置首页。 */
-private enum class SettingsPage { Home, Usage, PhoneOps, DuringWork, Capsule, Notifications, WebSites, Grants, Sandbox, Routes, Recovery, Developer, RunStats }
+private enum class SettingsPage { Home, Usage, PhoneOps, DuringWork, Capsule, Notifications, WebSites, Sandbox, Routes, Recovery, Developer, RunStats }
 
 /**
  * 设置页:总状态卡 + 基本 / 隐私与数据 / 高级 / 关于四组。各子页面在这里切换(返回键先回首页),
@@ -75,7 +75,6 @@ fun SettingsScreen(
     onOpenModels: () -> Unit,
     onOpenMemory: (() -> Unit)? = null,
     webSites: WebSitesState? = null,
-    standingGrants: StandingGrantsState? = null,
     /** 开发者选项里的「自主模式」:当前值和换它的办法。 */
     autonomous: Boolean = false,
     onAutonomous: (Boolean) -> Unit = {},
@@ -150,7 +149,6 @@ fun SettingsScreen(
             onOpenNotifications = { notificationsFrom = SettingsPage.Home; page = SettingsPage.Notifications },
             onOpenMemory = onOpenMemory,
             webSitesCount = webSites?.sites?.size, onOpenWebSites = { page = SettingsPage.WebSites },
-            grantsCount = standingGrants?.items?.size, onOpenGrants = { page = SettingsPage.Grants },
             sandbox = sandboxStatus, onOpenSandbox = { page = SettingsPage.Sandbox },
             routes = routeCount, onOpenRoutes = { page = SettingsPage.Routes },
             onOpenRecovery = { page = SettingsPage.Recovery },
@@ -170,9 +168,8 @@ fun SettingsScreen(
             parallel, onParallelMax = { flags.setParallelMax(it); parallelMax = it }, onBack = toHome,
         )
         SettingsPage.Capsule -> CapsuleScreen(capsuleMode, onMode = { flags.setCapsuleMode(it); capsuleMode = it }, onBack = toHome)
-        // 没有数据时首页不显示入口,走不到这两页
+        // 没有数据时首页不显示入口,走不到这一页
         SettingsPage.WebSites -> webSites?.let { WebSitesScreen(it, onBack = toHome) }
-        SettingsPage.Grants -> standingGrants?.let { StandingGrantsScreen(it, onBack = toHome) }
         SettingsPage.Sandbox -> SandboxScreen(onBack = toHome)
         SettingsPage.Routes -> RoutesScreen(
             routeCount,
@@ -233,8 +230,6 @@ fun SettingsContent(
     onOpenMemory: (() -> Unit)? = null,
     webSitesCount: Int? = null,
     onOpenWebSites: () -> Unit = {},
-    grantsCount: Int? = null,
-    onOpenGrants: () -> Unit = {},
     sandbox: SandboxStatus? = null,
     onOpenSandbox: () -> Unit = {},
     /** 已记住的操作路线条数;为空(还没读出来)时不显示这一行。 */
@@ -279,7 +274,7 @@ fun SettingsContent(
             }
         }
 
-        val privacyRows = onOpenMemory != null || webSitesCount != null || grantsCount != null
+        val privacyRows = onOpenMemory != null || webSitesCount != null
         if (privacyRows) {
             GroupLabel("隐私与数据")
             GroupCard {
@@ -290,9 +285,6 @@ fun SettingsContent(
                 }
                 webSitesCount?.let {
                     ListRow(MikaIcons.Globe, "网站登录", first = take(), onClick = onOpenWebSites) { RowValue("$it 个"); RowChevron() }
-                }
-                grantsCount?.let {
-                    ListRow(MikaIcons.Shield, "长期授权", first = take(), onClick = onOpenGrants) { RowValue("$it 项"); RowChevron() }
                 }
             }
         }

@@ -263,12 +263,6 @@ fun WebSitesScreen(state: WebSitesState, onBack: () -> Unit) {
     PageScaffold("网站登录", onBack) { WebSitesSection(state, labeled = false) }
 }
 
-/** 设置 › 长期授权。 */
-@Composable
-fun StandingGrantsScreen(state: StandingGrantsState, onBack: () -> Unit) {
-    PageScaffold("长期授权", onBack) { StandingGrantsSection(state, labeled = false) }
-}
-
 // ---------- 高级 ----------
 
 /** 设置 › 文件与计算环境:允许脚本联网、重置运行环境。 */

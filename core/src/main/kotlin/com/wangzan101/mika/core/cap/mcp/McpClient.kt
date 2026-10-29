@@ -1,7 +1,6 @@
 package com.wangzan101.mika.core.cap.mcp
 
 import com.wangzan101.mika.core.action.ActionRisk
-import com.wangzan101.mika.core.action.FloorKind
 import com.wangzan101.mika.core.action.Risk as ApprovalRisk
 import com.wangzan101.mika.core.capability.Capability
 import com.wangzan101.mika.core.capability.CapabilityStatus
@@ -64,9 +63,9 @@ data class McpConnection(
     init { require(previewChars > 0 && (maxCostUnits == null || maxCostUnits >= 0)) }
 }
 
-/** 没有只读注解就按可写处理；破坏性与开放世界操作进入更高的审批层。 */
+/** 没有只读注解就按可写处理；破坏性与开放世界操作记成不可逆、对外(审批记录据此知道任务做过对外的事)。 */
 fun mcpApprovalRisk(a: McpAnnotations, trust: McpTrust = McpTrust.TrustAnnotations): ApprovalRisk = when {
-    a.destructiveHint == true -> ApprovalRisk(ActionRisk.Irreversible, FloorKind.Unreadable)
+    a.destructiveHint == true -> ApprovalRisk(ActionRisk.Irreversible)
     a.openWorldHint == true -> ApprovalRisk(ActionRisk.External)
     a.readOnlyHint == true && trust == McpTrust.TrustAnnotations -> ApprovalRisk(ActionRisk.Read)
     else -> ApprovalRisk(ActionRisk.Change)

@@ -116,7 +116,7 @@ internal class ModelCaller(
 
     private fun needsMain(call: Part.ToolCall): Boolean =
         ModelRouter.mainOnly(call.name, tools.verb(call.name)) ||
-            (!autonomous && ConfirmDecision.mayNeedConfirmation(tools, call.name, parseArgs(call.argsJson)))
+            (!autonomous && ConfirmDecision.mayBeIrreversible(tools, call.name, parseArgs(call.argsJson)))
 
     /** 问 [using](默认主模型):发出的是给它看的那份历史([viewFor])压缩后的副本。 */
     suspend fun ask(history: List<Message>, specs: List<ToolSpec>, using: ChatModel = model, onText: ((String) -> Unit)? = null): ModelReply =

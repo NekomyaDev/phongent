@@ -285,20 +285,6 @@ object IrreversibleDetector {
     }
 
     /**
-     * 点击作用的那一点上有没有可判的文字:目标元素(连同没名字容器里的文字)有名字,
-     * 或坐标点击时同一行有带名字的矮元素。看图找到的点没有可判的文字时,判定方不放行。
-     */
-    fun hasLabelAt(target: GateTarget?, args: JsonObject, snapshot: ScreenSnapshot?, fresh: ScreenSnapshot? = null): Boolean {
-        if (target != GateTarget.Tap) return true
-        val targets = tapTargets(args, snapshot, fresh)
-        if (targets.any { (e, s) -> withChildren(e, s).any { it.name.isNotBlank() } }) return true
-        if (str(args, "ref") != null) return false
-        val s = fresh ?: snapshot ?: return false
-        val y = num(args, "y") ?: return false
-        return rowElements(s, y).isNotEmpty()
-    }
-
-    /**
      * 这一屏是付款页或付款面板:有确认支付、支付密码一类字样,或有金额且像付款面板
      * (商品页、规格面板不算)。返回命中的依据;不是为 null。
      */

@@ -4,7 +4,6 @@ import android.app.Application
 import android.net.Uri
 import android.util.Log
 import com.wangzan101.mika.chat.ConversationStore
-import com.wangzan101.mika.core.action.ConfirmChoice
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import com.wangzan101.mika.cap.sandbox.AndroidSandbox
 import com.wangzan101.mika.cap.sandbox.Attachments
@@ -129,7 +128,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     /** 用户发来的屏幕(跟着各自的对话存在工作区里)。 */
     val userScreens: com.wangzan101.mika.chat.UserScreenFiles by lazy { com.wangzan101.mika.chat.UserScreenFiles(this) }
 
-    /** 全局审批模式与长期授权:整个进程一份,设置页和各任务共用。 */
+    /** 全局的询问 / 自主:整个进程一份,设置页和各任务共用。 */
     val approvals: ApprovalStore by lazy { ApprovalStore(java.io.File(filesDir, "approvals.json")) }
 
     /** 全局的询问 / 自主和各任务自己的那一份;开发者选项里的「自主模式」经它改。 */
@@ -167,7 +166,6 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 override fun skip() = TaskService.skip(app)
                 override fun answer(text: String) = TaskService.answer(app, text)
                 override fun approve(key: Int) = TaskService.approve(app, key)
-                override fun approveAs(key: Int, choice: ConfirmChoice) = TaskService.approve(app, key, choice = choice)
                 override fun decline(key: Int) = TaskService.decline(app, key)
                 override fun show(conversationId: String) = taskState.show(conversationId)
 
@@ -181,9 +179,6 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 override fun skipIn(conversationId: String) { key(conversationId)?.let { TaskService.skip(app, runKey = it) } }
                 override fun answerIn(conversationId: String, text: String) { key(conversationId)?.let { TaskService.answer(app, text, it) } }
                 override fun approveIn(conversationId: String, key: Int) { key(conversationId)?.let { TaskService.approve(app, key, it) } }
-                override fun approveAsIn(conversationId: String, key: Int, choice: ConfirmChoice) {
-                    key(conversationId)?.let { TaskService.approve(app, key, it, choice) }
-                }
                 override fun declineIn(conversationId: String, key: Int) { key(conversationId)?.let { TaskService.decline(app, key, it) } }
             },
             conversations,

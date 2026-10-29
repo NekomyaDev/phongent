@@ -33,7 +33,6 @@ import com.wangzan101.mika.cap.phone.a11y.OverlayPlacement
 import com.wangzan101.mika.cap.phone.a11y.OverlayWindow
 import com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility
 import com.wangzan101.mika.confirm.ConfirmationNotifier
-import com.wangzan101.mika.core.action.ConfirmChoice
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.core.record.RunEvent
@@ -920,7 +919,7 @@ class CapsuleController(
         }
         override fun resume(runKey: String) = TaskService.resume(context, runKey)
         override fun answer(runKey: String, text: String) = TaskService.answer(context, text, runKey)
-        override fun approve(runKey: String, requestKey: Int, choice: ConfirmChoice) = TaskService.approve(context, requestKey, runKey, choice)
+        override fun approve(runKey: String, requestKey: Int) = TaskService.approve(context, requestKey, runKey)
         override fun decline(runKey: String, requestKey: Int) = TaskService.decline(context, requestKey, runKey)
         override fun openMika(conversationId: String) {
             open(conversationId)

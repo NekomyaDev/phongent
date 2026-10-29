@@ -48,9 +48,9 @@ class ReplayNoticeSurfaceTest {
         })
         items += "diverged, executed without effect" to notice(Notes.screen().apply { links.clear() })
         items += "diverged with error code" to notice(FailingTap(Notes.screen()))
-        val send = Notes.steps.take(1) + RouteStep("phone_tap", "{}", Selector("button", "发送", "n:id/send", listOf(0, 900, 300, 999), 0, true), Notes.homeA, Notes.editorA)
+        val send = Notes.steps.take(1) + RouteStep("phone_tap", "{}", Selector("button", "提交订单", "n:id/send", listOf(0, 900, 300, 999), 0, true), Notes.homeA, Notes.editorA)
         items += "stopped for confirmation" to notice(Notes.screen().apply {
-            pages["home"] = Notes.home + ui("@e5", "button", "发送", listOf(0, 900, 300, 999), rid = "n:id/send")
+            pages["home"] = Notes.home + ui("@e5", "button", "提交订单", listOf(0, 900, 300, 999), rid = "n:id/send")
         }, Notes.route(send))
         PromptSurface.check("feedback-replay", PromptSurface.entries(items))
     }

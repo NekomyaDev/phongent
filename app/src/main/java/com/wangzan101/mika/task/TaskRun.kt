@@ -546,7 +546,7 @@ class TaskRun(
                         conversationId = conversationId, inlineScreen = speed.inlineScreen,
                         adaptiveVision = speed.adaptiveVision)
                     AgentLoop(model, childTools, SystemPrompt.identity(), maxSteps = childSpec.stepBudget ?: AgentLoop.UNLIMITED_STEPS,
-                        // 子任务跟着询问 / 自主;询问时它也过关卡,而子任务的对外、底线动作一律不做
+                        // 子任务跟着询问 / 自主;询问时它也过关卡,子任务里花钱的一步一律不做
                         confirmations = runApproval.gate(), approvals = runApproval, autonomous = runApproval.startedAutonomous,
                         reviewFinalAnswer = false, flags = speed, outwardPacing = OutwardPacing.human())
                 },
@@ -598,7 +598,7 @@ class TaskRun(
                 maxSteps = env.evalHooks.maxSteps ?: AgentLoop.UNLIMITED_STEPS,
                 reviewFinalAnswer = false,
                 inputTimeoutMs = TaskService.INPUT_TIMEOUT_MS,
-                // 询问 / 自主:询问时不可逆、对外的操作先问(有确认关卡和 request_confirmation);自主时不问。
+                // 询问 / 自主:询问时只有花钱的一步先问(有确认关卡和 request_confirmation);自主时连付款也不问。
                 // 开工时询问、中途换成自主的,下一步起不再问;开工时自主的,换成询问留给下一个任务
                 confirmations = runApproval.gate(),
                 approvals = runApproval,

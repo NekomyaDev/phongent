@@ -14,7 +14,6 @@ import com.wangzan101.mika.core.action.ActionRecorder
 import com.wangzan101.mika.core.action.OutwardPacing
 import com.wangzan101.mika.core.action.ApprovalSettings
 import com.wangzan101.mika.core.action.ConfirmChoice
-import com.wangzan101.mika.core.action.FixedApprovals
 import com.wangzan101.mika.core.action.FollowUp
 import com.wangzan101.mika.core.action.Origin
 import com.wangzan101.mika.core.action.Presented
@@ -109,10 +108,10 @@ class AgentLoop(
     private val installedApps: suspend () -> List<Pair<String, String>> = { emptyList() },
     /** 最终回答交出前、按风险才请的独立核查(见 [AnswerReview]);为 null 时只做字面核对(产品路径必须给)。 */
     private val verifier: Verifier? = null,
-    /** 旧确认关卡；自主执行路径传 null，也不向模型提供 request_confirmation。 */
+    /** 付款的确认关卡；自主执行路径传 null，也不向模型提供 request_confirmation。 */
     private val confirmations: ConfirmationGate? = ConfirmationGate(),
-    /** 审批模式与长期授权;默认 SMART。 */
-    private val approvals: ApprovalSettings = FixedApprovals(),
+    /** 询问 / 自主(中途换成自主时从下一步起照它);默认询问。 */
+    private val approvals: ApprovalSettings = ApprovalSettings.ASK,
     /** 等用户回答确认的时限,到时按不同意;为 null 时一直等(测试)。 */
     confirmTimeoutMs: Long? = null,
     /** Mika 自己的包名:作用在它上面的写操作不做。 */
@@ -143,7 +142,6 @@ class AgentLoop(
     /** 不带调用的回复收下当最终回答之前问一次(见 [BeforeAccept]);默认照收。步数用完后的最后一轮不问。 */
     private val beforeAccept: suspend (answer: String) -> BeforeAccept = { BeforeAccept.Accept },
     private val interaction: Interaction = LocalInteraction,
-    private val smartReviewer: com.wangzan101.mika.core.action.SmartReviewer? = null,
     private val profileSnapshot: List<ProfileEntry> = emptyList(),
     private val autonomous: Boolean = false,
     /** 交互界面开启可见文字流；评测和后台调用保持原请求格式。 */
@@ -359,7 +357,7 @@ class AgentLoop(
         val recorder = ActionRecorder(sink, clock, saveScreen = { id, png -> sink.media(id, png) })
         val executor = ActionExecutor(tools, guards, confirmations, gate = ::awaitGate, recorder = recorder, offScreen = tools.offScreenGuard(), approvals = approvals,
             provenance = provenance,
-            selfPackage = selfPackage, reviewer = smartReviewer, autonomous = autonomous, pacing = outwardPacing)
+            selfPackage = selfPackage, autonomous = autonomous, pacing = outwardPacing)
         var emptyNudged = false
         // 调过工具才有可核对的材料;交给用户付款和放行过对外动作一样,回答要另请核查
         var acted = false

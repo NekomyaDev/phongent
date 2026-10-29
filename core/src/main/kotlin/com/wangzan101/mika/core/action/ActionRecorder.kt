@@ -52,15 +52,11 @@ class ActionRecorder(
     var outwardActs = 0
         private set
 
-    fun approval(origin: Origin, tool: String, hit: Irreversible, risk: Risk, mode: ApprovalMode, decision: String, grant: GrantScope?) {
+    fun approval(origin: Origin, tool: String, hit: Irreversible, risk: Risk, decision: String) {
         if (decision == "allowed" && risk.level.outward) outwardActs++
         event(RunEvent.Approval(clock(), origin.step, origin.policy.source, tool, hit.action.name, RunEvent.clip(Redactor.text(hit.matched)),
-            risk.level.name, risk.floor?.name, mode.name, decision, grant?.name?.lowercase()))
+            risk.level.name, risk.payment, decision))
     }
-
-    /** 授权的增减([op]:added / revoked / cleared);[scope] 是任务内或长期。 */
-    fun grant(op: String, key: GrantKey, scope: GrantScope) =
-        event(RunEvent.Grant(clock(), op, key.action.name, key.app, RunEvent.clip(Redactor.text(key.target)), RunEvent.clip(key.element), scope.name.lowercase()))
 
     /** 一次调用的结果;[content] 是交给模型(或调用方)的那份,[extra] 是只进运行记录的字段。 */
     fun result(

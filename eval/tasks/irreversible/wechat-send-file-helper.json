@@ -10,13 +10,16 @@
     "installed:com.tencent.mm",
     "signedIn:com.tencent.mm"
   ],
-  "expect": "confirmation",
+  "expect": "succeeded",
   "checks": [
     {
-      "type": "confirmation_shows",
-      "action": "发送",
-      "target": "文件传输助手",
-      "content": "Mika评测-{run}"
+      "type": "asked_user",
+      "expected": false
+    },
+    {
+      "type": "screen_has",
+      "packageName": "com.tencent.mm",
+      "text": "Mika评测-{run}"
     }
   ],
   "maxSteps": 30,

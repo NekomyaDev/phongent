@@ -33,9 +33,9 @@ private fun tools(vararg calls: Part.ToolCall) = ModelReply(calls.toList(), Stop
 private fun finish() = com.wangzan101.mika.core.testing.answerReply("done")
 
 /** 屏上只有一个「发送」按钮。 */
-private class SendScreen(private val inner: FakeScreen = FakeScreen()) : com.wangzan101.mika.core.uistate.ScreenPort by inner {
+private class SendScreen(private val label: String = "发送", private val inner: FakeScreen = FakeScreen()) : com.wangzan101.mika.core.uistate.ScreenPort by inner {
     override suspend fun snapshot() = ScreenSnapshot("s1", "com.x",
-        listOf(UiElement("@e1", "button", "发送", 500, 500, listOf(400, 450, 600, 550), null, true, false, false)), 1080, 2400)
+        listOf(UiElement("@e1", "button", label, 500, 500, listOf(400, 450, 600, 550), null, true, false, false)), 1080, 2400)
 }
 
 class AgentLoopLightTest {
@@ -88,12 +88,12 @@ class AgentLoopLightTest {
     }
 
     @Test fun confirmationBlockedStepForcesMain() = runTest {
-        // 第 2 步主模型点「发送」被确认关卡拦下:之后两步主模型,第 5 步才轮到轻量模型
+        // 第 2 步主模型点「提交订单」被确认关卡拦下:之后两步主模型,第 5 步才轮到轻量模型
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_tap", """{"ref":"@e1","snapshotId":"s1"}""")),
             tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(tools(call("phone_observe")), finish()))
         val sink = Events()
-        loop(main, light, sink, SendScreen()).run("t")
+        loop(main, light, sink, SendScreen("提交订单")).run("t")
         assertEquals(listOf("main", "main", "main", "main", "light", "light_rejected", "main"),
             sink.list.filterIsInstance<RunEvent.ModelReply>().map { it.role })
         assertTrue((sink.list.filterIsInstance<RunEvent.ToolResult>().first { it.tool == "phone_tap" }).resultJson.contains("confirmation_required"))

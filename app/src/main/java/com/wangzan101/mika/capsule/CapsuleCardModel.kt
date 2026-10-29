@@ -61,8 +61,8 @@ sealed interface CardContent {
      */
     data class Takeover(val need: String, val body: String, val queueLine: String?, val canTakeOver: Boolean) : CardContent
 
-    /** 要你同意:和对话页的确认卡片同一套字和编号 [key];底线操作([floor])只能同意这一次。 */
-    data class Confirm(val title: String, val body: String, val key: Int, val floor: Boolean, val scope: String) : CardContent
+    /** 要你同意一次花钱的操作(只能同意这一次):和对话页的确认卡片同一套字和编号 [key]。 */
+    data class Confirm(val title: String, val body: String, val key: Int) : CardContent
 
     /** Mika 问你:给了 [options] 就列成按钮;没有选项的回答在 Mika 里打字(卡片里的输入下一步再做)。 */
     data class Question(val prompt: String, val options: List<String>) : CardContent
@@ -152,11 +152,11 @@ object CapsuleCards {
                 canTakeOver = r.ahead == 0 && r.kind == CapsuleKind.NeedTakeover,
             )
             is TaskState.WaitingConfirmation -> (ex?.status as? ExchangeStatus.NeedsConfirmation)
-                ?.let { CardContent.Confirm(it.title, it.body, it.key, it.floor, it.scope) }
+                ?.let { CardContent.Confirm(it.title, it.body, it.key) }
                 // 还没推出这一问一答时(刚开始跟)用包名代替 App 名
                 ?: CardContent.Confirm(
                     ConfirmationCopy.title(s.request), ConfirmationCopy.detail(s.request, s.request.app),
-                    ConfirmationNotifier.requestKey(s), s.floor, ConfirmationCopy.scope(s.request, s.request.app),
+                    ConfirmationNotifier.requestKey(s),
                 )
             is TaskState.WaitingInput -> CardContent.Question(s.prompt.trim(), s.options.orEmpty().filter(String::isNotBlank))
             is TaskState.Held -> CardContent.Held(s.reason.why.trim().ifEmpty { "先等等" }, s.reason.resumable)

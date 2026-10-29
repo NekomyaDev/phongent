@@ -59,7 +59,7 @@ private class BatchScreen(vararg val screens: List<Pair<String, List<Int>>>) : S
 }
 
 class BatchRunnerTest {
-    private val home = listOf("搜索框" to listOf(0, 0, 999, 80), "返回" to listOf(0, 900, 100, 999), "发送" to listOf(800, 900, 999, 999))
+    private val home = listOf("搜索框" to listOf(0, 0, 999, 80), "返回" to listOf(0, 900, 100, 999), "提交订单" to listOf(800, 900, 999, 999))
     private val events = mutableListOf<RunEvent>()
     private val sink = object : RunSink { override fun event(e: RunEvent) { events += e } }
     private var gates = 0
@@ -179,7 +179,7 @@ class BatchRunnerTest {
         val s = BatchScreen(home)
         val r = runner(toolDispatcher(s)).run(steps(st("phone_back"), st("phone_tap", """{"x":900,"y":950}""")), "c1").content
         assertEquals("confirmation_required", r.s("error"))
-        assertTrue("发送" in r.s("matched"))
+        assertTrue("提交订单" in r.s("matched"))
         assertEquals(listOf("back"), s.calls)
     }
 
@@ -244,9 +244,9 @@ class BatchRunnerTest {
     }
 
     @Test fun gateBeforeIrreversibleCheck() = runTest {
-        // 等锁屏/被拿走的关卡期间屏幕换了:同一位置现在是「发送」,按过关卡之后的屏幕判,不点
+        // 等锁屏/被拿走的关卡期间屏幕换了:同一位置现在是「提交订单」,按过关卡之后的屏幕判,不点
         val s = BatchScreen(listOf("确定" to listOf(400, 450, 600, 550), "返回" to listOf(0, 900, 100, 999)))
-        onGate = { if (gates == 2) s.replaced = listOf("发送" to listOf(400, 450, 600, 550)) }
+        onGate = { if (gates == 2) s.replaced = listOf("提交订单" to listOf(400, 450, 600, 550)) }
         val r = runner(toolDispatcher(s)).run(steps(st("phone_back"), st("phone_tap", """{"x":500,"y":500}""")), "c1").content
         assertEquals("confirmation_required", r.s("error"))
         assertEquals(listOf("back"), s.calls)

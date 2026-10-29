@@ -5,7 +5,6 @@ import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.Channel
 import com.wangzan101.mika.core.run.ChannelInputSink
 import com.wangzan101.mika.core.run.ChannelPeer
-import com.wangzan101.mika.core.run.ConfirmationReach
 import com.wangzan101.mika.core.run.Delivery
 import com.wangzan101.mika.core.run.MemoryRunStore
 import com.wangzan101.mika.core.run.Outbox
@@ -29,7 +28,7 @@ class RunRecoveryTest {
     private class RecordingChannel : Channel {
         val sent = mutableListOf<Delivery>()
         override val id = LocalChannel.ID
-        override val confirmationReach = ConfirmationReach.All
+        override val confirms = true
         override fun start(sink: ChannelInputSink) = AutoCloseable { }
         override suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome { sent += delivery; return SendOutcome.Delivered }
     }

@@ -38,7 +38,7 @@ object DeveloperSwitches {
 object AutonomyCopy {
     const val GROUP = "做事方式"
     const val TITLE = "自主模式"
-    const val SUBTITLE = "打开后，付款、发送、联系他人这类对外操作不再先问你，Mika 直接做完"
+    const val SUBTITLE = "打开后连付款也不先问你，Mika 直接做完；关着时只有付款先问"
 }
 
 const val DEVELOPER_NOTE = "这些开关影响 Mika 做事的方式和速度，一般保持默认。"

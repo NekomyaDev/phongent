@@ -8,15 +8,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.wangzan101.mika.core.testing.verb
 
+/** 询问时只有花钱的那一步要同意:下面的页面上都有应付金额 ¥25,申报也都带着它。 */
 class ConfirmationGateTest {
     private fun req(action: IrrevAction, app: String, target: String = "张三", content: String = "明天见") =
-        ConfirmationRequest(action, target, content, null, app)
+        ConfirmationRequest(action, target, content, "¥25", app)
     private fun hit(action: IrrevAction) = Irreversible(action, "x")
     private fun el(name: String, editable: Boolean = false, top: Int = 0) =
         UiElement("@e1", "v", name, 0, 0, listOf(0, top, 999, top + 60), null, true, editable, false)
     /** 和 [peer] 的聊天页:标题在顶部,输入框里是 [typed]。 */
     private fun chat(app: String = "com.a", typed: String = "明天见", peer: String = "张三", vararg more: UiElement) =
-        ScreenSnapshot("s", app, listOf(el(peer, top = 30), el(typed, editable = true, top = 900), el("发送", top = 900)) + more, 1080, 2400)
+        ScreenSnapshot("s", app, listOf(el(peer, top = 30), el("¥25", top = 800), el(typed, editable = true, top = 900), el("发送", top = 900)) + more, 1080, 2400)
 
     private fun approved(r: ConfirmationRequest, step: Int = 1) = ConfirmationGate().apply {
         assertEquals(DeclareResult.Pending, declare(r, r.app)); decide(true, step)
@@ -36,7 +37,7 @@ class ConfirmationGateTest {
 
     // 联系、投申请的按钮按提交核对:对象(职位、公司)在屏上任何地方都行,没有要核的输入框文字
     @Test fun contactButtonApprovalChecksTargetOnScreen() {
-        val page = ScreenSnapshot("s", "www.jobs.example", listOf(el("产品经理 · 某公司", top = 400), el("立即沟通", top = 460)), 1080, 2400)
+        val page = ScreenSnapshot("s", "www.jobs.example", listOf(el("产品经理 · 某公司", top = 400), el("¥25", top = 430), el("立即沟通", top = 460)), 1080, 2400)
         val r = req(IrrevAction.submit, "www.jobs.example", target = "产品经理", content = "点立即沟通,发出预设的招呼语")
         assertEquals(Permit.Allowed, approved(r).permits(hit(IrrevAction.submit), page, 2))
         assertTrue(approved(r.copy(target = "运营专员")).permits(hit(IrrevAction.submit), page, 2) is Permit.Mismatch)
@@ -84,7 +85,7 @@ class ConfirmationGateTest {
         assertEquals(Permit.Allowed, approved(req(IrrevAction.send, "com.a")).permits(hit(IrrevAction.send), empty, 2, typing = "明天见"))
         assertTrue(approved(req(IrrevAction.send, "com.a")).permits(hit(IrrevAction.send), empty, 2, typing = "别的话") is Permit.Mismatch)
         // 删除不比内容;对象可以在屏上任何不可编辑的地方
-        val del = ScreenSnapshot("s", "com.a", listOf(el("张三", top = 500), el("删除", top = 600)), 1080, 2400)
+        val del = ScreenSnapshot("s", "com.a", listOf(el("张三", top = 500), el("¥25", top = 550), el("删除", top = 600)), 1080, 2400)
         assertEquals(Permit.Allowed, approved(req(IrrevAction.delete, "com.a", content = "整个会话")).permits(hit(IrrevAction.delete), del, 2))
     }
 

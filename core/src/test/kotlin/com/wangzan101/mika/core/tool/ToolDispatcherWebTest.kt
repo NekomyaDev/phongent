@@ -419,7 +419,7 @@ class ToolDispatcherWebTest {
 
     @Test fun confirmationAppIsSiteHostOnWeb() = runTest {
         val t = d(); t.go()
-        fun ask(app: String) = call("request_confirmation", """{"action":"submit","target":"表单","content":"提交","app":"$app"}""")
+        fun ask(app: String) = call("request_confirmation", """{"action":"submit","target":"表单","content":"提交","amount":"¥25","app":"$app"}""")
         val ok = t.execute(ask("shop.example.com"))
         val o = ok.outcome as Outcome.Confirm
         assertEquals("shop.example.com", o.request.app); assertEquals("shop.example.com", o.foregroundApp)

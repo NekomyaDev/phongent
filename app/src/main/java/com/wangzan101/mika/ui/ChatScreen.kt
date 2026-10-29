@@ -99,7 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wangzan101.mika.R
 import com.wangzan101.mika.chat.SharedFile
-import com.wangzan101.mika.core.action.ConfirmChoice
+import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.settings.Prerequisites
 import com.wangzan101.mika.takeover.Takeover
 import com.wangzan101.mika.task.TaskService
@@ -696,17 +696,8 @@ private fun StatusCard(
                 if (options.isEmpty()) CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
             }
         }
-        // 底线操作只能同意这一次;其余可以记成这个任务都允许、以后都允许(范围写在卡片上)
-        is ExchangeStatus.NeedsConfirmation -> NeedCard(
-            status.title,
-            status.body + if (status.floor) "\n这类操作每次都要你同意。" else "\n「以后都允许」:${status.scope}",
-            footer = if (status.floor) null else ({
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CardButton("这个任务都允许", onClick = { vm.approve(status.key, ConfirmChoice.Task) })
-                    CardButton("以后都允许", onClick = { vm.approve(status.key, ConfirmChoice.Always) })
-                }
-            }),
-        ) {
+        // 只有花钱的操作要你同意,每次只同意这一次
+        is ExchangeStatus.NeedsConfirmation -> NeedCard(status.title, status.body + "\n" + ConfirmationCopy.NOTE) {
             CardButton("拒绝", onClick = { vm.decline(status.key) })
             CardButton("允许这一次", primary = true, onClick = { vm.approve(status.key) })
         }

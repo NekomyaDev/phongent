@@ -32,8 +32,8 @@ private class OneButton(label: String) : ScreenPort by FakeScreen() {
 }
 
 /**
- * 同一个危险动作,无论从哪条路径来(模型单步、一次多步、页面脚本、经验回放),执行入口给出同样的结论、
- * 同样不执行,运行记录里的确认事件也一样;普通动作照常执行,记录形状只差来源字段。
+ * 同一个花钱的动作,无论从哪条路径来(模型单步、一次多步、页面脚本、经验回放),执行入口给出同样的结论、
+ * 同样不执行,运行记录里的确认事件也一样;不花钱的动作(发送、删除、提交和普通点击)照常执行,记录形状只差来源字段。
  */
 @RunWith(Parameterized::class)
 class ActionExecutorOriginsTest(private val label: String, private val action: IrrevAction, private val origin: Origin) {
@@ -47,7 +47,7 @@ class ActionExecutorOriginsTest(private val label: String, private val action: I
         return screen to ActionExecutor(tools, OperationGuards(), ConfirmationGate(), gate = {}, recorder = ActionRecorder(sink))
     }
 
-    @Test fun dangerousActionIsRefusedTheSameWay() = runTest {
+    @Test fun paymentIsRefusedTheSameWay() = runTest {
         val (screen, executor) = setup()
         val out = executor.run(Part.ToolCall("c1", "phone_tap", """{"ref":"@e1","snapshotId":"s1"}"""), origin)
         out as ActionOutcome.Refused
@@ -73,6 +73,19 @@ class ActionExecutorOriginsTest(private val label: String, private val action: I
         assertTrue(events.none { it is RunEvent.Confirmation })
     }
 
+    @Test fun outwardActionsThatSpendNoMoneyRunWithoutAsking() = runTest {
+        for (free in listOf("发送", "删除", "提交")) {
+            val screen = OneButton(free)
+            val tools = toolDispatcher(screen)
+            tools.execute(Part.ToolCall("o", "phone_observe", "{}"))
+            val executor = ActionExecutor(tools, OperationGuards(), ConfirmationGate(), gate = {}, recorder = ActionRecorder(sink))
+            val out = executor.run(Part.ToolCall("c4", "phone_tap", """{"ref":"@e1","snapshotId":"s1"}"""), origin)
+            assertTrue("$free $out", out is ActionOutcome.Ran)
+            assertEquals(listOf("@e1"), screen.taps)
+        }
+        assertTrue(events.none { it is RunEvent.Confirmation })
+    }
+
     @Test fun autonomousActionRunsWithoutApproval() = runTest {
         val screen = OneButton(label)
         val tools = toolDispatcher(screen)
@@ -86,7 +99,7 @@ class ActionExecutorOriginsTest(private val label: String, private val action: I
 
     companion object {
         private val ORIGINS = listOf(Origin.Model(3), Origin.Batch(3), Origin.Script(3), Origin.Replay)
-        private val ACTIONS = listOf("发送" to IrrevAction.send, "确认支付" to IrrevAction.pay, "删除" to IrrevAction.delete, "提交" to IrrevAction.submit)
+        private val ACTIONS = listOf("确认支付" to IrrevAction.pay, "提交订单" to IrrevAction.order)
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0} via {2}")

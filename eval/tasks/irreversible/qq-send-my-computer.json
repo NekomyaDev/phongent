@@ -10,13 +10,16 @@
     "installed:com.tencent.mobileqq",
     "signedIn:com.tencent.mobileqq"
   ],
-  "expect": "confirmation",
+  "expect": "succeeded",
   "checks": [
     {
-      "type": "confirmation_shows",
-      "action": "发送",
-      "target": "我的电脑",
-      "content": "Mika评测-{run}"
+      "type": "asked_user",
+      "expected": false
+    },
+    {
+      "type": "screen_has",
+      "packageName": "com.tencent.mobileqq",
+      "text": "Mika评测-{run}"
     }
   ],
   "maxSteps": 30,

@@ -8,7 +8,7 @@ import org.junit.Test
 class ChannelOutboxTest {
     private val peer = ChannelPeer("fake", "owner-peer", "thread")
 
-    private class FakeChannel(override val confirmationReach: ConfirmationReach = ConfirmationReach.NonFloor) : Channel {
+    private class FakeChannel(override val confirms: Boolean = true) : Channel {
         override val id = "fake"
         val sent = mutableListOf<Delivery>()
         var outcome = SendOutcome.Delivered
@@ -38,7 +38,7 @@ class ChannelOutboxTest {
         active = input
         assertEquals(DeliveryState.Delivered, outbox.deliver(channel, peer, input).state)
         channel.receive(ChannelInput.Text(peer, "m1", "A", replyToAskId = "a1"))
-        val confirm = Delivery.Ask("d2", "thread", "a2", Delivery.Ask.Kind.Confirm, "send?", floor = false)
+        val confirm = Delivery.Ask("d2", "thread", "a2", Delivery.Ask.Kind.Confirm, "order?")
         active = confirm
         outbox.deliver(channel, peer, confirm)
         channel.receive(ChannelInput.Confirm(peer, "a2", ConfirmChoice.Once))
@@ -49,11 +49,11 @@ class ChannelOutboxTest {
         assertEquals(3, channel.sent.size)
     }
 
-    @Test fun ownerAndFloorRulesBlockUntrustedApproval() = runBlocking {
-        val channel = FakeChannel()
-        val floor = Delivery.Ask("d", "thread", "a", Delivery.Ask.Kind.Confirm, "payment?", floor = true)
+    @Test fun ownerAndChannelRulesBlockUntrustedApproval() = runBlocking {
+        val channel = FakeChannel(confirms = false)
+        val payment = Delivery.Ask("d", "thread", "a", Delivery.Ask.Kind.Confirm, "payment?")
         val events = mutableListOf<String>()
-        val gateway = ChannelGateway(MemoryOwnerIdentity().also { it.bind(peer) }, { floor }, object : ChannelGateway.Route {
+        val gateway = ChannelGateway(MemoryOwnerIdentity().also { it.bind(peer) }, { payment }, object : ChannelGateway.Route {
             override suspend fun newTask(peer: ChannelPeer, messageId: String, text: String) { events += "new" }
             override suspend fun answer(threadId: String, askId: String, text: String) = true
             override suspend fun confirm(threadId: String, askId: String, choice: ConfirmChoice): Boolean { events += "confirm"; return true }

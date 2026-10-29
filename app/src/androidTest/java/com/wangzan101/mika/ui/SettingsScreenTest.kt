@@ -49,7 +49,7 @@ class SettingsScreenTest {
                 onOpenModels = { opened += "models" }, usageTokens = usageTokens, onOpenUsage = { opened += "usage" }, onOpenPhoneOps = { opened += "phone" }, onOpenDuringWork = { opened += "work" },
                 capsuleMode = CapsuleMode.DuringTasks, onOpenCapsule = { opened += "capsule" }, onOpenNotifications = { opened += "notifications" },
                 onOpenMemory = { opened += "memory" },
-                webSitesCount = 3, onOpenWebSites = { opened += "web" }, grantsCount = 2, onOpenGrants = { opened += "grants" },
+                webSitesCount = 3, onOpenWebSites = { opened += "web" },
                 sandbox = SandboxStatus.Ready(network = false), onOpenSandbox = { opened += "sandbox" },
                 routes = 8, onOpenRoutes = { opened += "routes" }, onOpenRecovery = { opened += "recovery" },
                 showDeveloper = showDeveloper, onOpenDeveloper = { opened += "dev" },
@@ -85,11 +85,11 @@ class SettingsScreenTest {
     fun homeRowsOpenTheirPages() {
         val opened = mutableListOf<String>()
         home(opened = opened)
-        for (t in listOf("模型", "Token 用量", "手机操作", "干活时", "悬浮胶囊", "通知", "记忆与技能", "网站登录", "长期授权", "文件与计算环境", "记住的操作路线", "恢复与修复", "开发者选项", "关于 Mika")) {
+        for (t in listOf("模型", "Token 用量", "手机操作", "干活时", "悬浮胶囊", "通知", "记忆与技能", "网站登录", "文件与计算环境", "记住的操作路线", "恢复与修复", "开发者选项", "关于 Mika")) {
             scrollTo(t)
             compose.onNodeWithText(t).performClick()
         }
-        assertEquals(listOf("models", "usage", "phone", "work", "capsule", "notifications", "memory", "web", "grants", "sandbox", "routes", "recovery", "dev", "about"), opened)
+        assertEquals(listOf("models", "usage", "phone", "work", "capsule", "notifications", "memory", "web", "sandbox", "routes", "recovery", "dev", "about"), opened)
     }
 
     /** 「Token 用量」写近 7 天的合计;一点没有时写「还没有」,还没统计出来时不显示这一行。 */

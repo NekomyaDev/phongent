@@ -126,8 +126,8 @@ class ReplayerTest {
 
     @Test fun stopsBeforeIrreversible() = runTest {
         val s = Notes.screen()
-        s.pages["home"] = Notes.home + ui("@e5", "button", "发送", listOf(0, 900, 300, 999), rid = "n:id/send")
-        val steps = Notes.steps.take(1) + RouteStep("phone_tap", "{}", Selector("button", "发送", "n:id/send", listOf(0, 900, 300, 999), 0, true), Notes.homeA, Notes.editorA)
+        s.pages["home"] = Notes.home + ui("@e5", "button", "提交订单", listOf(0, 900, 300, 999), rid = "n:id/send")
+        val steps = Notes.steps.take(1) + RouteStep("phone_tap", "{}", Selector("button", "提交订单", "n:id/send", listOf(0, 900, 300, 999), 0, true), Notes.homeA, Notes.editorA)
         val out = replayer(s).run(RouteChoice(Notes.route(steps), listOf("x")))
         assertEquals(ReplayOutcome.StoppedForConfirmation(1), out)
         assertTrue(s.taps.isEmpty())
