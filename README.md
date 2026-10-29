@@ -1,0 +1,274 @@
+<div align="center">
+
+<img src="docs/media/logo.png" alt="Mika" width="120" />
+
+# Mika
+
+**你手机上的私人 AI 助理，替你操作 App、上网、把事办成。**
+
+它在一块看不见的后台屏上干活，你照样刷你的手机。
+
+An on-device AI agent for Android that operates apps and the web to get things done for you — on a hidden background screen, so you can keep using your phone.
+
+<a href="https://github.com/wangzan101/Mika/releases/latest"><img src="https://img.shields.io/github/v/release/wangzan101/Mika?include_prereleases&label=version" alt="version" /></a>
+<img src="https://img.shields.io/badge/Android-13%2B-3DDC84" alt="android" />
+<img src="https://img.shields.io/badge/sandbox-arm64-blue" alt="sandbox" />
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
+
+[下载 APK](https://github.com/wangzan101/Mika/releases/latest) · [快速开始](#快速开始) · [能做什么](#能做什么) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
+
+</div>
+
+> **English summary**
+>
+> Mika is an Android app that takes a one-sentence request and carries it out on your phone. It drives apps on a private background screen (so you can keep using your phone), browses the web in a built-in desktop-class browser, and runs scripts in a local Linux sandbox. You bring your own model API key (several providers are supported as presets, plus any OpenAI-compatible, Anthropic or Gemini endpoint). There is no Mika server: your requests go only to the model provider you configure.
+>
+> Status: **public beta**, changing quickly (see [Releases](../../releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI and docs are in Chinese for now. Licensed under Apache-2.0.
+
+## Beta 说明
+
+- 这是早期公开测试版，功能和界面还在快速变化，升级时可能有不兼容的改动。
+- 目前主要在一台安卓 14 手机上测试过。别的安卓版本、别的手机上可能遇到没见过的问题，欢迎[反馈](#参与贡献)。
+- Mika 会替你操作第三方 App 和网站，请先读[免责声明](#免责声明)。
+
+## 演示
+
+<!-- TODO: 演示素材还没放进来。把下面 4 个文件放到 docs/media/ 后即可显示。 -->
+
+| | |
+|---|---|
+| ![后台操作微信给联系人发消息](docs/media/wechat-send.gif)<br>后台操作微信，给联系人发消息 | ![在招聘网站批量打招呼](docs/media/job-greet.gif)<br>在招聘网站批量打招呼 |
+| ![双击胶囊，把这一屏发给 Mika](docs/media/screen-ask.gif)<br>双击胶囊，把这一屏发给 Mika | ![网页办事：搜索、筛选、读出结果](docs/media/web-task.gif)<br>网页办事：搜索、筛选、读出结果 |
+
+## 能做什么
+
+你用一句话交代一件事，Mika 在手机上替你办。
+
+### 操作 App，不占你的屏幕
+
+- 在一块单独的后台屏上打开 App、读界面、点击、输入、滚动，你照常用手机；对话页上的小画面实时显示它在做什么。
+- 能逐屏读长列表和聊天记录，比如「帮我总结一下某个群今天都聊了些啥」。
+- 界面读不出来的 App（自己画界面、控件没有名字）也能用：Mika 用随 APK 自带的文字识别读屏上的字；配了能看图的模型时，还能看图找按钮和输入框。
+- 能把一段文字直接分享进某个 App（发消息、记笔记），收件人和发送仍由 Mika 在那一页上点。
+- 系统问「用哪个 App 打开」、装了两份的 App 问「打开哪一个」、一个 App 打开另一个 App（比如跳到付款页）时，Mika 认得出来：能处理的接着做，要你选或要你亲手处理的，会停下来请你在屏幕上操作。
+- 需要你亲手处理的事（登录、验证码、付款）会发通知请你接管：App 挪到主屏，你处理完交还，Mika 重新核实再继续。
+
+### 内置浏览器
+
+- 在后台打开网页，用真实的点击和键盘输入操作页面，默认按电脑版网页打开。
+- 能读页面正文，也能读页面自己收到的数据；支持下载、上传。
+- 登录过的网站保持登录；侧栏「浏览器」里可以自己浏览，在这里登录的网站 Mika 办事时也能直接用。
+- 翻页有节奏：同一个网站连着换页会停一停，对限制浏览快慢的网站停得更久；认得出风控拦截页，交给你处理而不是硬闯。
+
+### 此刻的屏幕
+
+- 你在别的 App 里时，屏幕边上有一颗 Mika 悬浮胶囊，显示后台任务的进展、要你处理的事和结果，点开可以插话、回答、同意或停止。
+- **双击胶囊**，把你正在看的这一屏发给 Mika，比如「这个怎么回」「帮我记下来」；也可以在卡片里截屏、补一句话再发。
+
+### 定时与条件任务
+
+- 「明早 9 点提醒我」「每天早上看看天气，下雨才告诉我」「每周五做某件事」。
+- 到点在原对话里执行，结果送回来；定时任务页可以暂停、改时间、立即执行、删除。
+
+### 随时插话、随时停
+
+- 任务进行中可以继续说话，补充或更正要求，Mika 在下一步之前读到。
+- 按停止后，Mika 会补几行交代：做了什么、看到了什么、发出了几次、哪些没做完。下次说「继续」它知道从哪接着做。
+
+### 询问 / 自主
+
+- 默认是**询问**：付款、发送、联系他人这类动作先问你。也可以换成**自主**，不再先问。详见[下文](#询问--自主模式)。
+
+### 记忆
+
+- 记住你明确说过的事实、偏好和做事方式（做事方式要你批准），可以查看、修改、删除；只从你自己说的话里记，密码、验证码、卡号这类不记。记忆加密保存在手机上。
+
+### 常用 App 和网站的知识
+
+内置常用 App 和网站的使用知识（入口在哪、常见做法、要注意什么），以及几类事情的通用做法，Mika 用到时自动查阅。比如进了聊天 App 知道怎么找联系人、翻聊天记录；打开招聘网站知道怎么筛岗位、打招呼。知识持续增加，人人可以补充：它们是放在 [`core/src/main/resources/knowledge/`](core/src/main/resources/knowledge/) 和 [`core/src/main/resources/skills/`](core/src/main/resources/skills/) 下的纯文本文件，[欢迎补充](#参与贡献)。
+
+现在内置的有：
+
+<!-- generated:knowledge:start -->
+<!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
+| 类别 | 内置 |
+|---|---|
+| **App** | Android 设置、百家号、哔哩哔哩、BOSS直聘、得到、抖音、飞书、Gmail、即刻、快手、领英、QQ邮箱、今日头条、微信、微博、闲鱼、小红书、知乎 |
+| **网站** | 哔哩哔哩、豆瓣、抖音、Instagram、百度贴吧、微博、搜狗微信、小红书、小宇宙、YouTube、知乎、BOSS直聘 |
+| **通用做法**（技能） | 把内容整理成文字、处理 PDF 文档、查清一件事、消息与邮件 |
+<!-- generated:knowledge:end -->
+
+### 成批的事
+
+- 对一份你确认过的名单成批做事（比如逐个打招呼、投递），每两次之间隔开一段随机时间，做到网站自己说「到上限了」就停下告诉你。
+
+### 过程可查
+
+- 回答下面列出来源（读过的页面、截图）；每次任务都有可回看的过程记录。
+- 每次任务一行小结：总用时、和模型来回几次、用了多少 Token、多久看到第一次反馈；设置里的「Token 用量」按天、按服务商、按模型统计。
+
+### Linux 沙箱
+
+- 每个对话一个工作区，可以跑 Python、Node 和 shell 命令，处理你发来的文件，把结果存到手机的「下载/Mika」。
+- 默认断网，需要时在设置里的「文件与计算环境」打开「允许脚本联网」。只支持 arm64 设备。
+
+## 快速开始
+
+### 系统要求
+
+| 项目 | 要求 |
+|---|---|
+| 安装 | 安卓 11 及以上 |
+| 执行任务 | 安卓 13 及以上（后台屏和内置手机助手的要求） |
+| 推荐 | 安卓 14 及以上：后台屏有自己的焦点，不影响你在主屏打字；不同对话的任务同时进行也需要它 |
+| Linux 沙箱 | 仅 arm64 设备；其他设备照常安装，沙箱显示「此设备不支持」 |
+| 模型 | 一个支持工具调用的大模型 API Key |
+
+### 1. 下载安装
+
+从 [Releases](../../releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
+
+### 2. 打开无障碍
+
+在系统「无障碍」设置里找到 Mika 并打开。Mika 靠它读界面、做点按；打开后配对无线调试时它还能自己读出配对码。
+
+### 3. 配对无线调试（只需一次）
+
+打开设置里的「设置手机操作」向导，照着清单做：打开开发者选项、USB 调试、无线调试，然后用 6 位配对码配对。
+
+为什么要这一步：Mika 有一个内置的手机助手，要在后台屏上启动和操作 App，需要借用安卓自带的无线调试来启动它。全程在手机上完成，不需要电脑和数据线。配对过后，如果无线调试被系统关掉了（换 Wi-Fi、重启手机后安卓会关掉它），Mika 在你允许的前提下会自己把它重新打开。
+
+只用上网、文件和聊天的话，这一步可以先跳过。
+
+### 4. 添加模型
+
+打开设置里的「模型」（第一次打开 App 时也会引导你）。
+
+<!-- generated:providers:start -->
+<!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
+内置 DeepSeek、通义千问、Kimi、智谱、OpenRouter、Anthropic、Gemini 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini 接口都能接。
+<!-- generated:providers:end -->
+
+1. 添加服务商：选一个预设，或选「自定义」填接口地址；填 API Key。
+2. 点「测试并保存」，连上第一家时会自动选一个主模型。
+3. 主模型要支持工具调用。可选：看图模型（看懂界面、看图找按钮）、轻量模型（便宜快的即可，处理判断结局、提取记忆等小事）。
+
+### 5. 试一试
+
+空对话里有几条示例，点一下就能改了再发。也可以这样说：
+
+- 「帮我总结一下微信群今天都聊了些啥」
+- 「打开小红书，帮我总结一下某个博主最近发的内容」
+- 「帮我订明天早上 9:40、9:50、10:00 的闹钟」
+- 「每天早上 8 点看看天气，下雨才告诉我」
+
+## 询问 / 自主模式
+
+全局一个开关：设置里的「开发者选项」→「自主模式」，关着是询问，打开是自主。
+
+| 模式 | 行为 |
+|---|---|
+| **询问**（默认） | 付款、发送消息、提交、联系他人这类不可逆或对外的动作，先弹卡片问你：只同意这一次 / 这个任务都允许 / 以后都允许 / 不同意。付款、账号、安全、密码这几类只能单次同意。 |
+| **自主** | 这些动作不再先问你，直接做。成批做事时两次之间的间隔照样保留。 |
+
+- 换了开关管之后的所有任务；正在做的任务从询问换成自主，下一步起就不再问。
+- 定时任务等你不在场的任务，在询问模式下遇到要问的动作不会等人，会直接不做，并照实告诉你哪一步没做成。
+- 「以后都允许」可以在设置里的「长期授权」查看和撤销。
+
+## 数据与隐私
+
+- **没有 Mika 的服务器。** 你的话、屏幕内容、截图只发给你自己配置的模型服务商。
+- API Key、记忆和用户画像用安卓密钥库加密，保存在手机上。对话、运行记录、Token 用量都只存在本机。
+- 检查更新只访问 GitHub。
+- 内置浏览器访问的是你让它去的网站；沙箱默认断网。
+
+## 免责声明
+
+- 用自动化方式操作第三方 App 和网站，可能违反它们的用户协议，有被限制功能、封号的风险。请自行判断、自担风险。
+- 你同意的动作（以及自主模式下 Mika 替你做的动作）由你负责。重要的事请用询问模式，并检查结果。
+- 这是 Beta 软件，按「原样」提供，不做任何担保（详见 [LICENSE](LICENSE)）。
+
+## 常见问题
+
+**无线调试自己关掉了？**
+安卓原版在 Wi-Fi 断开、手机重启后会关掉无线调试。设置里的「恢复与修复」中「自动打开无线调试」默认开着：需要时 Mika 会自己打开它再连接（要你允许 Mika 修改系统设置）。第一次在某个 Wi-Fi 上，系统会问是否允许，请手动打开一次并勾选「始终允许这个网络」。如果还是连不上，回到设置里的「设置手机操作」向导重新配对即可。
+
+**无障碍服务被关掉了？**
+系统有时会停掉无障碍服务（比如进程被清理后）。「替我打开无障碍」默认开着，Mika 会自己把它重新打开；修不好时设置页会提示你手动打开。
+
+**有的 App 页面读不到、截不到？**
+有些页面（比如付款、输密码）禁止截屏，Mika 看不到画面，也不会去识别上面的字。这类页面需要你接管处理，处理好交还给 Mika。
+
+**为什么要安卓 13？**
+Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏需要安卓 13 及以上。安卓 14 起后台屏有自己的焦点，不会影响你在主屏打字，所以更推荐。只用网页、沙箱和聊天，安卓 11、12 也能用。
+
+**APK 更新从哪来？**
+只从本仓库的 [GitHub Releases](../../releases) 发布。每个版本改了什么、国内备用下载链接，都写在那个版本的发布说明里。
+
+## 参与贡献
+
+### 补充 App / 网站知识（不用写代码）
+
+最简单的贡献：给某个 App 写一份 `APP.md`、给某个网站写一份 `SITE.md`，或者改进已有的。它们是带头部的 Markdown 纯文本，放在 `core/src/main/resources/knowledge/` 下。格式见 [`docs/knowledge-format.md`](docs/knowledge-format.md)。
+
+### 报告问题
+
+开 Issue 时请写上：**手机型号、安卓版本、Mika 版本**（设置里的「关于 Mika」），做了什么、期望什么、实际发生了什么。能附上「查看过程」里的截图更好（注意先遮掉隐私）。
+
+### 贡献代码
+
+欢迎 PR。先读 [`docs/architecture.md`](docs/architecture.md)（按代码现状写，带类名和文件路径）和 [`docs/roadmap.md`](docs/roadmap.md)（已完成、接下来、已知问题）。改动请带单元测试。
+
+## 开发者
+
+### 构建与测试
+
+需要 JDK 17 和 Android SDK（`local.properties` 里的 `sdk.dir`，或环境变量 `ANDROID_HOME`）。
+
+```bash
+./gradlew :app:assembleDebug                  # 调试包
+./gradlew :app:assemblePerf                   # 看流畅度用的包：和发布版一样预先编译、不可调试，用调试签名，可直接覆盖调试包
+./gradlew :core:test :app:testDebugUnitTest   # 单元测试
+```
+
+调试包不做预先编译，界面会慢好几倍；判断流畅度请用 perf 包。
+
+- 仓库有两个模块：`:core` 是纯 Kotlin，主循环、工具、提示词、知识都在这里，可以在电脑上用单测和假模型跑；`:app` 是安卓宿主。
+- 沙箱的原生程序和自带运行环境已在仓库里；重新构建见 [`tools/sandbox/README.md`](tools/sandbox/README.md)。
+- 真机评测见 [`eval/README.md`](eval/README.md)。
+
+### 模型配置细节
+
+- 三个用途：**主模型**（办事，要支持工具调用）、**看图模型**（描述界面、看图定位；新装默认不用，可选「用主模型」）、**轻量模型**（判断结局、提取记忆、理解意图等小事，默认用主模型）。
+- 「测试并保存」只调一次服务商公开的列模型接口；列得出（或服务不提供列表）就保存，连不上当场说原因。不提供列表的服务可以手动填模型名。
+- 模型列表上的能力标签（工具调用、看图、上下文长度）：接口给了的照实显示，没给的沿用预设初值并标「未确认」，只作参考，不拦。
+- 「看图定位已验证」在设置里的「开发者选项」（调试版可见），对当前看图模型生效。
+
+### 文档
+
+- [`docs/architecture.md`](docs/architecture.md)：整体结构。
+- [`docs/roadmap.md`](docs/roadmap.md)：已完成、接下来、已知问题与暂缓。
+- [`docs/knowledge-format.md`](docs/knowledge-format.md)：App、网站知识与技能的格式。
+- [`docs/sandbox/skill-scripts.md`](docs/sandbox/skill-scripts.md)：知识与技能自带的沙箱脚本。
+
+### 发布与更新（维护者）
+
+- 发布在 GitHub Releases，tag 用 `vX.Y.Z`，APK 作为附件挂在这个版本上。
+- 发布说明里单独一行写国内备用下载，格式固定：
+
+  ```
+  国内备用下载: <url>
+  ```
+
+- 检查更新：App 每天查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
+
+## 联系作者
+
+- X：[@wangzan101](https://x.com/wangzan101)
+- 微信：在 App 设置里的「关于 Mika」扫码加作者微信，备注「Mika」，拉你进内测群。
+
+## 许可证
+
+Mika 以 [Apache License 2.0](LICENSE) 发布，版权声明见 [NOTICE](NOTICE)。
+
+第三方组件保留各自的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。其中：APK 里带有 PRoot（GPL-2.0-or-later，静态链接 talloc，LGPL-3.0-or-later）编译成的独立可执行程序 `libproot.so`、`libproot_loader.so`，Mika 只以子进程方式运行它们；源码地址与校验值在 [`tools/sandbox/sources.lock`](tools/sandbox/sources.lock)，补丁在 `tools/sandbox/patches/`，可以用 `tools/sandbox/build-native.sh` 重新编译。沙箱的运行环境（Alpine Linux 3.22 的最小根文件系统和软件包）随 APK 发布，发布时附带对应源码包，做法见 [`tools/sandbox/README.md`](tools/sandbox/README.md)。

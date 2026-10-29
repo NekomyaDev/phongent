@@ -1,0 +1,270 @@
+package com.wangzan101.mika.ui
+
+import com.wangzan101.mika.core.model.ListFailure
+import com.wangzan101.mika.core.model.ListedModel
+import com.wangzan101.mika.core.model.ModelListResult
+import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.settings.ModelOption
+import com.wangzan101.mika.settings.ModelOptions
+import com.wangzan101.mika.settings.Provider
+import com.wangzan101.mika.settings.ProviderConfig
+import com.wangzan101.mika.settings.ProviderConnection
+import com.wangzan101.mika.settings.ProviderPreset
+import com.wangzan101.mika.settings.ProviderPresets
+import com.wangzan101.mika.settings.ProviderStore
+import com.wangzan101.mika.settings.RoleChoice
+import com.wangzan101.mika.settings.RoleChoices
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** 列模型(「测试并保存」或刷新一个服务商)的进度。 */
+sealed interface ListState {
+    data object Idle : ListState
+    data object Running : ListState
+    data class Failed(val message: String) : ListState
+}
+
+/** 「添加服务商」表单。 */
+data class AddForm(
+    val preset: String,
+    val kind: ProviderConfig.Kind,
+    val baseUrl: String,
+    val apiKey: String,
+    val test: ListState = ListState.Idle,
+) {
+    val isCustom: Boolean get() = preset == ProviderPresets.custom.label
+
+    val urlProblem: String?
+        get() = when {
+            baseUrl.isBlank() -> "请填写接口地址"
+            !baseUrl.trim().startsWith("http://") && !baseUrl.trim().startsWith("https://") -> "接口地址要以 http:// 或 https:// 开头"
+            else -> null
+        }
+
+    /** 自定义的 OpenAI 兼容接口(本地服务)可以不填 Key,其余都要。 */
+    val keyRequired: Boolean get() = !(isCustom && kind == ProviderConfig.Kind.OpenAiCompat)
+
+    val canTest: Boolean get() = urlProblem == null && (!keyRequired || apiKey.isNotBlank()) && test != ListState.Running
+
+    /** 存成服务商时用的名字:预设用预设名,自定义用地址的主机名。 */
+    val providerName: String get() = if (isCustom) ProviderConnection.nameForUrl(baseUrl) else preset
+
+    companion object {
+        fun of(p: ProviderPreset) = AddForm(p.label, p.kind, p.baseUrl, "")
+        fun presetFor(label: String): ProviderPreset = ProviderPresets.all.firstOrNull { it.label == label } ?: ProviderPresets.custom
+    }
+}
+
+/**
+ * 配置模型(上手时)和设置 › 模型共用的全部状态:已连接的服务商、添加服务商表单、三个用途。
+ * [providers]、[configs]、[roles] 是 [ProviderStore] 的快照,[keyed] 是存了 Key 的服务商 id;
+ * [listing] 是各服务商刷新列表的进度(按服务商 id)。
+ */
+data class ModelSetupUi(
+    val form: AddForm,
+    val formOpen: Boolean = false,
+    val providers: List<Provider> = emptyList(),
+    val configs: List<ProviderConfig> = emptyList(),
+    val roles: RoleChoices = RoleChoices(),
+    val keyed: Set<String> = emptySet(),
+    val listing: Map<String, ListState> = emptyMap(),
+) {
+    /** 还没有服务商时表单总是展开。 */
+    val showForm: Boolean get() = formOpen || providers.isEmpty()
+
+    /** 选好了主模型就能「下一步」。 */
+    val canNext: Boolean get() = roles.main != null
+
+    /** 这个用途实际用的配置(「用主模型」时是主模型的)。 */
+    fun configFor(role: ModelRole): ProviderConfig? = roles.resolve(role)?.let { id -> configs.firstOrNull { it.id == id } }
+
+    fun providerOf(cfg: ProviderConfig): Provider? = providers.firstOrNull { it.id == cfg.providerId }
+
+    /** 一个服务商可选的全部模型(记住的列表加已有配置)。 */
+    fun options(p: Provider): List<ModelOption> = ModelOptions.ofProvider(p, configs)
+
+    /** 一个服务商的全部模型,在用的排前面,其余保持原来的顺序。 */
+    fun sortedOptions(p: Provider): List<ModelOption> = options(p).sortedBy { if (rolesOf(p.id, it.id).isEmpty()) 1 else 0 }
+
+    /** 实际在用这个模型的用途(含「用主模型」跟过来的),按主模型、看图、轻量的顺序。 */
+    fun rolesOf(providerId: String, model: String): List<ModelRole> =
+        ModelRole.entries.filter { role -> configFor(role)?.let { it.providerId == providerId && it.model == model } == true }
+
+    /** 实际在用这个服务商的用途。 */
+    fun rolesOf(p: Provider): List<ModelRole> = ModelRole.entries.filter { configFor(it)?.providerId == p.id }
+
+    /** 这个用途明确选的是不是这个模型(「用主模型」不算)。 */
+    fun picked(role: ModelRole, providerId: String, model: String): Boolean {
+        val id = (roles[role] as? RoleChoice.Model)?.configId ?: return false
+        return configs.firstOrNull { it.id == id }?.let { it.providerId == providerId && it.model == model } == true
+    }
+}
+
+/**
+ * 配置模型的状态与动作。添加服务商:选预设 → 填 Key →「测试并保存」(只列模型,列得出就存下这家和列表,列不出说原因、不存);
+ * 改了服务商、地址或 Key,进行中的测试作废。用途:从所有已连接服务商记住的模型里选,选中即生效;
+ * 看图还可以「用主模型」「不用」,轻量可以「用主模型」。连上第一家(还没有主模型)时自动选它的一个模型为主模型。
+ * 首次上手和设置 › 模型共用。
+ */
+class ModelSetupViewModel(
+    private val store: ProviderStore,
+    private val scope: CoroutineScope,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+) {
+    private val _state = MutableStateFlow(snapshot(ModelSetupUi(AddForm.of(ProviderPresets.all.first()))))
+    val state: StateFlow<ModelSetupUi> = _state.asStateFlow()
+
+    private var testJob: Job? = null
+    private val refreshJobs = mutableMapOf<String, Job>()
+
+    init {
+        // 别处(开发者选项等)改了存储时跟着更新
+        scope.launch { merge(store.providers, store.configs, store.roles).collect { sync() } }
+    }
+
+    private fun snapshot(ui: ModelSetupUi): ModelSetupUi {
+        val providers = store.providers.value
+        return ui.copy(
+            providers = providers, configs = store.configs.value, roles = store.roles.value,
+            keyed = providers.filter { store.hasKey(it.id) }.map { it.id }.toSet(),
+        )
+    }
+
+    private fun sync() = _state.update(::snapshot)
+
+    // ---------- 添加服务商 ----------
+
+    fun openForm() = _state.update { it.copy(formOpen = true) }
+
+    fun closeForm() {
+        testJob?.cancel()
+        _state.update { it.copy(formOpen = false, form = AddForm.of(ProviderPresets.all.first())) }
+    }
+
+    fun selectPreset(label: String) {
+        val p = AddForm.presetFor(label)
+        if (p.label == _state.value.form.preset) return
+        val key = _state.value.form.apiKey
+        edit { AddForm.of(p).copy(apiKey = key) }
+    }
+
+    fun setKind(kind: ProviderConfig.Kind) = edit { it.copy(kind = kind) }
+    fun setBaseUrl(url: String) = edit { it.copy(baseUrl = url) }
+    fun setApiKey(key: String) = edit { it.copy(apiKey = key) }
+
+    /** 连接信息变了:进行中的测试和上次的失败原因作废。 */
+    private fun edit(change: (AddForm) -> AddForm) {
+        testJob?.cancel()
+        _state.update { it.copy(form = change(it.form).copy(test = ListState.Idle)) }
+    }
+
+    /** 测试并保存:列得出模型(或服务不提供列表)就存下这家服务商,表单清空收起;列不出就说原因、不存。 */
+    fun testAndSave() {
+        val f = _state.value.form
+        if (!f.canTest) return
+        testJob?.cancel()
+        _state.update { it.copy(form = it.form.copy(test = ListState.Running)) }
+        testJob = scope.launch {
+            val key = f.apiKey.trim()
+            val baseUrl = f.baseUrl.trim()
+            val models = when (val r = withContext(io) { store.listModels(f.kind, baseUrl, key.ifEmpty { null }) }) {
+                is ModelListResult.Ok -> r.models
+                is ModelListResult.Failed -> {
+                    if (r.reason != ListFailure.NotSupported) {
+                        _state.update { it.copy(form = it.form.copy(test = ListState.Failed(r.message))) }
+                        return@launch
+                    }
+                    emptyList()
+                }
+            }
+            withContext(io) {
+                val p = store.connect(f.providerName, f.kind, baseUrl, key, models)
+                if (store.roles.value.main == null) {
+                    val options = ModelOptions.ofProvider(p, store.list())
+                    (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
+                }
+            }
+            _state.update { snapshot(it.copy(form = AddForm.of(ProviderPresets.all.first()), formOpen = false)) }
+        }
+    }
+
+    // ---------- 用途 ----------
+
+    /** 把 [providerId] 下的 [model] 用作 [role](选择页和「用作」面板都走这里):没有配置的当场建一条。 */
+    fun pick(role: ModelRole, providerId: String, model: String) {
+        val m = model.trim()
+        if (m.isEmpty()) return
+        scope.launch {
+            withContext(io) {
+                val p = store.provider(providerId) ?: return@withContext
+                use(role, p, m, ModelOptions.ofProvider(p, store.list()))
+            }
+            sync()
+        }
+    }
+
+    /** 看图、轻量的固定选项:「用主模型」或(只有看图)「不用」。 */
+    fun choose(role: ModelRole, choice: RoleChoice) {
+        scope.launch {
+            withContext(io) { store.choose(role, choice) }
+            sync()
+        }
+    }
+
+    private fun use(role: ModelRole, p: Provider, model: String, options: List<ModelOption>) {
+        val caps = options.firstOrNull { it.id == model }?.capabilities ?: ModelOptions.baseOf(p)
+        store.use(role, p.id, model, caps)
+    }
+
+    // ---------- 一个服务商 ----------
+
+    /** 重新列一次这个服务商的模型并记下;失败时记下原因。 */
+    fun refresh(providerId: String) {
+        val p = store.provider(providerId) ?: return
+        if (refreshJobs[providerId]?.isActive == true) return
+        _state.update { it.copy(listing = it.listing + (providerId to ListState.Running)) }
+        refreshJobs[providerId] = scope.launch {
+            val r = withContext(io) { store.listModels(p.kind, p.baseUrl, store.providerKey(p.id)) }
+            val models: List<ListedModel>? = when (r) {
+                is ModelListResult.Ok -> r.models
+                is ModelListResult.Failed -> if (r.reason == ListFailure.NotSupported) emptyList() else null
+            }
+            if (models != null) withContext(io) { store.rememberModels(p.id, models) }
+            val after = if (r is ModelListResult.Failed && models == null) ListState.Failed(r.message) else ListState.Idle
+            _state.update { snapshot(it.copy(listing = it.listing + (providerId to after))) }
+        }
+    }
+
+    /** 选择页、服务商页打开时:还没记住列表的服务商列一次。 */
+    fun ensureListed() {
+        _state.value.providers.filter { it.models == null && _state.value.listing[it.id] == null }.forEach { refresh(it.id) }
+    }
+
+    /** 换 Key,然后用新 Key 重新列一次模型。 */
+    fun changeKey(providerId: String, apiKey: String) {
+        val k = apiKey.trim()
+        if (k.isEmpty()) return
+        scope.launch {
+            withContext(io) { store.updateProviderKey(providerId, k) }
+            refreshJobs.remove(providerId)?.cancel()
+            refresh(providerId)
+        }
+    }
+
+    /** 删掉服务商和它的 Key;用着它的用途退回默认。 */
+    fun removeProvider(providerId: String) {
+        scope.launch {
+            withContext(io) { store.removeProvider(providerId) }
+            _state.update { snapshot(it.copy(listing = it.listing - providerId)) }
+        }
+    }
+}
