@@ -23,7 +23,7 @@ An on-device AI agent for Android that operates apps and the web to get things d
 >
 > Mika is an Android app that takes a one-sentence request and carries it out on your phone. It drives apps on a private background screen (so you can keep using your phone), browses the web in a built-in desktop-class browser, and runs scripts in a local Linux sandbox. You bring your own model API key (several providers are supported as presets, plus any OpenAI-compatible, Anthropic or Gemini endpoint). There is no Mika server: your requests go only to the model provider you configure.
 >
-> Status: **public beta**, changing quickly (see [Releases](../../releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI and docs are in Chinese for now. Licensed under Apache-2.0.
+> Status: **public beta**, changing quickly (see [Releases](https://github.com/wangzan101/Mika/releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI and docs are in Chinese for now. Licensed under Apache-2.0.
 
 ## Beta 说明
 
@@ -31,14 +31,14 @@ An on-device AI agent for Android that operates apps and the web to get things d
 - 目前主要在一台安卓 14 手机上测试过。别的安卓版本、别的手机上可能遇到没见过的问题，欢迎[反馈](#参与贡献)。
 - Mika 会替你操作第三方 App 和网站，请先读[免责声明](#免责声明)。
 
+<!-- 演示素材录好放进 docs/media/ 后，去掉这段注释的首尾即可显示。
 ## 演示
-
-<!-- TODO: 演示素材还没放进来。把下面 4 个文件放到 docs/media/ 后即可显示。 -->
 
 | | |
 |---|---|
 | ![后台操作微信给联系人发消息](docs/media/wechat-send.gif)<br>后台操作微信，给联系人发消息 | ![在招聘网站批量打招呼](docs/media/job-greet.gif)<br>在招聘网站批量打招呼 |
 | ![双击胶囊，把这一屏发给 Mika](docs/media/screen-ask.gif)<br>双击胶囊，把这一屏发给 Mika | ![网页办事：搜索、筛选、读出结果](docs/media/web-task.gif)<br>网页办事：搜索、筛选、读出结果 |
+-->
 
 ## 能做什么
 
@@ -126,7 +126,7 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 ### 1. 下载安装
 
-从 [Releases](../../releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
+从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
 
 ### 2. 打开无障碍
 
@@ -203,7 +203,7 @@ An on-device AI agent for Android that operates apps and the web to get things d
 Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏需要安卓 13 及以上。安卓 14 起后台屏有自己的焦点，不会影响你在主屏打字，所以更推荐。只用网页、沙箱和聊天，安卓 11、12 也能用。
 
 **APK 更新从哪来？**
-只从本仓库的 [GitHub Releases](../../releases) 发布。每个版本改了什么、国内备用下载链接，都写在那个版本的发布说明里。
+只从本仓库的 [GitHub Releases](https://github.com/wangzan101/Mika/releases) 发布。每个版本改了什么、国内备用下载链接，都写在那个版本的发布说明里。
 
 ## 参与贡献
 
