@@ -254,6 +254,7 @@ class BrowserScriptDeviceTest {
         assertEquals("$SCRIPT_MAX_ACTIONS", page("window.clicks"))
     }
 
+    // 页上列着带「元」的价钱:这里的发送按花钱算,询问时脚本里不做
     @Test
     fun irreversibleTapIsNotRun() = runBlocking<Unit> {
         val r = script("""

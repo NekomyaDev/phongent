@@ -29,7 +29,7 @@ import com.wangzan101.mika.task.testTasks
 import com.wangzan101.mika.task.TaskEnvironment
 
 /**
- * 真机测试:脚本模型在虚拟屏的设置里申报一次不可逆操作(只是申报,从不真的去做),
+ * 真机测试:脚本模型在虚拟屏的设置里申报一次花钱的操作(只是申报,从不真的去做;只有花钱要同意,申报都带金额),
  * 检查高优先级通知的标题、正文和「同意」「不同意」按钮,以及不同意、同意、评测自动拒绝三条路。
  * 需要内置助手在运行、Mika 无障碍服务已开启。
  */
@@ -74,14 +74,14 @@ class ConfirmationDeviceTest {
     private fun lastToolResult(call: ScriptedModel.Call): String =
         call.messages.last { it.role == Role.Tool }.parts.filterIsInstance<Part.ToolResult>().single().content
 
-    /** 在虚拟屏上打开设置,然后申报「删除」;返回时任务正等用户同意。 */
+    /** 在虚拟屏上打开设置,然后申报「下单」;返回时任务正等用户同意。 */
     private fun startAndRequest() {
         TaskService.start(context, "测试确认关卡")
         assertEquals(1, model.awaitCall().number)
         model.feed("phone_launch_app", """{"package":"$SETTINGS"}""")
         model.awaitCall()
         appTask = shell.topTaskId(testTasks.agentDisplayId.value)
-        model.feed("request_confirmation", """{"action":"delete","target":"测试项","content":"删除测试项\n第二行","app":"$SETTINGS"}""")
+        model.feed("request_confirmation", """{"action":"order","target":"测试项","content":"买测试项\n第二行","amount":"¥25","app":"$SETTINGS"}""")
         awaitState { it is TaskState.WaitingConfirmation }
     }
 
@@ -89,9 +89,9 @@ class ConfirmationDeviceTest {
     fun notificationHasApproveDecline() {
         startAndRequest()
         val n = pollUntil(5_000) { attention()?.takeIf { it.actions?.size == 2 } } ?: error("no confirmation notification")
-        assertEquals("要你同意:删除", n.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("要你同意:下单", n.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         val text = n.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
-        assertTrue(text, text.startsWith("在 ") && "对象:测试项" in text && "内容:删除测试项 第二行" in text && "金额" !in text)
+        assertTrue(text, text.startsWith("在 ") && "对象:测试项" in text && "内容:买测试项 第二行" in text && "金额:¥25" in text)
         assertEquals(listOf("同意", "不同意"), n.actions.map { it.title.toString() })
         // 和接管同一个频道。建频道时是高优先级;用户或系统之后可能调低(App 改不回来),这里只要求不低于默认,并记下实际级别
         assertEquals(TaskService.CHANNEL_ATTENTION, n.channelId)
@@ -117,9 +117,9 @@ class ConfirmationDeviceTest {
         val result = lastToolResult(model.awaitCall())
         assertTrue(result, "confirmation_declined" in result)
         assertEquals(true, pollUntil(3_000) { if (attention() == null) true else null })
-        model.feed("end_not_done", """{"message":"用户没有同意删除,没有做这一步"}""")
+        model.feed("end_not_done", """{"message":"用户没有同意下单,没有做这一步"}""")
         val end = pollUntil(15_000) { DeviceTaskState.state.value.takeIf { !it.running() } }
-        assertTrue(end.toString(), end is TaskState.Failed && "用户没有同意删除" in end.reason)
+        assertTrue(end.toString(), end is TaskState.Failed && "用户没有同意下单" in end.reason)
     }
 
     @Test
@@ -144,7 +144,7 @@ class ConfirmationDeviceTest {
         model.feed("phone_launch_app", """{"package":"$SETTINGS"}""")
         model.awaitCall()
         appTask = shell.topTaskId(testTasks.agentDisplayId.value)
-        model.feed("request_confirmation", """{"action":"send","target":"测试","content":"你好","app":"$SETTINGS"}""")
+        model.feed("request_confirmation", """{"action":"send","target":"测试","content":"转账","amount":"¥25","app":"$SETTINGS"}""")
         val result = lastToolResult(model.awaitCall())
         assertTrue(result, "confirmation_declined" in result)
         model.feed("end_not_done", """{"message":"没有同意"}""")
@@ -161,7 +161,7 @@ class ConfirmationDeviceTest {
         TaskService.decline(context, ConfirmationNotifier.requestKey(DeviceTaskState.state.value as TaskState.WaitingConfirmation))
         assertTrue(lastToolResult(model.awaitCall()).contains("confirmation_declined"))
         // 换一类动作再申报一次(同类同 App 被拒过就不会再问)
-        model.feed("request_confirmation", """{"action":"submit","target":"测试项","content":"提交测试项","app":"$SETTINGS"}""")
+        model.feed("request_confirmation", """{"action":"submit","target":"测试项","content":"提交测试项","amount":"¥25","app":"$SETTINGS"}""")
         awaitState { it is TaskState.WaitingConfirmation && it.request.action.name == "submit" }
         pollUntil(5_000) { attention()?.takeIf { it.extras.getCharSequence(Notification.EXTRA_TITLE).toString() == "要你同意:提交" } }
         runCatching { firstApprove.send() } // 旧按钮可能已被系统作废,作废也算通过
