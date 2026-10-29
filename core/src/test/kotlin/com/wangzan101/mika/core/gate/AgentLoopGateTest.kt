@@ -40,8 +40,8 @@ import org.junit.Test
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
 /**
- * 和张三的聊天页:标题、输入框、右下角按钮,聊天里有一笔要付的「转账 ¥25」:屏上有应付金额,这里的发送就要花钱,询问时要先同意。
- * 没打字时按钮是「+」,打了字变成「发送」(很多聊天 App 这样)。
+ * 和张三的聊天页:标题、输入框、右下角按钮,聊天里有一笔要付的「转账 ¥25」:屏上有应付金额,这里的「提交订单」就要花钱,询问时要先同意。
+ * 没打字时按钮是「+」,打了字变成「提交订单」(很多聊天 App 这样)。
  * [snapshot] 登记读屏(编号 s1、s2…),[peek] 不登记(编号 p1、p2…)。
  */
 private class ChatScreen(var app: String = "com.chat") : ScreenPort {
@@ -59,7 +59,7 @@ private class ChatScreen(var app: String = "com.chat") : ScreenPort {
     private fun read(id: String) = ScreenSnapshot(id, app, if (blank) emptyList() else listOf(
         UiElement("@e1", "text", "张三", 500, 100, listOf(0, 0, 999, 80), null, false, false, false),
         UiElement("@e2", "edit", typed.ifEmpty { "发消息" }, 400, 2300, listOf(0, 900, 790, 999), null, true, true, false, hint = typed.isEmpty()),
-        UiElement("@e3", "button", button ?: if (typed.isEmpty()) "+" else "发送", 950, 2300, listOf(800, 900, 990, 990), null, true, false, false),
+        UiElement("@e3", "button", button ?: if (typed.isEmpty()) "+" else "提交订单", 950, 2300, listOf(800, 900, 990, 990), null, true, false, false),
         UiElement("@e4", "text", "转账 ¥25", 500, 1000, listOf(0, 400, 600, 460), null, false, false, false),
     ), 1080, 2400)
     override suspend fun snapshot(): ScreenSnapshot = read("s${++reads}")
@@ -94,7 +94,7 @@ private val OBSERVE get() = tools(call("phone_observe"))
 private val FINISH get() = com.wangzan101.mika.core.testing.answerReply("发好了")
 private val TYPE get() = tools(call("phone_type_text", """{"text":"明天见","ref":"@e2","snapshotId":"s1"}"""))
 private fun tapSend(snapshot: String = "s1") = tools(call("phone_tap", """{"ref":"@e3","snapshotId":"$snapshot"}"""))
-private fun ask(action: String = "send", target: String = " 张三 ", content: String = "明天见") =
+private fun ask(action: String = "order", target: String = " 张三 ", content: String = "明天见") =
     tools(call("request_confirmation", """{"action":"$action","target":"$target","content":"$content","amount":"¥25","app":"com.chat"}"""))
 private fun failure(msg: String) = tools(call("end_not_done", """{"message":"$msg"}"""))
 
@@ -133,18 +133,19 @@ class AgentLoopGateTest {
         val m = FakeModel(OBSERVE, TYPE, tapSend(), tools(call("phone_type_text", """{"text":"明天见","pressEnter":true}""")), failure("没发"))
         assertEquals(TaskState.Failed("没发", FailKind.GaveUp), loop(m, s, sink).run("给张三发明天见"))
         assertTrue(s.taps.isEmpty())
-        // 模型手里的读屏(s1)上按钮还是「+」,此刻已变成「发送」:按此刻的判
+        // 模型手里的读屏(s1)上按钮还是「+」,此刻已变成「提交订单」:按此刻的判
         val r = m.result(3)
         assertEquals("false", r.s("ok")); assertEquals("confirmation_required", r.s("error"))
-        assertEquals("send", r.s("action")); assertEquals("发送", r.s("matched"))
-        assertTrue(r.s("message").startsWith("这一步要花钱(发送),没有执行。先调用 request_confirmation"))
+        assertEquals("order", r.s("action")); assertEquals("提交订单", r.s("matched"))
+        assertTrue(r.s("message").startsWith("这一步要花钱(下单),没有执行。先调用 request_confirmation"))
         assertTrue(r.s("message"), "无论它成功与否都会用掉" in r.s("message"))
-        assertEquals("confirmation_required", m.result(4).s("error"))
+        // 打字后回车是发送:发消息不花钱,屏上有金额也照常做
+        assertEquals(null, m.result(4)["error"])
         assertTrue("request_confirmation" in m.offeredTools[0])
-        assertEquals(listOf("required", "required"), sink.events.filterIsInstance<RunEvent.Confirmation>().map { it.decision })
+        assertEquals(listOf("required"), sink.events.filterIsInstance<RunEvent.Confirmation>().map { it.decision })
     }
 
-    // C1:读屏后界面变了(「+」变「发送」),不带 target 的坐标点击也要拦
+    // C1:读屏后界面变了(「+」变「提交订单」),不带 target 的坐标点击也要拦
     @Test fun coordinateTapJudgedOnFreshScreen() = runTest {
         val s = ChatScreen()
         val m = FakeModel(OBSERVE, tools(call("phone_tap", """{"x":900,"y":950}""")), TYPE, tools(call("phone_tap", """{"x":900,"y":950}""")), failure("没发"))
@@ -160,7 +161,7 @@ class AgentLoopGateTest {
         val l = loop(m, s, sink)
         val run = async { l.run("给张三发明天见") }
         advanceUntilIdle()
-        assertEquals(TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.send, "张三", "明天见", "¥25", "com.chat")), l.state.value)
+        assertEquals(TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.order, "张三", "明天见", "¥25", "com.chat")), l.state.value)
         l.answerConfirmation(true)
         com.wangzan101.mika.core.testing.assertAnswered(DONE, run.await())
         assertEquals("true", m.result(3).s("approved"))
@@ -173,7 +174,7 @@ class AgentLoopGateTest {
     // C3:同意绑定申报内容,中间点了别处就作废
     @Test fun approvalBoundToRequestAndNextAction() = runTest {
         val s = ChatScreen()
-        val m = FakeModel(OBSERVE, TYPE, ask(content = "后天见"), tapSend(), ask(), tools(call("phone_tap", """{"x":500,"y":40}""")), tapSend(), failure("没发"))
+        val m = FakeModel(OBSERVE, TYPE, ask(target = "李四"), tapSend(), ask(), tools(call("phone_tap", """{"x":500,"y":40}""")), tapSend(), failure("没发"))
         val l = loop(m, s)
         val run = async { l.run("t") }
         advanceUntilIdle(); l.answerConfirmation(true)
@@ -369,11 +370,11 @@ class AgentLoopGateTest {
     @Test fun locatedTapIsGated() = runTest {
         val s = ChatScreen().apply { png = FRAME_A }
         lateinit var m: StepModel
-        m = StepModel(step(OBSERVE), step(TYPE), locate("发送按钮", "发送"), { m.tapLocated()(it) }, step(failure("没发")))
+        m = StepModel(step(OBSERVE), step(TYPE), locate("提交订单按钮", "提交订单"), { m.tapLocated()(it) }, step(failure("没发")))
         assertEquals(TaskState.Failed("没发", FailKind.GaveUp), visionLoop(m, s).run("给张三发明天见"))
         assertEquals("@v1", m.results[2].s("ref"))
         assertEquals("confirmation_required", m.results[3].s("error"))
-        assertEquals("send", m.results[3].s("action"))
+        assertEquals("order", m.results[3].s("action"))
         assertTrue(s.taps.isEmpty())
     }
 

@@ -25,7 +25,7 @@ object ClassifiedRisk : RiskJudge {
     /** 这个动作会改界面上的东西(不只是在界面间移动);不可逆、对外的动作也都是这几种动作做出来的。 */
     fun changesState(verb: Verb?): Boolean = verb in CHANGE_VERBS
 
-    /** 屏上带币种的金额:这时对外、不可逆的动作都按花钱算。 */
+    /** 屏上带币种的金额:这时提交、删除一类的动作按花钱算(结算页上的「确认」「去支付」);发消息不花钱,不算。 */
     private val AMOUNT = Regex("[¥￥]\\s*\\d|\\d+(\\.\\d+)?\\s*元")
 
     override fun assess(verb: Verb?, hit: Irreversible?, screen: () -> ScreenSnapshot?): Risk {
@@ -37,7 +37,7 @@ object ClassifiedRisk : RiskJudge {
         }
         if (hit == null) return Risk(level)
         val payment = hit.action == IrrevAction.pay || hit.action == IrrevAction.order ||
-            screen()?.elements?.any { !it.editable && AMOUNT.containsMatchIn(it.name) } == true
+            hit.action != IrrevAction.send && screen()?.elements?.any { !it.editable && AMOUNT.containsMatchIn(it.name) } == true
         return Risk(level, payment)
     }
 
