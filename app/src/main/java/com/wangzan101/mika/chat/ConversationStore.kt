@@ -50,11 +50,30 @@ class ConversationStore(private val dir: File) {
     fun title(conversationId: String): String? =
         runCatching { titleFile(conversationId).takeIf { it.isFile }?.readText()?.trim() }.getOrNull()?.takeIf(String::isNotEmpty)
 
+    /**
+     * 删掉过的对话。删之后才到的「补写」(后台起好的标题、任务收尾后补的结局和交代)不再把它写回来;
+     * 再往里存进一轮([append])就是重新开始用这个编号,从这里拿掉。只记在进程里。
+     */
+    private val deleted = mutableSetOf<String>()
+
+    /**
+     * 删掉一个对话存下的一切:对话文件、标题,以及写到一半的临时文件和挪到一边的损坏文件。删了什么都发一次 [changes]。
+     * 对话的工作区、定时任务、在跑的任务不归这里管,见 [ConversationDeleter]。
+     */
+    @Synchronized
+    fun delete(conversationId: String) {
+        deleted += safe(conversationId)
+        val main = file(conversationId).name
+        dir.listFiles { f -> f.isFile && (f.name == main || f.name.startsWith("$main.") || f.name == titleFile(conversationId).name) }
+            .orEmpty().forEach { it.delete() }
+        _changes.tryEmit(conversationId)
+    }
+
     /** 给对话记下标题;已经有标题就不动(标题只起一次)。写进去了返回 true。 */
     @Synchronized
     fun setTitle(conversationId: String, title: String): Boolean {
         val t = title.trim()
-        if (t.isEmpty() || title(conversationId) != null) return false
+        if (t.isEmpty() || safe(conversationId) in deleted || title(conversationId) != null) return false
         dir.mkdirs()
         val ok = runCatching { titleFile(conversationId).writeText(t) }.isSuccess
         if (ok) _changes.tryEmit(conversationId)
@@ -105,6 +124,7 @@ class ConversationStore(private val dir: File) {
 
     @Synchronized
     fun append(conversationId: String, turn: Turn, files: List<SharedFile> = emptyList()) {
+        deleted -= safe(conversationId)
         val f = file(conversationId)
         val prior = if (f.isFile) read(f) else emptyList()
         if (prior == null) {

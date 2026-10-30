@@ -51,6 +51,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -421,13 +425,19 @@ internal fun UserBubble(text: String, conversationId: String?, note: String? = n
             }
             if (attached.hasAttachments && attached.words.isNotEmpty()) Spacer(Modifier.size(6.dp))
             if (!attached.hasAttachments || attached.words.isNotEmpty()) UserMessage(conversationId, if (attached.hasAttachments) attached.words else text, ChatThumbWidth) { words ->
-                Text(
-                    words,
-                    Modifier.widthIn(max = max)
-                        .background(MikaTheme.colors.accent, MikaShapes.UserBubble)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    style = BubbleText, color = MikaTheme.colors.onAccent,
-                )
+                // 长按选中、复制自己说过的话;蓝底上选中的底色用白色半透明,把手照旧是蓝色(画在气泡外面)
+                val colors = MikaTheme.colors
+                CompositionLocalProvider(LocalTextSelectionColors provides TextSelectionColors(colors.accent, colors.onAccent.copy(alpha = 0.35f))) {
+                    SelectionContainer(Modifier.testTag("selectable-user")) {
+                        Text(
+                            words,
+                            Modifier.widthIn(max = max)
+                                .background(colors.accent, MikaShapes.UserBubble)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            style = BubbleText, color = colors.onAccent,
+                        )
+                    }
+                }
             }
             note?.let { Text(it, Modifier.padding(top = 3.dp, end = 4.dp), style = MikaType.Hint, color = MikaTheme.colors.ink3) }
         }
@@ -714,7 +724,7 @@ private fun StatusCard(
                     Text(line, style = MikaType.Caption, fontWeight = FontWeight.SemiBold, color = MikaTheme.colors.ink2)
                 }
             }
-            MarkdownText(status.answer, AnswerText.copy(color = MikaTheme.colors.ink))
+            SelectableAnswer { MarkdownText(status.answer, AnswerText.copy(color = MikaTheme.colors.ink)) }
             // 来源:旧记录里模型写的依据文字,或运行记录里代码记下的来源;都没有就不显示
             if (status.evidence != null || runId != null) SourceChip(status.evidence, runId, loadSource, openSource)
         }
@@ -733,11 +743,20 @@ private fun StatusCard(
             )
             status.summary?.let { summary ->
                 Column(Modifier.fillMaxWidth().padding(top = 8.dp).answerSurface()) {
-                    MarkdownText(summary, AnswerText.copy(color = MikaTheme.colors.ink))
+                    SelectableAnswer { MarkdownText(summary, AnswerText.copy(color = MikaTheme.colors.ink)) }
                 }
             }
         }
     }
+}
+
+/**
+ * 回答的文字可以长按选中、用系统的复制条复制;回答里的链接照旧点开。只包住文字,下面的来源等入口不在选区里。
+ * 选区的把手在单独的弹出窗口里,拖把手不会带出侧栏;长按后接着拖选的移动由选区消费,侧栏和列表也不跟着动。
+ */
+@Composable
+private fun SelectableAnswer(content: @Composable () -> Unit) {
+    SelectionContainer(Modifier.testTag("selectable-answer")) { content() }
 }
 
 /** 回答下面的「来源」小胶囊,只是入口;依据和截图在独立页面看。 */

@@ -9,6 +9,15 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import com.wangzan101.mika.chat.DeleteImpact
+import com.wangzan101.mika.i18n.trPlural
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,6 +171,8 @@ fun ChatDrawer(
     onAbout: () -> Unit = {},
     /** 有新版本:「关于 Mika」带小红点。 */
     aboutDot: Boolean = false,
+    /** 长按一条存过的对话:要删它(先弹确认)。 */
+    onDelete: (DrawerConversation) -> Unit = {},
 ) {
     val c = MikaTheme.colors
     Column(
@@ -202,7 +213,7 @@ fun ChatDrawer(
         LazyColumn(Modifier.fillMaxWidth().weight(1f).lazyListScrollbar(list), state = list) {
             if (sections.running.isNotEmpty()) {
                 item("h-running") { SectionLabel(stringResource(R.string.drawer_running)) }
-                items(sections.running, key = { "r-${it.id}" }) { ConversationEntry(it, onOpen) }
+                items(sections.running, key = { "r-${it.id}" }) { ConversationEntry(it, onOpen, onDelete) }
             }
             if (sections.recent.isNotEmpty()) {
                 item("h-recent") { SectionLabel(stringResource(R.string.drawer_recent)) }
@@ -214,7 +225,7 @@ fun ChatDrawer(
                         )
                     }
                 }
-                items(sections.recent, key = { "c-${it.id}" }) { ConversationEntry(it, onOpen) }
+                items(sections.recent, key = { "c-${it.id}" }) { ConversationEntry(it, onOpen, onDelete) }
             }
             item("end") { Box(Modifier.height(12.dp)) }
         }
@@ -260,14 +271,30 @@ private fun SectionLabel(text: String) {
     )
 }
 
+/**
+ * 一条对话:点开它;长按(带一下振动)要删它。换不了对话时(任务进行中、没开并行)点不开,长按照样能删。
+ * 还没存进对话列表的(没有编号)没东西可删,不响应长按。
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversation) -> Unit) {
+private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversation) -> Unit, onDelete: (DrawerConversation) -> Unit) {
     val c = MikaTheme.colors
+    val deletable = item.id != null
+    val haptic = LocalHapticFeedback.current
     Column(
         Modifier.padding(horizontal = 12.dp).fillMaxWidth()
             .then(if (item.current) Modifier.cardSurface(c, NavShape) else Modifier)
             .clip(NavShape)
-            .clickable(enabled = item.enabled, onClick = { onOpen(item) })
+            .then(
+                if (deletable) Modifier.combinedClickable(
+                    onClickLabel = null,
+                    onLongClickLabel = stringResource(R.string.drawer_delete_action),
+                    // 和系统里长按一样振一下
+                    onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onDelete(item) },
+                    onClick = { if (item.enabled) onOpen(item) },
+                ) else Modifier.clickable(enabled = item.enabled, onClick = { onOpen(item) }),
+            )
+            .testTag("conversation-row")
             .alpha(if (item.enabled) 1f else 0.45f)
             .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
@@ -282,6 +309,30 @@ private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversat
             Text(item.subtitle, Modifier.padding(top = 2.dp), style = ConversationTime, color = c.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+/**
+ * 删对话前的确认:写明删的是哪个对话;有任务在跑、绑着定时任务时也写明会停掉、一起删掉。
+ * 和别处删东西的确认一样:右边红字「删除」,左边「取消」。
+ */
+@Composable
+internal fun DeleteConversationDialog(title: String, impact: DeleteImpact, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val body = listOfNotNull(
+        stringResource(R.string.drawer_delete_body, title),
+        if (impact.runningTask) stringResource(R.string.drawer_delete_running) else null,
+        if (impact.schedules > 0) trPlural(R.plurals.drawer_delete_schedules, impact.schedules) else null,
+    ).joinToString("\n")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_delete_title)) },
+        text = { Text(body, Modifier.testTag("delete-conversation-body")) },
+        confirmButton = {
+            TextButton(onClick = onConfirm, Modifier.testTag("confirm-delete-conversation")) {
+                Text(stringResource(R.string.confirm_delete), color = MikaTheme.colors.bad)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 private val DrawerWidth = 304.dp
@@ -348,6 +399,9 @@ fun ChatWithDrawer(
     }
     var revision by remember { mutableIntStateOf(0) }
     LaunchedEffect(conversationChanges) { conversationChanges.collect { revision++ } }
+    val deleted by vm.deleted.collectAsState()
+    /** 长按了要删的那条和删它会连带什么;确认弹窗开着。 */
+    var confirming by remember { mutableStateOf<Pair<DrawerConversation, DeleteImpact>?>(null) }
     ModalNavigationDrawer(
         drawerContent = {
             // 只在打开时读盘;每次打开、开着时存储里有对话改过都重读一次
@@ -361,8 +415,9 @@ fun ChatWithDrawer(
                 if (running) ChatCopy.subtitle(last, last?.let(vm::livePlace))?.first.orEmpty() else "",
             )
             val canSwitch = vm.canSwitch()
-            val sections = remember(all, current, others, canSwitch) {
-                drawerSections(all, current, others, vm::runningGoal, canSwitch, System.currentTimeMillis())
+            // 删掉的对话当场不列,不等后台删完
+            val sections = remember(all, current, others, canSwitch, deleted) {
+                drawerSections(all.filter { it.id !in deleted }, current, others.filter { it !in deleted }, vm::runningGoal, canSwitch, System.currentTimeMillis())
             }
             ChatDrawer(
                 check, sections, canSwitch,
@@ -373,6 +428,7 @@ fun ChatWithDrawer(
                 onBrowser = { leave(onBrowser) },
                 onAbout = { leave(onAbout) },
                 aboutDot = updateAvailable,
+                onDelete = { item -> item.id?.let { confirming = item to vm.deleteImpact(it) } },
                 onOpen = { item ->
                     close {
                         val id = item.id
@@ -392,5 +448,15 @@ fun ChatWithDrawer(
         scrimColor = MikaTheme.colors.floatShadow.copy(alpha = 0.28f),
     ) {
         content { scope.launch { if (reduceMotion) drawer.snapTo(DrawerValue.Open) else drawer.open() } }
+    }
+    confirming?.let { (item, impact) ->
+        DeleteConversationDialog(
+            item.title, impact,
+            onConfirm = {
+                confirming = null
+                item.id?.let(vm::deleteConversation)
+            },
+            onDismiss = { confirming = null },
+        )
     }
 }

@@ -54,6 +54,13 @@
     <string name="drawer_browser">浏览器</string>
     <string name="drawer_recent">最近</string>
     <string name="drawer_busy">任务进行中,结束后才能切换对话</string>
+    <string name="drawer_delete_title">删除这个对话？</string>
+    <string name="drawer_delete_body">「%1$s」和里面的文件都会删掉。</string>
+    <string name="drawer_delete_running">正在进行的任务会被停止。</string>
+    <plurals name="drawer_delete_schedules">
+        <item quantity="other">这个对话里的 %1$d 条定时任务也会一起删除。</item>
+    </plurals>
+    <string name="drawer_delete_action">删除对话</string>
     <string name="settings_title">设置</string>
     <string name="chat_unconfirmed">这几处没能确认:%1$s</string>
     <string name="chat_unverified">办完了,但没能核实</string>

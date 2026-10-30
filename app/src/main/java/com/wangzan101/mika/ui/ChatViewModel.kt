@@ -6,6 +6,7 @@ import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.core.assembly.legacyNames
 import com.wangzan101.mika.core.tool.LegacyNames
 import com.wangzan101.mika.chat.ConversationStore
+import com.wangzan101.mika.chat.DeleteImpact
 import com.wangzan101.mika.chat.SharedFile
 import com.wangzan101.mika.cap.sandbox.ImportResult
 import com.wangzan101.mika.confirm.ConfirmationCopy
@@ -302,9 +303,19 @@ class ChatViewModel(
     private val summarizing: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
     /** 算用时的时钟(毫秒)。 */
     private val clock: () -> Long = System::currentTimeMillis,
+    /** 删掉一个对话会连带什么(见 `ConversationDeleter.impact`)。 */
+    private val deletionImpact: (String) -> DeleteImpact = { DeleteImpact(runningTask = false, schedules = 0) },
+    /** 删掉一个对话和属于它的一切(见 `ConversationDeleter.delete`)。 */
+    private val removeConversation: suspend (String) -> Unit = {},
 ) {
     private val _ui = MutableStateFlow(ChatUi())
     val ui: StateFlow<ChatUi> = _ui.asStateFlow()
+
+    /** 删掉了(或正在删)的对话:侧栏当场不再列出,不等删完。 */
+    private val _deleted = MutableStateFlow<Set<String>>(emptySet())
+    val deleted: StateFlow<Set<String>> = _deleted.asStateFlow()
+    /** 还没删完的。 */
+    private val deleting = mutableSetOf<String>()
 
     /** 屏上这个对话以外、有任务在跑或排队的对话(顶部「另 n 个任务进行中」)。 */
     val otherRunning: StateFlow<List<String>> = combine(activeConversations, _ui.map { it.conversationId }.distinctUntilChanged()) { active, current ->
@@ -372,7 +383,13 @@ class ChatViewModel(
         scope.launch { taskState.collect { s -> if (!parallel()) shownTask.value?.let { onShown(it.first, s) } ?: onState(s) } }
         scope.launch { shownTask.collect { t -> if (t != null && parallel()) onShown(t.first, t.second) } }
         // 不论是谁存进屏上这个对话的(悬浮胶囊、定时任务、这里),都按存下的那份补上
-        scope.launch { store.changes.collect { id -> if (id == _ui.value.conversationId) syncSaved(id) } }
+        scope.launch {
+            store.changes.collect { id ->
+                if (id == _ui.value.conversationId) syncSaved(id)
+                // 删掉的对话又有人往里存了(比如悬浮胶囊接着在那个对话里说):重新列出来
+                if (id in _deleted.value && id !in deleting && store.turns(id).isNotEmpty()) _deleted.update { it - id }
+            }
+        }
         // 并行时只收屏上这个对话的任务的接管进度
         scope.launch {
             takeoverStage.collect { s -> if (ownTask()) _ui.update { it.copy(takeoverStage = s) } }
@@ -657,6 +674,8 @@ class ChatViewModel(
      * 服务换去显示别的对话的任务(别处刚开始了一个)时,这里正在跟的任务还在跑就让服务显示回来,不让它停在半路。
      */
     private fun onShown(conversationId: String, s: TaskState) {
+        // 删掉的对话的任务正在停下:不接到屏上
+        if (conversationId in _deleted.value) return
         val current = _ui.value.conversationId
         when {
             current == null -> {
@@ -837,6 +856,35 @@ class ChatViewModel(
         if (busy()) return
         liveIndex = -1
         _ui.update { ChatUi(takeoverStage = it.takeoverStage, attachEnabled = it.attachEnabled) }
+    }
+
+    /** 删掉 [id] 会连带什么:侧栏的确认弹窗据此写明会停掉任务、删掉定时任务。 */
+    fun deleteImpact(id: String): DeleteImpact = deletionImpact(id)
+
+    /**
+     * 删掉对话 [id](用户在侧栏确认过):当场从侧栏拿掉;是屏上这个对话就换成一个新的空对话。
+     * 停任务、删定时任务、删文件在后台做(见 `ConversationDeleter`)。
+     */
+    fun deleteConversation(id: String) {
+        if (!deleting.add(id)) return
+        _deleted.update { it + id }
+        if (id == _ui.value.conversationId) startOver(id) else unpark(id)
+        scope.launch {
+            try { removeConversation(id) } catch (e: CancellationException) { throw e } catch (e: Exception) { } finally { deleting -= id }
+        }
+    }
+
+    /** 屏上的对话被删了:不再跟它的任务(还没交给服务的开始直接作废),换成新的空对话。 */
+    private fun startOver(id: String) {
+        lingerJob?.cancel()
+        pendingStart?.cancel()
+        pendingStart = null
+        held.clear()
+        unpark(id)
+        liveIndex = -1
+        screenSeen = false
+        val fresh = if (parallel()) store.newConversation() else null
+        _ui.update { ChatUi(conversationId = fresh, takeoverStage = Takeover.Stage.None, attachEnabled = it.attachEnabled) }
     }
 
     fun busy() = _ui.value.composer != ComposerMode.Idle

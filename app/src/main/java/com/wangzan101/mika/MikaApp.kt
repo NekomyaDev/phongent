@@ -6,6 +6,7 @@ import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Application
 import android.net.Uri
 import android.util.Log
+import com.wangzan101.mika.chat.ConversationDeleter
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import com.wangzan101.mika.cap.sandbox.AndroidSandbox
@@ -50,6 +51,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.wangzan101.mika.cap.web.cdp.WebDevtools
 import com.wangzan101.mika.cap.web.WebOwner
 import com.wangzan101.mika.cap.web.SiteRegistry
@@ -127,6 +129,22 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
 
     /** 对话记录:整个进程一份,任务服务、聊天界面、结果卡片的按钮共用。 */
     val conversations: ConversationStore by lazy { ConversationStore(this) }
+
+    /** 删对话(侧栏长按):连带它的任务、定时任务和工作区。 */
+    val conversationDeleter: ConversationDeleter by lazy {
+        val app = this
+        ConversationDeleter(
+            conversations, taskState.activeConversations,
+            cancelTasks = { id -> taskState.runs.value.filter { it.conversationId == id }.forEach { TaskService.cancel(app, it.key) } },
+            schedulesOf = { id -> TriggerRuntime.list(app).filter { it.threadId == id }.map { it.id } },
+            removeSchedule = { TriggerRuntime.remove(app, it) },
+            deleteWorkspace = { id ->
+                // 工作区里有附件、用户发来的屏幕、任务写的文件;沙箱里的命令碰得到这里,按句柄删、不跟进链接,和重置互斥
+                val dirs = SandboxDirs(app)
+                dirs.tree.shared { withContext(Dispatchers.IO) { dirs.gate.deleteTree(dirs.work, dirs.workspace(id).name) } }
+            },
+        )
+    }
 
     /** 用户发来的屏幕(跟着各自的对话存在工作区里)。 */
     val userScreens: com.wangzan101.mika.chat.UserScreenFiles by lazy { com.wangzan101.mika.chat.UserScreenFiles(this) }
@@ -213,6 +231,8 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 Attachments.importInto(app, uris.map(Uri::parse), dirs.workspace(id), dirs.gate, dirs.tree, sandbox::freeBytes) { sandbox.workspaceBytes(id) }
             },
             describeAttachments = { uris -> AttachFiles.describe(app, uris) },
+            deletionImpact = conversationDeleter::impact,
+            removeConversation = conversationDeleter::delete,
         )
     }
 

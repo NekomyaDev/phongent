@@ -36,6 +36,45 @@ class ConversationStoreTest {
         assertFalse("groups" in java.io.File(dir, "$id.json").readText().substringAfter("谢谢"))
     }
 
+    /** 删对话:对话文件、标题、挪到一边的损坏文件、临时文件都删掉,列表里没有了,别的对话不动;删完发一次改动。 */
+    @Test fun deleteRemovesTheConversationAndItsSidecars() = kotlinx.coroutines.runBlocking {
+        val dir = tmp.newFolder("c")
+        val store = ConversationStore(dir)
+        val id = store.newConversation()
+        val other = store.newConversation()
+        store.append(id, Turn("查天气", "晴", "succeeded"))
+        store.setTitle(id, "天气")
+        java.io.File(dir, "$id.json.corrupt-1").writeText("x")
+        java.io.File(dir, "$id.json.tmp").writeText("x")
+        store.append(other, Turn("订票", "好了", "succeeded"))
+        val changes = mutableListOf<String>()
+        val job = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { store.changes.collect { changes += it } }
+        store.delete(id)
+        kotlinx.coroutines.yield()
+        job.cancel()
+        assertEquals(listOf(id), changes)
+        assertEquals(listOf("$other.json"), dir.list()!!.sorted())
+        assertEquals(listOf(other), store.list().map { it.id })
+        assertEquals(emptyList<Turn>(), store.turns(id))
+        assertEquals(null, store.title(id))
+    }
+
+    /** 删之后才到的补写(后台起好的标题、收尾后补的结局)不把对话写回来;再存进一轮就是重新用这个编号。 */
+    @Test fun lateWritesDoNotReviveADeletedConversation() {
+        val dir = tmp.newFolder("c")
+        val store = ConversationStore(dir)
+        val id = store.newConversation()
+        store.append(id, Turn("查天气", "晴", "succeeded", runId = "r1"))
+        store.delete(id)
+        assertFalse(store.setTitle(id, "天气"))
+        store.updateTurn(id, "r1") { it.copy(outcome = "补上的") }
+        assertTrue(dir.list()!!.isEmpty())
+
+        store.append(id, Turn("再来", "好", "succeeded"))
+        assertTrue(store.setTitle(id, "再来"))
+        assertEquals(listOf("再来"), store.list().map { it.title })
+    }
+
     @Test fun corruptFileReadsAsEmpty() {
         val dir = tmp.newFolder("c")
         val s = ConversationStore(dir)
