@@ -278,6 +278,15 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
 - 发布在 GitHub Releases，tag 用 `vX.Y.Z`，APK 作为附件挂在这个版本上。
 - 检查更新：每次打开 App 查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
 
+## Star 增长
+
+<a href="https://star-history.com/#wangzan101/Mika&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&theme=dark" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date" width="600" />
+  </picture>
+</a>
+
 ## 联系作者
 
 - X：[@wangzan101](https://x.com/wangzan101)

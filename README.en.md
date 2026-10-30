@@ -278,6 +278,15 @@ The debug build is not precompiled and its UI is several times slower; use the p
 - Releases are published on GitHub Releases with tags `vX.Y.Z`, with the APK attached to the release.
 - Update checks: each time you open the app it queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
 
+## Star history
+
+<a href="https://star-history.com/#wangzan101/Mika&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&theme=dark" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date" width="600" />
+  </picture>
+</a>
+
 ## Contact
 
 - X: [@wangzan101](https://x.com/wangzan101)
