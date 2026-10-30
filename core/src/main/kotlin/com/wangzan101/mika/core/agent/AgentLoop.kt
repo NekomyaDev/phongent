@@ -366,6 +366,7 @@ class AgentLoop(
         var answered: String? = null
         var followUpNudged = false
         var resultReadNudged = false
+        var languageNudged = false
         fun facts() = ReviewFacts(acted, paymentHandedOver || recorder.outwardActs > 0, recorder.lastChangeMark?.let { !tools.readSince(it) } == true)
         media.clear()
         gapsNudged = false
@@ -508,6 +509,15 @@ class AgentLoop(
                     resultReadNudged = true
                     history += ctx.notice("operation_result", "The result of the last action has not been read yet. Look at the current screen first to confirm the actual state, then answer; if it cannot be read, say so plainly.")
                     continue
+                }
+                // 回答的正文不是用户最近那句的语言:退回一次整段改写;改写后还不对照样交出
+                if (!languageNudged) {
+                    val mismatch = ReplyLanguage.mismatch(latestUserWords(history), text)
+                    if (mismatch != null) {
+                        languageNudged = true
+                        TurnPolicy.language(mismatch).let { history += ctx.notice(it.source, it.text) }
+                        continue
+                    }
                 }
                 // 不带调用的回复就是最终回答；产品路径只整理来源。
                 val result = conclude(task, text, step, currentFacts, history)
@@ -693,6 +703,11 @@ class AgentLoop(
         if (last == null || last.role == Role.Assistant) history += Message(Role.User, listOf(state), Author.Mika)
         else history[history.lastIndex] = last.copy(parts = last.parts + state)
     }
+
+    /** 用户最近一句话的文字(不含接在后面的运行时状态和插话标记)。 */
+    private fun latestUserWords(history: List<Message>): String =
+        history.lastOrNull { it.author == Author.User }?.let(ContextBuilder::withoutRuntimeState)?.parts?.filterIsInstance<Part.Text>()
+            ?.joinToString(" ") { it.text.removePrefix(STEER_MARKER) }.orEmpty()
 
     private suspend fun channelLine(matched: List<KnowledgeEntry>): String? {
         val facts = channelFacts ?: return null

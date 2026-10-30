@@ -49,6 +49,13 @@ class LoopPoliciesTest {
         assertTrue(n.text, "- ¥89\n- 「已发送」" in n.text)
     }
 
+    @Test fun languageNudgeNamesBothSidesAndTheRules() {
+        val n = TurnPolicy.language(ReplyLanguage.Mismatch(ReplyLanguage.CHINESE, ReplyLanguage.Family("Latin script")))
+        assertEquals(Feedback["language_source"], n.source)
+        assertTrue(n.text, "mostly in Chinese" in n.text && "is in Latin script" in n.text)
+        assertTrue(n.text, "Translate what you read" in n.text && "\"translation (original)\"" in n.text && "Do not change any value" in n.text)
+    }
+
     @Test fun finalTurnOffersOnlyReportFailure() {
         val specs = listOf("ask_user", "end_not_done", "phone_tap").map { ToolSpec(it, "", "{}") }
         val verbs = mapOf("ask_user" to Verb.AskUser, "end_not_done" to Verb.EndNotDone, "phone_tap" to Verb.Tap)

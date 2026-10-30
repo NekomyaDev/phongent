@@ -52,6 +52,10 @@ internal object TurnPolicy {
         return Notice(Feedback["unconfirmed_source"], Feedback.format("unconfirmed_nudge", "findings" to findings))
     }
 
+    /** 回答的正文不是用户那句的语言([m] 是两边的语族,见 [ReplyLanguage]):退回一次,整段改写成用户的语言。 */
+    fun language(m: ReplyLanguage.Mismatch): Notice =
+        Notice(Feedback["language_source"], Feedback.format("language_nudge", "answer" to m.answer.display, "user" to m.user.display))
+
     /** 用户同意了、或回答了([what]),之后却什么也没做就要交回答:提醒一次照做,或说清为什么不做。 */
     fun followUp(what: String): Notice = Notice(Feedback["followup_source"], Feedback.format("followup_nudge", "what" to what))
 

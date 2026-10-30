@@ -147,6 +147,7 @@ internal object PromptSurfaceFeedback {
         val empty = TurnPolicy.afterEmpty(already = false, truncated = false)!!
         val truncated = TurnPolicy.afterEmpty(already = false, truncated = true)!!
         val unconfirmed = TurnPolicy.unconfirmed(listOf("¥89", "「已发送」"))
+        val language = TurnPolicy.language(ReplyLanguage.Mismatch(ReplyLanguage.CHINESE, ReplyLanguage.Family("Latin script")))
         val progress = TurnPolicy.beforeStep(TurnSnapshot(11, 20))!!
         val final = TurnPolicy.finalTurn()
         val stuck = GuardVerdict("no_progress", Severity.Warn, JsonObject(emptyMap()))
@@ -156,6 +157,7 @@ internal object PromptSurfaceFeedback {
             "empty_reply" to empty.text,
             "truncated_reply" to truncated.text,
             "unconfirmed_nudge" to unconfirmed.text,
+            "language_nudge" to language.text,
             "answer_or_failure" to ANSWER_OR_FAILURE,
             "give_up_advice" to giveUp,
             "repeated_input_advice" to typedAgain,
@@ -168,6 +170,7 @@ internal object PromptSurfaceFeedback {
             "recalled_note" to NoticePolicy.imageNote(Verb.ViewPastScreens, offScreen = false),
             "nudge_source" to empty.source,
             "unconfirmed_source" to unconfirmed.source,
+            "language_source" to language.source,
             "progress_source" to progress.source,
             "final_source" to final.source,
             "replay_source" to fileCall("RouteReplayKt", "getREPLAY_SOURCE"),

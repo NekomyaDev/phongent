@@ -311,7 +311,41 @@ class LoopScenarioTest {
         snapshot("m_irreversible_verified", end, "main" to main, "verifier" to checker)
     }
 
+    // (n) 英文问、回答漂成中文:交出前退回一次,让模型整段改写成用户的语言;改写好的英文回答照常交出
+    @Test fun answerInOtherLanguageIsNudgedOnce() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300),
+            label("@e3", "已使用 250.53 GB / 512 GB", 400)))))
+        val main = fakeModel("main") {
+            call("phone_observe")
+            answer(CHINESE_ANSWER)
+            answer("Android version: 14 (Android 版本). Storage: 250.53 GB of 512 GB is used (已使用), as shown on About phone (关于手机).")
+        }
+        val end = loop(main, toolDispatcher(screen)).run("What Android version is this phone on, and how much storage is used?")
+        end as TaskState.Succeeded
+        assertTrue(end.answer, end.answer.startsWith("Android version: 14"))
+        val notice = main.requests[2].messages.withoutRuntime().last()
+        assertEquals(ContextKind.Notice, ContextBuilder.kindOf(notice))
+        assertTrue("translation (original)" in (notice.parts.single() as Part.Text).text)
+        snapshot("n_answer_language_nudge", end, "main" to main)
+    }
+
+    // 改写后还是别的语言:不再退回,照样交出
+    @Test fun answerLanguageIsNudgedOnlyOnce() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300),
+            label("@e3", "已使用 250.53 GB / 512 GB", 400)))))
+        val main = fakeModel("main") {
+            call("phone_observe")
+            answer(CHINESE_ANSWER)
+            answer(CHINESE_ANSWER)
+        }
+        val end = loop(main, toolDispatcher(screen)).run("What Android version is this phone on, and how much storage is used?")
+        assertEquals(CHINESE_ANSWER, (end as TaskState.Succeeded).answer)
+        assertEquals(0, main.remaining)
+        assertEquals(3, main.requests.size)
+    }
+
     private companion object {
+        const val CHINESE_ANSWER = "我打开了关于手机页面看过了：这台手机的安卓版本是 14，存储已使用 250.53 GB，总共 512 GB，两个数字都是页面上显示的。"
         const val CLOCK = 1_761_300_000_000L
         const val SETTINGS = "com.android.settings"
         const val CHAT = "com.chat"

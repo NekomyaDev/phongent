@@ -11,6 +11,9 @@ Before this answer goes to the user:
 {{findings}}
 Check this: read the place again if you can, then reply with your corrected final answer. Anything you still cannot confirm, say plainly in the answer that you could not confirm it instead of stating it as fact. This check happens once; your next answer goes to the user.
 
+## language_nudge
+Before this answer goes to the user: it is written mostly in {{answer}}, but the user's latest message is in {{user}}. Rewrite the whole answer in the language of the user's latest message. Translate what you read; keep the original only for proper names, or for labels the user must find on the screen, written as "translation (original)". Do not change any value: numbers, dates, amounts, units and names stay exactly as read. This check happens once; your next answer goes to the user.
+
 ## unconfirmed_gaps
 These items in your answer do not appear in anything you read during this task:
 {{items}}
@@ -70,6 +73,9 @@ not carried out yet
 
 ## unconfirmed_source
 answer check
+
+## language_source
+answer language
 
 ## progress_source
 step check
