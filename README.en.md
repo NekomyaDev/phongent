@@ -37,8 +37,9 @@ It works on a hidden background screen, so you can keep using your phone.
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="Reads through a WeChat group in the background and summarizes today's chat" width="260" /><br/>Reads through a WeChat group in the background and summarizes today's chat<br/><sub>(sped up; the summary quotes group members, so its text is blurred)</sub></td>
-<td align="center" width="50%"><img src="docs/media/xhs-summary.gif" alt="Opens Xiaohongshu and summarizes a creator's posts" width="260" /><br/>Opens Xiaohongshu and summarizes a creator's posts<br/><sub>(sped up)</sub></td>
+<td align="center" width="33%"><img src="docs/media/wechat-group.gif" alt="Reads through a WeChat group in the background and summarizes today's chat" width="230" /><br/>Reads through a WeChat group in the background and summarizes today's chat<br/><sub>(sped up; the summary quotes group members, so its text is blurred)</sub></td>
+<td align="center" width="33%"><img src="docs/media/xhs-summary.gif" alt="Opens Xiaohongshu and summarizes a creator's posts" width="230" /><br/>Opens Xiaohongshu and summarizes a creator's posts<br/><sub>(sped up)</sub></td>
+<td align="center" width="33%"><img src="docs/media/boss-greet.gif" alt="Greets recruiters for 3 jobs on the BOSS Zhipin website" width="230" /><br/>Greets recruiters for 3 jobs on the BOSS Zhipin website<br/><sub>(sped up)</sub></td>
 </tr>
 </table>
 

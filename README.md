@@ -39,8 +39,9 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="260" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>
-<td align="center" width="50%"><img src="docs/media/xhs-summary.gif" alt="打开小红书，总结一位博主的内容" width="260" /><br/>打开小红书，总结一位博主的内容<br/><sub>（加速播放）</sub></td>
+<td align="center" width="33%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="230" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>
+<td align="center" width="33%"><img src="docs/media/xhs-summary.gif" alt="打开小红书，总结一位博主的内容" width="230" /><br/>打开小红书，总结一位博主的内容<br/><sub>（加速播放）</sub></td>
+<td align="center" width="33%"><img src="docs/media/boss-greet.gif" alt="在 BOSS 直聘网页上给 3 个岗位打招呼" width="230" /><br/>在 BOSS 直聘网页上给 3 个岗位打招呼<br/><sub>（加速播放）</sub></td>
 </tr>
 </table>
 
