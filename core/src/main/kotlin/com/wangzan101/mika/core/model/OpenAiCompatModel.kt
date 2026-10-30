@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -17,14 +18,18 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * OpenAI Chat Completions 兼容端点(DeepSeek/Qwen/Kimi/GLM/OpenRouter/本地服务等)。差异只放在 [capabilities]。
- * [reasoningField] 是模型列表里写明的思考内容字段;为 `reasoning_content` 时,带工具的请求回传此前的思考。
+ *
+ * 思考内容各家放的地方不同:`reasoning_content`、`reasoning`,或者 `content` 是分块数组、思考在 `thinking` 块里。
+ * 收到的思考记下从哪个地址、哪个位置来的([ReasoningVia],存在 [Part.Thinking.opaque]),带工具的请求原样放回原处:
+ * 有的服务商要求工具调用前后的思考接着回传,不回传就拒绝。只回传从这个地址收到的,别家给的思考不发
+ * (不认这个字段的服务商不会收到它)。[reasoningField] 是模型列表里写明的思考字段(`reasoning_content` 或
+ * `reasoning`):写明了的,来历不明的思考(旧版本存下的历史)也按它回传。
  */
 class OpenAiCompatModel(
     baseUrl: String,
@@ -38,8 +43,7 @@ class OpenAiCompatModel(
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/chat/completions"
-    private val replayReasoningContent = reasoningField == "reasoning_content" ||
-        model.startsWith("deepseek-", ignoreCase = true) || baseUrl.toHttpUrlOrNull()?.host == "api.deepseek.com"
+    private val declaredVia = ReasoningVia.ofField(reasoningField)
     private val json = Json { ignoreUnknownKeys = true }
 
     private companion object {
@@ -56,11 +60,11 @@ class OpenAiCompatModel(
     override suspend fun completeStreaming(
         system: String, messages: List<Message>, tools: List<ToolSpec>, onText: (String) -> Unit,
     ): ModelReply {
-        var stream = OpenAiStream(onText, ::parseUsage)
+        var stream = OpenAiStream(onText, ::parseUsage, ::thinking)
         var response = HttpSupport.stream(http, request(system, messages, tools, stream = true), stream::accept)
         if (response.status == 400 && response.body.contains("stream_options")) {
             // 一些兼容端点能流式生成，却没有用量选项。
-            stream = OpenAiStream(onText, ::parseUsage)
+            stream = OpenAiStream(onText, ::parseUsage, ::thinking)
             response = HttpSupport.stream(http, request(system, messages, tools, stream = true, includeUsage = false), stream::accept)
         }
         val (status, retryAfter, text) = response
@@ -80,7 +84,8 @@ class OpenAiCompatModel(
     private fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, includeUsage: Boolean = true): Request {
         val payload = buildJsonObject {
             put("model", model)
-            val replayReasoning = replayReasoningContent && tools.isNotEmpty()
+            // 思考只在带工具的请求里回传(工具调用一步接一步时要接着想);不带工具的旁路调用不需要
+            val replayReasoning = tools.isNotEmpty()
             val wire = listOf(buildJsonObject { put("role", "system"); put("content", system) }) +
                 messages.flatMap { serialize(it, replayReasoning) }
             put("messages", JsonArray(if (capabilities.promptCaching == PromptCaching.Explicit) withCacheMarks(wire) else wire))
@@ -182,15 +187,38 @@ class OpenAiCompatModel(
         else -> ""
     }
 
-    // DeepSeek(以及列表里说思考放在 reasoning_content 的模型)的带工具请求要原样回传此前助手消息的 reasoning_content。
+    /** 收到的一段思考:记下这个地址和收到它的位置,回放时认得。 */
+    private fun thinking(text: String, via: ReasoningVia) = Part.Thinking(text, via.tag(endpoint))
+
+    /** 这条助手消息里能回传给这个地址的思考和放回哪里:从这里收到的按收到的位置;来历不明的按列表写明的字段;都没有为 null。 */
+    private fun replayable(m: Message): Pair<String, ReasoningVia>? {
+        val parts = m.parts.filterIsInstance<Part.Thinking>()
+        val own = parts.mapNotNull { p -> ReasoningVia.of(p.opaque, endpoint)?.let { p.text to it } }
+        if (own.isNotEmpty()) return own.joinToString("") { it.first } to own.first().second
+        val declared = declaredVia ?: return null
+        val untagged = parts.filter { it.opaque == null }.joinToString("") { it.text }
+        return if (untagged.isEmpty()) null else untagged to declared
+    }
+
     private fun assistantJson(m: Message, replayReasoning: Boolean): JsonObject {
         val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n") { it.text }
-        val thinking = m.parts.filterIsInstance<Part.Thinking>().joinToString("") { it.text }
         val calls = m.parts.filterIsInstance<Part.ToolCall>()
+        val replay = if (replayReasoning) replayable(m) else null
         return buildJsonObject {
             put("role", "assistant")
-            if (text.isEmpty() && calls.isNotEmpty()) put("content", JsonNull) else put("content", text)
-            if (replayReasoning && thinking.isNotEmpty()) put("reasoning_content", thinking)
+            when {
+                // 分块的那家要整条原样放回:思考块在前,文字块在后
+                replay?.second == ReasoningVia.ThinkingChunks -> putJsonArray("content") {
+                    addJsonObject {
+                        put("type", "thinking")
+                        putJsonArray("thinking") { addJsonObject { put("type", "text"); put("text", replay.first) } }
+                    }
+                    if (text.isNotEmpty()) addJsonObject { put("type", "text"); put("text", text) }
+                }
+                text.isEmpty() && calls.isNotEmpty() -> put("content", JsonNull)
+                else -> put("content", text)
+            }
+            replay?.second?.field?.let { put(it, replay.first) }
             if (calls.isNotEmpty()) putJsonArray("tool_calls") {
                 calls.forEach { c ->
                     add(buildJsonObject {
@@ -209,10 +237,18 @@ class OpenAiCompatModel(
                 ?: throw ModelError.BadResponse("缺少 choices")
             val msg = choice["message"]?.jsonObject ?: throw ModelError.BadResponse("缺少 message")
             val parts = mutableListOf<Part>()
-            (msg["reasoning_content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }
-                ?.let { parts += Part.Thinking(it) }
-            (msg["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }
-                ?.let { parts += Part.Text(it) }
+            ReasoningVia.fields.firstNotNullOfOrNull { via ->
+                (msg[via.field!!] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }?.let { it to via }
+            }?.let { (t, via) -> parts += thinking(t, via) }
+            when (val content = msg["content"]) {
+                is JsonArray -> {
+                    val chunks = ContentChunks.of(content)
+                    if (chunks.thinking.isNotEmpty() && parts.isEmpty()) parts += thinking(chunks.thinking, ReasoningVia.ThinkingChunks)
+                    if (chunks.text.isNotEmpty()) parts += Part.Text(chunks.text)
+                }
+                is JsonPrimitive -> content.contentOrNull?.takeIf { it.isNotEmpty() }?.let { parts += Part.Text(it) }
+                else -> {}
+            }
             (msg["tool_calls"] as? JsonArray)?.forEach { el ->
                 val c = el.jsonObject
                 val fn = c["function"]!!.jsonObject
@@ -253,6 +289,7 @@ class OpenAiCompatModel(
 private class OpenAiStream(
     private val onText: (String) -> Unit,
     private val usageOf: (JsonElement?) -> Usage?,
+    private val thinkingOf: (String, ReasoningVia) -> Part.Thinking,
 ) {
     private data class Call(val id: StringBuilder = StringBuilder(), val name: StringBuilder = StringBuilder(),
         val args: StringBuilder = StringBuilder())
@@ -260,6 +297,7 @@ private class OpenAiStream(
     private val json = Json { ignoreUnknownKeys = true }
     private val visible = StringBuilder()
     private val thinking = StringBuilder()
+    private var thinkingVia: ReasoningVia? = null
     private val calls = sortedMapOf<Int, Call>()
     private var usage: Usage? = null
     private var reason: String? = null
@@ -276,10 +314,17 @@ private class OpenAiStream(
         val choice = (root["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return
         (choice["finish_reason"] as? JsonPrimitive)?.contentOrNull?.let { reason = it }
         val delta = choice["delta"] as? JsonObject ?: return
-        (delta["reasoning_content"] as? JsonPrimitive)?.contentOrNull?.let { thinking.append(it) }
-        (delta["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }?.let {
-            visible.append(it)
-            onText(visible.toString())
+        ReasoningVia.fields.forEach { via ->
+            (delta[via.field!!] as? JsonPrimitive)?.contentOrNull?.let { appendThinking(it, via) }
+        }
+        when (val content = delta["content"]) {
+            is JsonArray -> {
+                val chunks = ContentChunks.of(content)
+                if (chunks.thinking.isNotEmpty()) appendThinking(chunks.thinking, ReasoningVia.ThinkingChunks)
+                appendVisible(chunks.text)
+            }
+            is JsonPrimitive -> content.contentOrNull?.let(::appendVisible)
+            else -> {}
         }
         (delta["tool_calls"] as? JsonArray)?.forEach { item ->
             val obj = item as? JsonObject ?: return@forEach
@@ -292,10 +337,23 @@ private class OpenAiStream(
         }
     }
 
+    /** 一次回复里思考只按最先收到的位置记(同一家不会换位置;两个字段都给时只记一份)。 */
+    private fun appendThinking(t: String, via: ReasoningVia) {
+        if (t.isEmpty()) return
+        if (thinkingVia == null) thinkingVia = via
+        if (via == thinkingVia) thinking.append(t)
+    }
+
+    private fun appendVisible(t: String) {
+        if (t.isEmpty()) return
+        visible.append(t)
+        onText(visible.toString())
+    }
+
     fun finish(): ModelReply {
         if (!done || chunks == 0) throw ModelError.BadResponse("流式响应提前结束")
         val parts = buildList<Part> {
-            if (thinking.isNotEmpty()) add(Part.Thinking(thinking.toString()))
+            thinkingVia?.takeIf { thinking.isNotEmpty() }?.let { add(thinkingOf(thinking.toString(), it)) }
             if (visible.isNotEmpty()) add(Part.Text(visible.toString()))
             calls.values.forEach { c ->
                 if (c.name.isEmpty() || c.id.isEmpty()) throw ModelError.BadResponse("工具调用流缺少名称或编号")
@@ -309,5 +367,56 @@ private class OpenAiStream(
             else -> if (calls.isNotEmpty()) StopReason.ToolUse else StopReason.Other
         }
         return ModelReply(parts, stop, usage)
+    }
+}
+
+/**
+ * 兼容接口把思考放在哪:[field] 是助手消息上的字段名;[ThinkingChunks] 是 `content` 为分块数组、思考在 `thinking` 块里。
+ * 记在 [Part.Thinking.opaque] 里的是 `{"endpoint":…,"via":…}`。
+ */
+internal enum class ReasoningVia(val wire: String, val field: String?) {
+    ReasoningContent("reasoning_content", "reasoning_content"),
+    Reasoning("reasoning", "reasoning"),
+    ThinkingChunks("thinking_chunks", null);
+
+    fun tag(endpoint: String): String = buildJsonObject { put("endpoint", endpoint); put("via", wire) }.toString()
+
+    companion object {
+        /** 放在消息字段上的几种,按这个次序认(两个都给时取 `reasoning_content`)。 */
+        val fields = listOf(ReasoningContent, Reasoning)
+
+        fun ofField(name: String?): ReasoningVia? = fields.firstOrNull { it.field == name }
+
+        /** [opaque] 是从 [endpoint] 收到的思考时给出它的位置;别处来的、认不出的为 null。 */
+        fun of(opaque: String?, endpoint: String): ReasoningVia? {
+            val o = opaque?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() } ?: return null
+            if ((o["endpoint"] as? JsonPrimitive)?.contentOrNull != endpoint) return null
+            val via = (o["via"] as? JsonPrimitive)?.contentOrNull
+            return entries.firstOrNull { it.wire == via }
+        }
+    }
+}
+
+/** `content` 是分块数组时:`text` 块拼成回答,`thinking` 块(里面又是 `text` 块)拼成思考。别的块不认。 */
+private class ContentChunks(val text: String, val thinking: String) {
+    companion object {
+        fun of(content: JsonArray): ContentChunks {
+            val text = StringBuilder()
+            val thinking = StringBuilder()
+            content.forEach { el ->
+                val c = el as? JsonObject ?: return@forEach
+                when ((c["type"] as? JsonPrimitive)?.contentOrNull) {
+                    "text" -> (c["text"] as? JsonPrimitive)?.contentOrNull?.let(text::append)
+                    "thinking" -> when (val t = c["thinking"]) {
+                        is JsonArray -> t.forEach { inner ->
+                            ((inner as? JsonObject)?.get("text") as? JsonPrimitive)?.contentOrNull?.let(thinking::append)
+                        }
+                        is JsonPrimitive -> t.contentOrNull?.let(thinking::append)
+                        else -> {}
+                    }
+                }
+            }
+            return ContentChunks(text.toString(), thinking.toString())
+        }
     }
 }
