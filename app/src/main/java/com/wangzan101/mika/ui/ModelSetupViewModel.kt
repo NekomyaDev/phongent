@@ -16,6 +16,11 @@ import com.wangzan101.mika.settings.ProviderPresets
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.settings.RoleChoice
 import com.wangzan101.mika.settings.RoleChoices
+import com.wangzan101.mika.core.chatgpt.ChatGptAuth
+import com.wangzan101.mika.core.chatgpt.SignInException
+import com.wangzan101.mika.core.chatgpt.SignInFailure
+import com.wangzan101.mika.core.chatgpt.signInWithChatGpt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +38,20 @@ sealed interface ListState {
     data object Idle : ListState
     data object Running : ListState
     data class Failed(val message: String) : ListState
+}
+
+/** 用 ChatGPT 登录的账号:[email] 来自核对过的 ID 令牌(可能为空);退出登录后 [signedIn] 为假。 */
+data class ChatGptAccount(val email: String, val signedIn: Boolean)
+
+/**
+ * 「用 ChatGPT 登录」要用到的系统能力:在浏览器里打开授权页、登录完回到 Mika、回调后浏览器里显示的网页。
+ * 界面给出(要 Context);测试里不给,就不能登录。
+ */
+interface ChatGptBrowser {
+    fun open(url: String)
+    fun returnToApp()
+    /** [params] 里有 `error` 表示用户在授权页取消了。 */
+    fun page(params: Map<String, String>): String
 }
 
 /** 「添加服务商」表单。 */
@@ -79,6 +98,14 @@ data class ModelSetupUi(
     val roles: RoleChoices = RoleChoices(),
     val keyed: Set<String> = emptySet(),
     val listing: Map<String, ListState> = emptyMap(),
+    /** ChatGPT 服务商的账号;没有这家时为 null。 */
+    val chatGptAccount: ChatGptAccount? = null,
+    /** 用 ChatGPT 登录的进度。 */
+    val chatGptSignIn: ListState = ListState.Idle,
+    /** 第一次登录成功后说明一次「在用你的 ChatGPT 套餐」,点「知道了」收起。 */
+    val chatGptWelcome: Boolean = false,
+    /** 退出登录时 ChatGPT 那边没确认注销(本机令牌已清)。 */
+    val chatGptRevokeUnconfirmed: Boolean = false,
 ) {
     /** 还没有服务商时表单总是展开。 */
     val showForm: Boolean get() = formOpen || providers.isEmpty()
@@ -121,11 +148,13 @@ class ModelSetupViewModel(
     private val store: ProviderStore,
     private val scope: CoroutineScope,
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val chatGptBrowser: ChatGptBrowser? = null,
 ) {
     private val _state = MutableStateFlow(snapshot(ModelSetupUi(AddForm.of(ProviderPresets.all.first()))))
     val state: StateFlow<ModelSetupUi> = _state.asStateFlow()
 
     private var testJob: Job? = null
+    private var signInJob: Job? = null
     private val refreshJobs = mutableMapOf<String, Job>()
 
     init {
@@ -138,6 +167,9 @@ class ModelSetupViewModel(
         return ui.copy(
             providers = providers, configs = store.configs.value, roles = store.roles.value,
             keyed = providers.filter { store.hasKey(it.id) }.map { it.id }.toSet(),
+            chatGptAccount = store.chatGptProvider()?.let { p ->
+                store.chatGptSession(p.id).let { ChatGptAccount(it?.email.orEmpty(), it?.signedIn == true) }
+            },
         )
     }
 
@@ -199,6 +231,68 @@ class ModelSetupViewModel(
         }
     }
 
+    // ---------- 用 ChatGPT 登录 ----------
+
+    /**
+     * 打开浏览器登录 ChatGPT,回调后换令牌、核对,列出模型,存成(或更新)ChatGPT 服务商,回到 Mika。
+     * 还没有主模型时选它的一个模型为主模型。第一次注册成功后说明一次在用套餐额度。失败说原因。
+     */
+    fun signInWithChatGpt() {
+        val browser = chatGptBrowser ?: return
+        if (_state.value.chatGptSignIn == ListState.Running) return
+        _state.update { it.copy(chatGptSignIn = ListState.Running, chatGptRevokeUnconfirmed = false) }
+        signInJob = scope.launch {
+            val (listProblem, first) = try {
+                withContext(io) {
+                    val (hostId, clientId) = store.chatGptRegistration()
+                    val existing = store.chatGptProvider()
+                    val session = signInWithChatGpt(
+                        store.chatGptAuth, hostId, clientId, existing?.let { store.chatGptSession(it.id) },
+                        openBrowser = browser::open, onRegistered = store::rememberChatGptClient, page = browser::page,
+                    )
+                    val listed = store.listModels(ProviderConfig.Kind.ChatGpt, ChatGptAuth.API_BASE, session.accessToken)
+                    val p = store.connectChatGpt(session, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty())
+                    if (store.roles.value.main == null) {
+                        val options = ModelOptions.ofProvider(p, store.list())
+                        (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
+                    }
+                    (listed as? ModelListResult.Failed)?.message to (clientId == null)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val reason = (e as? SignInException)?.reason ?: SignInFailure.Network
+                browser.returnToApp()
+                _state.update { it.copy(chatGptSignIn = ListState.Failed(ModelsCopy.chatGptFailure(reason))) }
+                return@launch
+            }
+            browser.returnToApp()
+            val id = store.chatGptProvider()?.id
+            _state.update {
+                snapshot(it.copy(
+                    chatGptSignIn = ListState.Idle, chatGptWelcome = first, formOpen = false,
+                    listing = if (listProblem != null && id != null) it.listing + (id to ListState.Failed(listProblem)) else it.listing - id.orEmpty(),
+                ))
+            }
+        }
+    }
+
+    /** 放弃正在进行的登录(本机回调随之关掉)。 */
+    fun cancelChatGptSignIn() {
+        signInJob?.cancel()
+        _state.update { it.copy(chatGptSignIn = ListState.Idle) }
+    }
+
+    fun dismissChatGptWelcome() = _state.update { it.copy(chatGptWelcome = false) }
+
+    /** 退出 ChatGPT 登录:服务端注销、本机清令牌;服务商和用途不动,再登录就能接着用。 */
+    fun signOutChatGpt(providerId: String) {
+        scope.launch {
+            val revoked = withContext(io) { store.signOutChatGpt(providerId) }
+            _state.update { snapshot(it.copy(chatGptRevokeUnconfirmed = !revoked, listing = it.listing - providerId)) }
+        }
+    }
+
     // ---------- 用途 ----------
 
     /** 把 [providerId] 下的 [model] 用作 [role](选择页和「用作」面板都走这里):没有配置的当场建一条。 */
@@ -235,7 +329,7 @@ class ModelSetupViewModel(
         if (refreshJobs[providerId]?.isActive == true) return
         _state.update { it.copy(listing = it.listing + (providerId to ListState.Running)) }
         refreshJobs[providerId] = scope.launch {
-            val r = withContext(io) { store.listModels(p.kind, p.baseUrl, store.providerKey(p.id)) }
+            val r = withContext(io) { store.listModels(p) }
             val models: List<ListedModel>? = when (r) {
                 is ModelListResult.Ok -> r.models
                 is ModelListResult.Failed -> if (r.reason == ListFailure.NotSupported) emptyList() else null
@@ -248,8 +342,11 @@ class ModelSetupViewModel(
 
     /** 选择页、服务商页打开时:还没记住列表的服务商列一次。 */
     fun ensureListed() {
-        _state.value.providers.filter { it.models == null && _state.value.listing[it.id] == null }.forEach { refresh(it.id) }
+        _state.value.providers.filter { it.models == null && _state.value.listing[it.id] == null && listable(it) }.forEach { refresh(it.id) }
     }
+
+    /** 退出了登录的 ChatGPT 列不了模型,等再登录。 */
+    private fun listable(p: Provider) = p.kind != ProviderConfig.Kind.ChatGpt || store.chatGptSession(p.id)?.signedIn == true
 
     /** 换 Key,然后用新 Key 重新列一次模型。 */
     fun changeKey(providerId: String, apiKey: String) {
@@ -265,7 +362,11 @@ class ModelSetupViewModel(
     /** 删掉服务商和它的 Key;用着它的用途退回默认。 */
     fun removeProvider(providerId: String) {
         scope.launch {
-            withContext(io) { store.removeProvider(providerId) }
+            withContext(io) {
+                // ChatGPT 的先在服务端注销登录,再删
+                if (store.provider(providerId)?.kind == ProviderConfig.Kind.ChatGpt) store.signOutChatGpt(providerId)
+                store.removeProvider(providerId)
+            }
             _state.update { snapshot(it.copy(listing = it.listing - providerId)) }
         }
     }

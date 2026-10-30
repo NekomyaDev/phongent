@@ -73,4 +73,34 @@
         <item quantity="other">%1$d models</item>
     </plurals>
     <string name="models_used_by">used as %1$s</string>
+
+    <!-- 用 ChatGPT 登录 -->
+    <string name="chatgpt_use_plan_title">Use your ChatGPT plan</string>
+    <string name="chatgpt_use_plan_body">Complete eligible AI requests in this app with usage included in your ChatGPT plan or credits balance. Works with ChatGPT Plus and Pro. Mika itself is free; nothing is charged by Mika.</string>
+    <string name="chatgpt_continue">Continue with ChatGPT</string>
+    <string name="chatgpt_waiting">Finish signing in in your browser, then come back to Mika.</string>
+    <string name="chatgpt_welcome_title">You’re using your ChatGPT plan</string>
+    <string name="chatgpt_welcome_body">Eligible usage in this app uses your ChatGPT plan. Manage usage in your ChatGPT settings.</string>
+    <string name="chatgpt_got_it">Got it</string>
+    <string name="chatgpt_account">Account</string>
+    <string name="chatgpt_signed_in">Signed in</string>
+    <string name="chatgpt_signed_out">Signed out</string>
+    <string name="chatgpt_sign_out">Sign out</string>
+    <string name="chatgpt_manage_usage">Manage usage</string>
+    <string name="chatgpt_plan_note">Using ChatGPT plan. On Plus, the 5-hour limit is shared with other apps that use your plan; Pro has no 5-hour limit.</string>
+    <string name="chatgpt_signed_out_note">Signed out on this phone. Continue with ChatGPT to use your plan again; your model choices are kept.</string>
+    <string name="chatgpt_revoke_unconfirmed">Signed out on this phone, but ChatGPT didn’t confirm it. You can also disconnect Mika in your ChatGPT settings.</string>
+    <string name="chatgpt_fail_denied">Sign-in was cancelled.</string>
+    <string name="chatgpt_fail_mismatch">The sign-in reply didn’t match this attempt. Please try again.</string>
+    <string name="chatgpt_fail_no_client">ChatGPT didn’t finish registering Mika. Please try again.</string>
+    <string name="chatgpt_fail_timed_out">Sign-in timed out. Please try again.</string>
+    <string name="chatgpt_fail_exchange">ChatGPT didn’t accept the sign-in. Please try again.</string>
+    <string name="chatgpt_fail_id_token">Couldn’t verify your ChatGPT account. Please try again.</string>
+    <string name="chatgpt_fail_no_plan">Mika wasn’t allowed to use your ChatGPT plan. Sign in again and allow plan usage (needs Plus or Pro).</string>
+    <string name="chatgpt_fail_network">Couldn’t reach ChatGPT. Check your network and try again.</string>
+    <string name="chatgpt_page_title">Mika</string>
+    <string name="chatgpt_page_done">Signed in with ChatGPT. You can return to Mika.</string>
+    <string name="chatgpt_page_cancelled">Sign-in cancelled. You can return to Mika.</string>
+    <string name="chatgpt_page_back">Return to Mika</string>
+    <string name="chatgpt_no_browser">No browser found to sign in with ChatGPT.</string>
 </resources>

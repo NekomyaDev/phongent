@@ -1,18 +1,25 @@
 package com.wangzan101.mika.settings
 
 import android.content.Context
+import com.wangzan101.mika.core.chatgpt.ChatGptAuth
+import com.wangzan101.mika.core.chatgpt.ChatGptSession
+import com.wangzan101.mika.core.chatgpt.ChatGptTokens
 import com.wangzan101.mika.core.model.AnthropicModel
+import com.wangzan101.mika.core.model.BearerToken
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.GeminiModel
+import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.ModelCatalog
 import com.wangzan101.mika.core.model.ModelEndpoint
+import com.wangzan101.mika.core.model.ModelError
 import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.OpenAiCompatModel
 import com.wangzan101.mika.core.model.PromptCaching
+import com.wangzan101.mika.core.model.ResponsesModel
 import com.wangzan101.mika.core.usage.UsagePurpose
 import com.wangzan101.mika.core.usage.UsageSink
 import com.wangzan101.mika.core.usage.UsageSource
@@ -56,8 +63,12 @@ data class ProviderConfig(
     /** 所属 [Provider] 的 id;为空时由 [ProviderStore.save] 按接口类型、地址和名字归到对应服务商。 */
     val providerId: String = "",
 ) {
+    /**
+     * 接口类型。[OpenAiResponses] 只在模型列表给某个模型写明 Responses 协议时用(添加服务商时不选它);
+     * [ChatGpt] 是用 ChatGPT 账号登录、用套餐额度调用的那一家:凭据是登录(见 [ChatGptSession]),不是 API Key。
+     */
     enum class Kind {
-        OpenAiCompat, Anthropic, Gemini;
+        OpenAiCompat, Anthropic, Gemini, OpenAiResponses, ChatGpt;
 
         companion object {
             /** 模型单独指定的协议用哪种接口类型的适配器。 */
@@ -65,7 +76,11 @@ data class ProviderConfig(
                 ModelProtocol.ChatCompletions -> OpenAiCompat
                 ModelProtocol.Messages -> Anthropic
                 ModelProtocol.GenerateContent -> Gemini
+                ModelProtocol.Responses -> OpenAiResponses
             }
+
+            /** 添加自定义服务商时可选的接口类型(填地址和 API Key 的)。 */
+            val withApiKey: List<Kind> = listOf(OpenAiCompat, Anthropic, Gemini)
         }
     }
 }
@@ -157,11 +172,20 @@ class ProviderStore(
     private val usage: UsageSink = UsageSink { _, _ -> },
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val modelLister: suspend (ProviderConfig.Kind, String, String?) -> ModelListResult = ::listAvailable,
-    /** 建可调用的模型:配置、Key、服务商列表里给这个模型单独指定的接口(没有为 null,按配置的接口类型和地址)。 */
-    private val modelFactory: (ProviderConfig, String?, ModelEndpoint?) -> ChatModel = ::buildModel,
+    /** 「用 ChatGPT 登录」的授权服务(换令牌、刷新、注销)。 */
+    val chatGptAuth: ChatGptAuth = defaultChatGptAuth,
+    /**
+     * 建可调用的模型:配置、Key、服务商列表里给这个模型单独指定的接口(没有为 null,按配置的接口类型和地址)。
+     * 为 null 时用内置的适配器(测试里换成假的)。
+     */
+    modelFactory: ((ProviderConfig, String?, ModelEndpoint?) -> ChatModel)? = null,
 ) {
+    private val modelFactory: (ProviderConfig, String?, ModelEndpoint?) -> ChatModel = modelFactory ?: ::buildModel
+    /** 每个 ChatGPT 服务商一份:同一时刻只有一个在换令牌。 */
+    private val chatGptTokens = mutableMapOf<String, ChatGptTokens>()
     private val configFile = File(dir, CONFIG_FILE)
     private val keyFile = File(dir, KEY_FILE)
+    private val chatGptHostFile = File(dir, CHATGPT_HOST_FILE)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _providers = MutableStateFlow<List<Provider>>(emptyList())
@@ -247,10 +271,14 @@ class ProviderStore(
 
     /**
      * 删掉一个服务商:它下面的模型配置和 Key 一起删。用着它的用途退回默认(主模型变成没选,看图不用,轻量用主模型);
-     * 界面上删除前已经说明哪些用途要重新选。
+     * 界面上删除前已经说明哪些用途要重新选。删的是 ChatGPT 的,连注册到的 client_id 一起忘掉(本机标识留着):
+     * 下次登录重新注册,可以换一个账号。
      */
     @Synchronized
     fun removeProvider(providerId: String) {
+        if (provider(providerId)?.kind == ProviderConfig.Kind.ChatGpt) {
+            writeAtomically(chatGptHostFile, buildJsonObject { put("hostId", chatGptRegistration().first) }.toString())
+        }
         _providers.value = _providers.value.filterNot { it.id == providerId }
         _configs.value = _configs.value.filterNot { it.providerId == providerId }
         _roles.value = _roles.value.keepOnly(_configs.value.map { it.id }.toSet())
@@ -333,6 +361,92 @@ class ProviderStore(
     /** 列出这个服务商的可用模型(见 [ModelCatalog])。 */
     suspend fun listModels(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?): ModelListResult =
         modelLister(kind, baseUrl, apiKey)
+
+    /** 重新列一个已连接服务商的模型:用存着的 Key;ChatGPT 用登录的访问令牌(快过期先换新的)。 */
+    suspend fun listModels(p: Provider): ModelListResult {
+        if (p.kind != ProviderConfig.Kind.ChatGpt) return listModels(p.kind, p.baseUrl, providerKey(p.id))
+        val token = try {
+            tokensFor(p.id).get(fresh = false)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: ModelError.SignInExpired) {
+            return ModelListResult.Failed(ListFailure.Auth)
+        } catch (e: ModelError) {
+            return ModelListResult.Failed(if (e is ModelError.Network) ListFailure.Network else ListFailure.Server)
+        }
+        return listModels(p.kind, p.baseUrl, token)
+    }
+
+    // ---------- ChatGPT 登录 ----------
+
+    /** ChatGPT 服务商的登录(和 API Key 存在同一处、同样加密);没有或解不开为 null。 */
+    fun chatGptSession(providerId: String): ChatGptSession? = ChatGptSession.fromJson(providerKey(providerId))
+
+    /** 已连接的 ChatGPT 服务商(只有一家)。 */
+    fun chatGptProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.ChatGpt }
+
+    /** 登录成功:存下登录和列出的模型;已有 ChatGPT 服务商就更新那一家。 */
+    @Synchronized
+    fun connectChatGpt(session: ChatGptSession, models: List<ListedModel>): Provider =
+        connect(CHATGPT_NAME, ProviderConfig.Kind.ChatGpt, ChatGptAuth.API_BASE, session.toJson(), models)
+
+    /**
+     * 退出登录:先在服务端注销刷新令牌(确认不了也照样清),再清掉本机的令牌;注册(client_id)和账号留着,再登录时沿用。
+     * 返回服务端是否确认了注销。服务商和它的模型、用途都不动。
+     */
+    suspend fun signOutChatGpt(providerId: String): Boolean {
+        val s = chatGptSession(providerId) ?: return true
+        val revoked = s.refreshToken.isEmpty() || chatGptAuth.revoke(s.clientId, s.refreshToken)
+        saveChatGptSession(providerId, s.signedOut())
+        return revoked
+    }
+
+    /**
+     * 这台设备在 ChatGPT 那边的本机标识和注册到的 client_id。标识第一次用时生成,之后一直不变;client_id 注册后记下,
+     * 退出登录后留着(再登录沿用,不重复注册),删掉 ChatGPT 服务商时忘掉。两者都不是密钥,明文存。
+     */
+    @Synchronized
+    fun chatGptRegistration(): Pair<String, String?> {
+        val saved = runCatching { json.parseToJsonElement(chatGptHostFile.readText()).jsonObject }.getOrNull()
+        val host = saved?.get("hostId")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        val client = saved?.get("clientId")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        if (host != null) return host to client
+        val fresh = ChatGptAuth.newHostId()
+        writeAtomically(chatGptHostFile, buildJsonObject { put("hostId", fresh) }.toString())
+        return fresh to null
+    }
+
+    /** 记下注册到的 client_id(换令牌前就记,换失败了下次也不用重新注册)。 */
+    @Synchronized
+    fun rememberChatGptClient(clientId: String) {
+        val host = chatGptRegistration().first
+        writeAtomically(chatGptHostFile, buildJsonObject { put("hostId", host); put("clientId", clientId) }.toString())
+    }
+
+    @Synchronized
+    private fun saveChatGptSession(providerId: String, session: ChatGptSession) {
+        if (provider(providerId) != null) setKey(providerId, session.toJson())
+    }
+
+    private fun tokensFor(providerId: String): ChatGptTokens = synchronized(chatGptTokens) {
+        chatGptTokens.getOrPut(providerId) {
+            ChatGptTokens(chatGptAuth, { chatGptSession(providerId) }, { saveChatGptSession(providerId, it) })
+        }
+    }
+
+    /** 模型单独指定了接口的,按它的协议选适配器、用它的地址;否则按配置的接口类型和地址。Key 都用服务商的。 */
+    private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?): ChatModel {
+        val (kind, baseUrl) = adapterFor(cfg, endpoint)
+        return when (kind) {
+            ProviderConfig.Kind.OpenAiCompat ->
+                OpenAiCompatModel(baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField)
+            ProviderConfig.Kind.Anthropic -> AnthropicModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
+            ProviderConfig.Kind.Gemini -> GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
+            ProviderConfig.Kind.OpenAiResponses -> ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http)
+            ProviderConfig.Kind.ChatGpt ->
+                ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true)
+        }
+    }
 
     private fun findOrAddProvider(name: String, kind: ProviderConfig.Kind, baseUrl: String): Provider {
         val key = ProviderConnection.keyOf(kind, baseUrl, name)
@@ -558,6 +672,7 @@ class ProviderStore(
     companion object {
         private const val CONFIG_FILE = "providers.json"
         private const val KEY_FILE = "provider-keys.json"
+        private const val CHATGPT_HOST_FILE = "chatgpt-host.json"
 
         /** `uses` 里每个用途的 `use`:具体模型(另记 `config`)、用主模型、不用。旧版本的文件里只有 `roles`。 */
         private const val USE_MODEL = "model"
@@ -568,21 +683,18 @@ class ProviderStore(
 
         private val catalog by lazy { ModelCatalog(OkHttpClient.Builder().readTimeout(30, TimeUnit.SECONDS).build()) }
 
+        private val defaultChatGptAuth by lazy { ChatGptAuth(OkHttpClient.Builder().readTimeout(30, TimeUnit.SECONDS).build()) }
+
+        /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
+        const val CHATGPT_NAME = "ChatGPT"
+
+        /**
+         * 列模型的接口:OpenAI 兼容、Responses 和 ChatGPT 都是 `GET {base}/models`(Bearer;ChatGPT 的 [apiKey] 是访问令牌)。
+         */
         suspend fun listAvailable(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?): ModelListResult = when (kind) {
-            ProviderConfig.Kind.OpenAiCompat -> catalog.openAiCompat(baseUrl, apiKey)
+            ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> catalog.openAiCompat(baseUrl, apiKey)
             ProviderConfig.Kind.Anthropic -> catalog.anthropic(baseUrl, apiKey.orEmpty())
             ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty())
-        }
-
-        /** 模型单独指定了接口的,按它的协议选适配器、用它的地址;否则按配置的接口类型和地址。Key 都用服务商的。 */
-        private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?): ChatModel {
-            val (kind, baseUrl) = adapterFor(cfg, endpoint)
-            return when (kind) {
-                ProviderConfig.Kind.OpenAiCompat ->
-                    OpenAiCompatModel(baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField)
-                ProviderConfig.Kind.Anthropic -> AnthropicModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
-                ProviderConfig.Kind.Gemini -> GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
-            }
         }
 
         /** 调用这个模型用哪种适配器、交给它什么 Base URL。 */

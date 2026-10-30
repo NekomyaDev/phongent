@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wangzan101.mika.core.chatgpt.SignInFailure
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.settings.ModelOption
 import com.wangzan101.mika.settings.Provider
@@ -260,6 +261,10 @@ class ProviderDetailActions(
     /** 把这家的一个模型用作某个用途(「用作」面板里点的)。 */
     val use: (ModelRole, String) -> Unit = { _, _ -> },
     val showAll: () -> Unit = {},
+    /** ChatGPT 服务商:再登录、退出登录、打开 ChatGPT 的用量页。 */
+    val signIn: () -> Unit = {},
+    val signOut: () -> Unit = {},
+    val manageUsage: () -> Unit = {},
 )
 
 /**
@@ -276,19 +281,23 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
     val list = ui.sortedOptions(p)
     Page(p.name, onBack) {
         GroupLabel(ModelsCopy.CONNECTION)
-        GroupCard {
-            ListRow(null, ModelsCopy.STATUS, first = true) {
-                when (state) {
-                    ListState.Running -> RowValue(ModelsCopy.LISTING)
-                    is ListState.Failed -> RowValue(ModelsCopy.LIST_FAILED, ValueTone.Bad)
-                    else -> RowValue(ModelsCopy.CONNECTED, ValueTone.Ok)
+        if (p.kind == ProviderConfig.Kind.ChatGpt) {
+            ChatGptConnection(ui, state, actions)
+        } else {
+            GroupCard {
+                ListRow(null, ModelsCopy.STATUS, first = true) {
+                    when (state) {
+                        ListState.Running -> RowValue(ModelsCopy.LISTING)
+                        is ListState.Failed -> RowValue(ModelsCopy.LIST_FAILED, ValueTone.Bad)
+                        else -> RowValue(ModelsCopy.CONNECTED, ValueTone.Ok)
+                    }
                 }
-            }
-            ListRow(null, ModelsCopy.KIND) { RowValue(ModelsCopy.kindLabel(p.kind)) }
-            ListRow(null, ModelsCopy.BASE_URL) { RowValue(ModelsCopy.shortUrl(p.baseUrl)) }
-            ListRow(null, ModelsCopy.API_KEY, onClick = { changingKey = true }) {
-                RowValue(if (p.id in ui.keyed) ModelsCopy.KEY_SAVED else ModelsCopy.KEY_NONE)
-                RowValue(ModelsCopy.CHANGE, ValueTone.Link)
+                ListRow(null, ModelsCopy.KIND) { RowValue(ModelsCopy.kindLabel(p.kind)) }
+                ListRow(null, ModelsCopy.BASE_URL) { RowValue(ModelsCopy.shortUrl(p.baseUrl)) }
+                ListRow(null, ModelsCopy.API_KEY, onClick = { changingKey = true }) {
+                    RowValue(if (p.id in ui.keyed) ModelsCopy.KEY_SAVED else ModelsCopy.KEY_NONE)
+                    RowValue(ModelsCopy.CHANGE, ValueTone.Link)
+                }
             }
         }
         (state as? ListState.Failed)?.let { FooterNote(ModelSetupCopy.failed(it.message), color = c.bad) }
@@ -354,6 +363,40 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
             dismissButton = { TextButton({ confirmDelete = false }) { Text(ModelSetupCopy.CANCEL) } },
         )
     }
+}
+
+/**
+ * ChatGPT 的连接:账号(邮箱)、退出登录或再登录、管理用量(打开 ChatGPT 的用量页)。
+ * 退出登录只清这台手机上的令牌,服务商、模型和用途都留着。
+ */
+@Composable
+private fun ChatGptConnection(ui: ModelSetupUi, state: ListState?, actions: ProviderDetailActions) {
+    val c = MikaTheme.colors
+    val account = ui.chatGptAccount
+    val signedIn = account?.signedIn == true
+    GroupCard {
+        ListRow(null, ModelsCopy.STATUS, first = true) {
+            when {
+                !signedIn -> RowValue(ModelsCopy.CHATGPT_SIGNED_OUT, ValueTone.Warn)
+                state == ListState.Running -> RowValue(ModelsCopy.LISTING)
+                state is ListState.Failed -> RowValue(ModelsCopy.LIST_FAILED, ValueTone.Bad)
+                else -> RowValue(ModelsCopy.CHATGPT_SIGNED_IN, ValueTone.Ok)
+            }
+        }
+        account?.email?.takeIf { it.isNotEmpty() }?.let { email -> ListRow(null, ModelsCopy.CHATGPT_ACCOUNT) { RowValue(email) } }
+        ListRow(null, ModelsCopy.CHATGPT_MANAGE_USAGE, titleColor = c.accent, onClick = actions.manageUsage) { RowChevron() }
+        if (signedIn) {
+            ListRow(null, ModelsCopy.CHATGPT_SIGN_OUT, titleColor = c.bad, onClick = actions.signOut)
+        } else {
+            ListRow(
+                null, if (ui.chatGptSignIn == ListState.Running) ModelsCopy.CHATGPT_WAITING else ModelsCopy.CHATGPT_CONTINUE,
+                titleColor = c.accent, onClick = actions.signIn,
+            )
+        }
+    }
+    FooterNote(if (signedIn) ModelsCopy.CHATGPT_PLAN_NOTE else ModelsCopy.CHATGPT_SIGNED_OUT_NOTE)
+    if (ui.chatGptRevokeUnconfirmed) FooterNote(ModelsCopy.CHATGPT_REVOKE_UNCONFIRMED, color = c.warn)
+    (ui.chatGptSignIn as? ListState.Failed)?.let { FooterNote(it.message, color = c.bad) }
 }
 
 /**
@@ -495,6 +538,35 @@ object ModelsCopy {
     val IN_USE: String get() = tr(R.string.models_in_use)
     val DELETE: String get() = tr(R.string.models_delete)
     val DELETE_CONFIRM: String get() = tr(R.string.confirm_delete)
+    val CHATGPT_TITLE: String get() = tr(R.string.chatgpt_use_plan_title)
+    val CHATGPT_BODY: String get() = tr(R.string.chatgpt_use_plan_body)
+    val CHATGPT_CONTINUE: String get() = tr(R.string.chatgpt_continue)
+    val CHATGPT_WAITING: String get() = tr(R.string.chatgpt_waiting)
+    val CHATGPT_WELCOME_TITLE: String get() = tr(R.string.chatgpt_welcome_title)
+    val CHATGPT_WELCOME_BODY: String get() = tr(R.string.chatgpt_welcome_body)
+    val CHATGPT_GOT_IT: String get() = tr(R.string.chatgpt_got_it)
+    val CHATGPT_ACCOUNT: String get() = tr(R.string.chatgpt_account)
+    val CHATGPT_SIGNED_IN: String get() = tr(R.string.chatgpt_signed_in)
+    val CHATGPT_SIGNED_OUT: String get() = tr(R.string.chatgpt_signed_out)
+    val CHATGPT_SIGN_OUT: String get() = tr(R.string.chatgpt_sign_out)
+    val CHATGPT_MANAGE_USAGE: String get() = tr(R.string.chatgpt_manage_usage)
+    val CHATGPT_PLAN_NOTE: String get() = tr(R.string.chatgpt_plan_note)
+    val CHATGPT_SIGNED_OUT_NOTE: String get() = tr(R.string.chatgpt_signed_out_note)
+    val CHATGPT_REVOKE_UNCONFIRMED: String get() = tr(R.string.chatgpt_revoke_unconfirmed)
+
+    /** 用 ChatGPT 登录没成的原因。 */
+    fun chatGptFailure(reason: SignInFailure): String = tr(
+        when (reason) {
+            SignInFailure.Denied -> R.string.chatgpt_fail_denied
+            SignInFailure.StateMismatch, SignInFailure.ClientMismatch -> R.string.chatgpt_fail_mismatch
+            SignInFailure.NoClientId -> R.string.chatgpt_fail_no_client
+            SignInFailure.TimedOut -> R.string.chatgpt_fail_timed_out
+            SignInFailure.Exchange -> R.string.chatgpt_fail_exchange
+            SignInFailure.IdToken -> R.string.chatgpt_fail_id_token
+            SignInFailure.NoPlanScope -> R.string.chatgpt_fail_no_plan
+            SignInFailure.Network -> R.string.chatgpt_fail_network
+        },
+    )
 
     /** 用途卡上的一行:[title] 是模型名([isModel])、「用主模型」「不用」或「未设置」([unset]),[subtitle] 是补充说明。 */
     data class RoleLine(val title: String, val subtitle: String, val isModel: Boolean = false, val unset: Boolean = false)
@@ -570,6 +642,8 @@ object ModelsCopy {
         ProviderConfig.Kind.OpenAiCompat -> tr(R.string.models_openai_compat)
         ProviderConfig.Kind.Anthropic -> "Anthropic"
         ProviderConfig.Kind.Gemini -> "Gemini"
+        ProviderConfig.Kind.OpenAiResponses -> "OpenAI Responses"
+        ProviderConfig.Kind.ChatGpt -> "ChatGPT"
     }
 
     fun shortUrl(url: String) = url.removePrefix("https://").removePrefix("http://")

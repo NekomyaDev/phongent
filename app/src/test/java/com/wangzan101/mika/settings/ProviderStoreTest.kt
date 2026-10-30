@@ -464,13 +464,14 @@ class ProviderStoreTest {
     private val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://x.test/openai/v1", "reasoning_content")
     private val messages = ModelEndpoint(ModelProtocol.Messages, "https://x.test/anthropic/v1")
     private val generate = ModelEndpoint(ModelProtocol.GenerateContent, "https://x.test/google/v1beta")
+    private val responses = ModelEndpoint(ModelProtocol.Responses, "https://x.test/openai/v1/")
 
     @Test
     fun perModelEndpointsPersistWithTheList() {
         val s = store()
         val listed = listOf(
             ListedModel("a", endpoint = chat), ListedModel("b", endpoint = messages), ListedModel("c", endpoint = generate),
-            ListedModel("r", unsupportedApis = listOf("responses")), ListedModel("plain"),
+            ListedModel("r", endpoint = responses), ListedModel("u", unsupportedApis = listOf("realtime")), ListedModel("plain"),
         )
         s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", listed)
         assertEquals(listed, store().providers.value.single().models)
@@ -503,6 +504,7 @@ class ProviderStoreTest {
         assertEquals(ProviderConfig.Kind.OpenAiCompat to "https://x.test/openai/v1", ProviderStore.adapterFor(c, chat))
         assertEquals(ProviderConfig.Kind.Anthropic to "https://x.test/anthropic", ProviderStore.adapterFor(c, messages))
         assertEquals(ProviderConfig.Kind.Gemini to "https://x.test/google", ProviderStore.adapterFor(c, generate))
+        assertEquals(ProviderConfig.Kind.OpenAiResponses to "https://x.test/openai/v1", ProviderStore.adapterFor(c, responses))
         val anthropicConfig = c.copy(kind = ProviderConfig.Kind.Anthropic, baseUrl = "https://api.anthropic.com")
         assertEquals(ProviderConfig.Kind.Anthropic to "https://api.anthropic.com", ProviderStore.adapterFor(anthropicConfig, null))
     }

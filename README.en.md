@@ -163,6 +163,8 @@ Open "Models" (模型) in Settings (the app also walks you through this on first
 Presets for DeepSeek, 通义千问, Kimi, 智谱, OpenRouter, OpenCode Go, Anthropic, Gemini and more; for any other provider pick Custom (自定义), which takes any OpenAI-compatible, Anthropic or Gemini endpoint.
 <!-- generated:providers:end -->
 
+You can also skip the API key and sign in with ChatGPT (Plus or Pro, uses your plan's usage): tap "Continue with ChatGPT" when adding a provider, sign in in the browser, then come back to Mika.
+
 1. Add a provider: pick a preset, or pick Custom and enter the endpoint URL; enter your API key.
 2. Tap "Test and save" (测试并保存). When you connect your first provider, a main model is picked automatically.
 3. The main model must support tool calling. Optional: a vision model (understands the UI and finds buttons in screenshots) and a light model (anything cheap and fast; handles small jobs like judging task outcomes and extracting memories).

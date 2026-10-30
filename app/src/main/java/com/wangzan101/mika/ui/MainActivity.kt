@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /** 用系统浏览器打开外部链接(GitHub、X 等);没有浏览器时提示一句。 */
-private fun openInBrowser(context: Context, url: String) {
+internal fun openInBrowser(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
     } catch (e: ActivityNotFoundException) {

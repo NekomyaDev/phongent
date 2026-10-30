@@ -1,6 +1,12 @@
 package com.wangzan101.mika.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import com.wangzan101.mika.R
+import com.wangzan101.mika.core.chatgpt.ChatGptAuth
 import com.wangzan101.mika.i18n.tr
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
@@ -21,7 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -74,7 +83,8 @@ import com.wangzan101.mika.ui.theme.MikaType
 @Composable
 fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Unit, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val vm = remember { ModelSetupViewModel(store, scope) }
+    val context = LocalContext.current
+    val vm = remember { ModelSetupViewModel(store, scope, chatGptBrowser = AndroidChatGptBrowser(context.applicationContext)) }
     val ui by vm.state.collectAsState()
     var picking by rememberSaveable { mutableStateOf<ModelRole?>(null) }
     var openProvider by rememberSaveable { mutableStateOf<String?>(null) }
@@ -88,6 +98,8 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
             remove = { vm.removeProvider(provider.id); openProvider = null; allModels = false },
             use = { role, model -> vm.pick(role, provider.id, model) },
             showAll = { allModels = true },
+            signIn = vm::signInWithChatGpt, signOut = { vm.signOutChatGpt(provider.id) },
+            manageUsage = { openInBrowser(context, ChatGptAuth.USAGE_URL) },
         )
         if (allModels) {
             BackHandler { allModels = false }
@@ -113,6 +125,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
         return
     }
 
+    if (ui.chatGptWelcome) ChatGptWelcome(vm::dismissChatGptWelcome)
     BackHandler(onBack = onBack)
     ModelSetupContent(
         ui, onboarding,
@@ -120,6 +133,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
             selectPreset = vm::selectPreset, setKind = vm::setKind, setBaseUrl = vm::setBaseUrl, setApiKey = vm::setApiKey,
             testAndSave = vm::testAndSave, openForm = vm::openForm, closeForm = vm::closeForm,
             openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, next = onDone,
+            signInWithChatGpt = vm::signInWithChatGpt, cancelChatGpt = vm::cancelChatGptSignIn,
         ),
         onBack,
     )
@@ -137,6 +151,8 @@ class ModelSetupActions(
     val openProvider: (String) -> Unit = {},
     val pickRole: (ModelRole) -> Unit = {},
     val next: () -> Unit = {},
+    val signInWithChatGpt: () -> Unit = {},
+    val cancelChatGpt: () -> Unit = {},
 )
 
 /**
@@ -188,7 +204,9 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
         GroupLabel(ModelsCopy.PROVIDERS)
         GroupCard {
             ui.providers.forEachIndexed { i, p ->
-                ProviderRow(p, ModelsCopy.providerLine(p, ui.listing[p.id], ui.rolesOf(p)), first = i == 0) { actions.openProvider(p.id) }
+                val line = if (p.kind == ProviderConfig.Kind.ChatGpt && ui.chatGptAccount?.signedIn != true) ModelsCopy.CHATGPT_SIGNED_OUT
+                    else ModelsCopy.providerLine(p, ui.listing[p.id], ui.rolesOf(p))
+                ProviderRow(p, line, first = i == 0) { actions.openProvider(p.id) }
             }
             if (!ui.showForm) {
                 ListRow(
@@ -218,6 +236,7 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
             )
         }
     }
+    if (ui.chatGptAccount?.signedIn != true) ChatGptCard(ui, actions)
     FlowRow(
         Modifier.fillMaxWidth().padding(bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -235,7 +254,7 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
             ) {
                 Text(ModelSetupCopy.KIND, Modifier.padding(end = 12.dp), style = MikaType.Body, color = c.ink)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ProviderConfig.Kind.entries.forEach { k -> SelectChip(ModelsCopy.kindLabel(k), f.kind == k, { actions.setKind(k) }, small = true) }
+                    ProviderConfig.Kind.withApiKey.forEach { k -> SelectChip(ModelsCopy.kindLabel(k), f.kind == k, { actions.setKind(k) }, small = true) }
                 }
             }
             InputRow(
@@ -264,6 +283,90 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         )
     }
     FooterNote(ModelSetupCopy.TEST_NOTE, Modifier.padding(top = 6.dp))
+}
+
+/**
+ * 「用你的 ChatGPT 套餐」:不填 Key,点「使用 ChatGPT 继续」去浏览器登录。登录中可以取消;失败说原因。
+ * 文字照 OpenAI 对这项功能的界面要求(标题、说明、按钮),并写明哪些套餐可用、Mika 不另收费。
+ */
+@Composable
+private fun ChatGptCard(ui: ModelSetupUi, actions: ModelSetupActions) {
+    val c = MikaTheme.colors
+    val running = ui.chatGptSignIn == ListState.Running
+    GroupCard {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(ModelsCopy.CHATGPT_TITLE, style = MikaType.Body, fontWeight = FontWeight.SemiBold, color = c.ink)
+            Text(ModelsCopy.CHATGPT_BODY, Modifier.padding(top = 4.dp, bottom = 12.dp), fontSize = 13.sp, lineHeight = 19.sp, color = c.ink2)
+            MikaButton(
+                ModelsCopy.CHATGPT_CONTINUE, actions.signInWithChatGpt, Modifier.fillMaxWidth().testTag("chatgpt-continue"),
+                size = ButtonSize.Medium, enabled = !running,
+            )
+            if (running) {
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ModelsCopy.CHATGPT_WAITING, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp, color = c.ink2)
+                    Text(
+                        ModelSetupCopy.CANCEL, Modifier.clickable(onClick = actions.cancelChatGpt).padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                        fontSize = 13.sp, color = c.accent,
+                    )
+                }
+            }
+            (ui.chatGptSignIn as? ListState.Failed)?.let {
+                Text(it.message, Modifier.padding(top = 10.dp).testTag("chatgpt-failed"), fontSize = 13.sp, lineHeight = 18.sp, color = c.bad)
+            }
+        }
+    }
+}
+
+/** 第一次用 ChatGPT 登录成功后说明一次:Mika 里的用量走你的 ChatGPT 套餐。 */
+@Composable
+private fun ChatGptWelcome(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(ModelsCopy.CHATGPT_WELCOME_TITLE) },
+        text = { Text(ModelsCopy.CHATGPT_WELCOME_BODY) },
+        confirmButton = { TextButton(onDismiss) { Text(ModelsCopy.CHATGPT_GOT_IT) } },
+    )
+}
+
+/**
+ * 登录要用的系统能力:授权页用系统浏览器打开;回调页上放一个回到 Mika 的链接(intent 链接,点了由浏览器打开 Mika);
+ * 登录完(成功或失败)把 Mika 带回前台。安卓限制后台打开界面,带不回来时用户点回调页的链接或从最近任务回来。
+ */
+private class AndroidChatGptBrowser(private val context: Context) : ChatGptBrowser {
+    override fun open(url: String) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, tr(R.string.chatgpt_no_browser), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun returnToApp() {
+        runCatching {
+            context.startActivity(
+                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            )
+        }
+    }
+
+    override fun page(params: Map<String, String>): String {
+        val text = tr(if (params["error"] != null) R.string.chatgpt_page_cancelled else R.string.chatgpt_page_done)
+        val back = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${context.packageName};end"
+        return ChatGptPage.html(tr(R.string.chatgpt_page_title), text, tr(R.string.chatgpt_page_back), back)
+    }
+}
+
+/** 回调后浏览器里那一页:一句话加一个回到 App 的按钮。文字转义后放进去。 */
+internal object ChatGptPage {
+    fun html(title: String, text: String, back: String, backUrl: String): String {
+        fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" +
+            """<title>${esc(title)}</title><style>body{font-family:sans-serif;margin:0;padding:48px 24px;text-align:center;color:#1d1d1f;background:#fff}""" +
+            """p{font-size:17px;line-height:1.5}a{display:inline-block;margin-top:16px;padding:12px 28px;border-radius:999px;background:#1d1d1f;""" +
+            """color:#fff;text-decoration:none;font-size:16px}</style></head><body><p>${esc(text)}</p><a href="${esc(backUrl)}">${esc(back)}</a></body></html>"""
+    }
 }
 
 /** 用途:主模型、看图模型、轻量模型各一张卡,点开是选择页。 */

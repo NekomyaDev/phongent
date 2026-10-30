@@ -163,6 +163,8 @@ Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成
 内置 DeepSeek、通义千问、Kimi、智谱、OpenRouter、OpenCode Go、Anthropic、Gemini 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini 接口都能接。
 <!-- generated:providers:end -->
 
+也可以不填 Key，直接用 ChatGPT 登录（Plus 或 Pro，用你的套餐额度）：在添加服务商那里点「使用 ChatGPT 继续」，在浏览器里登录后回到 Mika。
+
 1. 添加服务商：选一个预设，或选「自定义」填接口地址；填 API Key。
 2. 点「测试并保存」，连上第一家时会自动选一个主模型。
 3. 主模型要支持工具调用。可选：看图模型（看懂界面、看图找按钮）、轻量模型（便宜快的即可，处理判断结局、提取记忆等小事）。

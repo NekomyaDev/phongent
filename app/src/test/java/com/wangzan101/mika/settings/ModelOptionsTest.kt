@@ -40,12 +40,13 @@ class ModelOptionsTest {
     @Test fun modelsOnlyReachableByUnsupportedProtocolsAreNotOffered() {
         val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://gw.test/openai/v1")
         val listed = listOf(
-            ListedModel("responses-only", toolCalls = true, unsupportedApis = listOf("responses")),
+            ListedModel("realtime-only", toolCalls = true, unsupportedApis = listOf("realtime")),
             ListedModel("chat", toolCalls = true, endpoint = chat),
+            ListedModel("responses", toolCalls = true, endpoint = ModelEndpoint(ModelProtocol.Responses, "https://gw.test/openai/v1")),
             ListedModel("plain"),
         )
         val options = ModelOptions.merge(listed, base)
-        assertEquals(listOf("chat", "plain"), options.map { it.id })
+        assertEquals(listOf("chat", "responses", "plain"), options.map { it.id })
         assertEquals("chat", ModelOptions.defaultMain(options))
     }
 
