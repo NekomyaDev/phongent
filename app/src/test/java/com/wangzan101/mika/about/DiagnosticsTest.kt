@@ -44,6 +44,7 @@ class DiagnosticsTest {
         ),
         wirelessSetting: Boolean? = true,
         installer: String? = "com.android.packageinstaller",
+        connect: ConnectCandidates? = ConnectCandidates(property = 0, mdns = 2, cache = 1, connected = false),
     ) = DiagnosticsSnapshot(
         generatedAtMs = now,
         app = DiagnosticsSnapshot.App("0.1.7", "cfa4380", installer, "System (zh-CN)"),
@@ -51,7 +52,7 @@ class DiagnosticsTest {
         setup = status.copy(builtinShell = shell).setupInputs(discovery, repair = false, confirmed = confirmed),
         phone = DiagnosticsSnapshot.Phone(
             accessibility = status.accessibility, wirelessDebuggingSetting = wirelessSetting,
-            connect = ConnectCandidates(property = 0, mdns = 2, cache = 1, connected = false),
+            connect = connect,
             pairingChannels = mapOf("pairing_alert" to 4), attentionChannelImportance = 2, wifiConnected = true, lastError = lastError,
         ),
         recovery = DiagnosticsSnapshot.Recovery(
@@ -96,11 +97,20 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("wireless debugging: on"))
         assertTrue(t, t.contains("accessibility: on (bound)"))
         assertTrue(t, t.contains("pairing service: found"))
-        assertTrue(t, t.contains("connect service: property 0, mDNS 2, cached 1 candidates; none connected"))
+        assertTrue(t, t.contains("connect service: cached 1, property 0, mDNS 2 candidates; scan: not run; manual: no; none connected"))
         assertTrue(t, t.contains("pairing channel: Ready (pairing_alert=high)"))
         assertTrue(t, t.contains("attention channel: low"))
         assertTrue(t, t.contains("Wi-Fi: connected"))
         assertTrue(t, t.contains("last error: AdbConnectionException(CONNECT_FAILED)"))
+    }
+
+    /** 扫过本机、用户填过端口:只写个数和有没有填,不写端口号。 */
+    @Test
+    fun connectServiceShowsScanAndManualWithoutPortNumbers() {
+        val c = ConnectCandidates(0, 0, 0, connected = true, scanned = true, scanOpen = 2, scanAdb = 1, manual = true)
+        val t = Diagnostics.render(snapshot(connect = c))
+        assertTrue(t, t.contains("connect service: cached 0, property 0, mDNS 0 candidates; scan: 2 open, 1 adb; manual: yes; connected"))
+        assertTrue(t, Diagnostics.render(snapshot(connect = null)).contains("connect service: not tried in this session"))
     }
 
     @Test

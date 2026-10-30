@@ -19,6 +19,8 @@ import com.wangzan101.mika.core.adb.ConnectCandidates
 import com.wangzan101.mika.core.adb.AdbPairing
 import com.wangzan101.mika.core.adb.AdbServiceTypes
 import com.wangzan101.mika.core.adb.AdbTls
+import com.wangzan101.mika.core.adb.LocalPortScan
+import com.wangzan101.mika.core.adb.NioPortScanner
 import com.wangzan101.mika.core.adb.PortCache
 import com.wangzan101.mika.core.shell.BuiltinShellEngine
 import com.wangzan101.mika.core.shell.BuiltinShellPlatform
@@ -34,9 +36,15 @@ import com.wangzan101.mika.cap.phone.shell.adb.NsdAdbServiceFinder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
+import java.net.Inet4Address
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 内置助手的真实现:配对、经本机 adbd 起助手、看门狗。由 [com.wangzan101.mika.cap.phone.PhoneServices] 建一份,
@@ -46,7 +54,13 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
     private val app = context.applicationContext
     private var started = false
 
-    private val platform: AndroidPlatform by lazy { AndroidPlatform(app, hub) { lastConnectCandidates = it } }
+    private val _scanningPorts = MutableStateFlow(false)
+    /** 正在扫本机找无线调试端口(引导页显示「正在本机查找…」)。 */
+    val scanningPorts: StateFlow<Boolean> = _scanningPorts.asStateFlow()
+
+    private val platform: AndroidPlatform by lazy {
+        AndroidPlatform(app, hub, { lastConnectCandidates = it }, { _scanningPorts.value = it })
+    }
 
     /** 最近一次找连接端口时各来源给了几个候选(诊断信息用);这次进程里还没连过为 null。 */
     @Volatile var lastConnectCandidates: ConnectCandidates? = null
@@ -72,6 +86,12 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
     /** 恢复和授权开关用:每条命令单独连一次已配对的 adbd,跑完就断。 */
     val commandRunner = ShellCommandRunner { command ->
         withContext(Dispatchers.IO) { platform.connect().use { it.exec(command).readText() } }
+    }
+
+    /** 用户在引导页填了无线调试的端口:下一次连接带上它(只用这一次,连上了就记作缓存),然后重试。 */
+    suspend fun connectWithPort(port: Int) {
+        platform.manualPort.set(port)
+        engine.retry()
     }
 
     @Synchronized
@@ -103,7 +123,11 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         private val app: Context,
         private val hub: HelperHub,
         private val candidates: (ConnectCandidates) -> Unit,
+        private val scanning: (Boolean) -> Unit,
     ) : BuiltinShellPlatform {
+        /** 用户填的端口,下一次连接取走。 */
+        val manualPort = AtomicReference<Int?>(null)
+        private val scan = LocalPortScan(NioPortScanner(), ::localHosts, { LocalPortScan.parseRange(portRangeText()) })
         private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         private val finder = NsdAdbServiceFinder(app)
         private val portCache = object : PortCache {
@@ -151,7 +175,21 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         }
 
         suspend fun connect(tls: AdbTls = AndroidAdb.tls(AndroidAdb.identity(app))): AdbConnection =
-            AdbConnectPort(::tlsPort, finder, portCache, report = candidates).connect { AdbConnection.open(LOCALHOST, it, tls) }
+            AdbConnectPort(
+                ::tlsPort, finder, portCache, report = candidates, scan = scan, manual = { manualPort.getAndSet(null) }, scanning = scanning,
+            ).connect { host, port -> AdbConnection.open(host, port, tls) }
+
+        /** 扫端口时只扫本机自己:127.0.0.1 和 Wi-Fi 上的 IPv4 地址。 */
+        private fun localHosts(): List<String> = listOf(LOCALHOST) + runCatching {
+            val cm = app.getSystemService(ConnectivityManager::class.java)
+            @Suppress("DEPRECATION")
+            cm.allNetworks.filter { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
+                .flatMap { cm.getLinkProperties(it)?.linkAddresses.orEmpty() }
+                .mapNotNull { (it.address as? Inet4Address)?.hostAddress }
+        }.getOrDefault(emptyList())
+
+        /** 系统分配临时端口的范围;有的系统不让 App 读,读不到就扫默认的一段。 */
+        private fun portRangeText(): String? = runCatching { File(PORT_RANGE_FILE).readText() }.getOrNull()
 
         override fun stopHelper() {
             // destroy 会让助手进程当场退出,这一调用多半以 DeadObjectException 结束
@@ -175,9 +213,10 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         /** 内置助手只在安卓 13 及以上启用(手机功能本来就要求这个版本)。 */
         const val MIN_SDK = Build.VERSION_CODES.TIRAMISU
         private const val PREFS = "builtin_shell"
-        /** 安卓原版 adbd 把无线调试的连接端口写在这个系统属性里;读不到的手机就靠 mDNS 和缓存。 */
+        /** 安卓原版 adbd 把无线调试的连接端口写在这个系统属性里;读不到时靠缓存、mDNS、扫本机端口和用户填的端口。 */
         private const val TLS_PORT_PROPERTY = "service.adb.tls.port"
-        private const val LOCALHOST = "127.0.0.1"
+        private const val LOCALHOST = AdbConnectPort.LOCALHOST
+        private const val PORT_RANGE_FILE = "/proc/sys/net/ipv4/ip_local_port_range"
         private const val HANDOFF_WAIT_MS = 15_000L
     }
 }

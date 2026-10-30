@@ -161,7 +161,10 @@ object Diagnostics {
             PairingDiscovery.Idle -> "not found / not searching"
         })
         line("connect service", p.connect?.let { c ->
-            "property ${c.property}, mDNS ${c.mdns}, cached ${c.cache} candidates; " + if (c.connected) "connected" else "none connected"
+            "cached ${c.cache}, property ${c.property}, mDNS ${c.mdns} candidates; " +
+                (if (c.scanned) "scan: ${c.scanOpen} open, ${c.scanAdb} adb; " else "scan: not run; ") +
+                "manual: " + (if (c.manual) "yes" else "no") + "; " +
+                if (c.connected) "connected" else "none connected"
         } ?: "not tried in this session")
         line("notifications", if (i.notificationsAllowed) "allowed" else "blocked")
         line("pairing channel", "${i.pairingChannel} (" +

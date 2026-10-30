@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.PairingCode
@@ -79,6 +80,7 @@ import com.wangzan101.mika.ui.components.ProgressDots
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaShapes
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 
 /** 用户确认做好的几步,转屏、进后台后还在。 */
 private val StepSetSaver = Saver<Set<SetupStep>, String>(
@@ -97,6 +99,7 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
     val phone = remember { PhoneServices.of(context) }
     val pairing = phone.pairing
     val discovery by phone.shellControl.pairingDiscovery.collectAsState()
+    val scanning by phone.shellManager.scanningPorts.collectAsState()
     val shell = status.builtinShell
     var repairStarted by rememberSaveable { mutableStateOf(false) }
     if (repair && !repairStarted) { repairStarted = true; pairing.startRepair() }
@@ -167,6 +170,13 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
         onRevisit = { step -> revisit = step },
         onboarding = onboarding,
         onDiagnostics = { diagnosticsOpen = true },
+        scanning = scanning,
+        onConnectPort = { port ->
+            phone.pairing.scope.launch {
+                phone.sharedShell.reconnect()
+                phone.shellManager.connectWithPort(port)
+            }
+        },
     )
     // 卡在哪一步都能把诊断信息发给作者:用的是引导页此刻的输入,用户确认过的步骤也在里面
     if (diagnosticsOpen) {
@@ -180,6 +190,8 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
  * [onboarding] 为真时是首次上手的最后一步,底部多一排分页点。[onSubmit] 收到的码已经校验过是 6 位数字。
  * 配对一步通知发不出来时([SetupView.needsNotifications]),先修通知是主按钮:[onAllowNotifications] 或 [onOpenPairingChannel]。
  * [onDiagnostics] 不为空时底部总有「复制诊断信息」,失败时出错的那一步里也有一个。
+ * 除了成功,哪个阶段底部都有「稍后再说」,返回也总能离开:不把用户困在这一页。
+ * [scanning] 为真时连接一步说明正在本机找端口;连不上时 [onConnectPort] 收用户填的无线调试端口(已校验 1–65535)。
  */
 @Composable
 fun PhoneSetupContent(
@@ -198,6 +210,8 @@ fun PhoneSetupContent(
     onboarding: Boolean = false,
     onOpenPairingChannel: () -> Unit = {},
     onDiagnostics: (() -> Unit)? = null,
+    scanning: Boolean = false,
+    onConnectPort: ((Int) -> Unit)? = null,
 ) {
     val canRevisit = view.phase == SetupPhase.Guide || view.phase == SetupPhase.Failed
     fun revisitable(step: SetupStep) = canRevisit && step != view.current && step in PhoneSetupFlow.REVISITABLE &&
@@ -226,14 +240,14 @@ fun PhoneSetupContent(
                         ) {
                             if (step == view.current) CurrentStepBody(
                                 step, view, onStepAction, onFailureFix, onAllowNotifications, onOpenPairingChannel, headsUpLowered, onOpenHeadsUp,
-                                onConfirmStep, onSubmit, onAppInfo, onSkipAccessibility, onRevisit, onDiagnostics,
+                                onConfirmStep, onSubmit, onAppInfo, onSkipAccessibility, onRevisit, onDiagnostics, onConnectPort,
                             )
-                            if (step == SetupStep.Connect && view.phase == SetupPhase.Working) WorkingLine()
+                            if (step == SetupStep.Connect && view.phase == SetupPhase.Working) WorkingLine(scanning)
                         }
                     }
                 }
                 if (SetupStep.entries.any(::revisitable)) FooterNote(PhoneSetupCopy.REVISIT_NOTE)
-                if (view.phase == SetupPhase.Guide) FooterNote(PhoneSetupCopy.SKIP_NOTE)
+                if (view.phase != SetupPhase.Success) FooterNote(PhoneSetupCopy.SKIP_NOTE)
             }
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
                 if (view.phase == SetupPhase.Success) {
@@ -248,11 +262,11 @@ fun PhoneSetupContent(
                         if (onboarding) PhoneSetupCopy.START_USING else PhoneSetupCopy.SUCCESS_DONE, onClose,
                         Modifier.fillMaxWidth().testTag("setup-done"),
                     )
-                    SetupPhase.Guide -> MikaButton(
+                    // 正在连接、连不上时也能先离开,之后在设置里接着弄
+                    SetupPhase.Guide, SetupPhase.Working, SetupPhase.Failed -> MikaButton(
                         PhoneSetupCopy.LATER, onClose, Modifier.fillMaxWidth().testTag("setup-later"),
                         kind = ButtonKind.Text, size = ButtonSize.Medium,
                     )
-                    else -> Unit
                 }
                 onDiagnostics?.let {
                     MikaButton(
@@ -324,6 +338,7 @@ private fun CurrentStepBody(
     onSkipAccessibility: () -> Unit,
     onRevisit: (SetupStep?) -> Unit,
     onDiagnostics: (() -> Unit)?,
+    onConnectPort: ((Int) -> Unit)?,
 ) {
     val copy = PhoneSetupCopy.step(step)
     Text(copy.body, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = MikaTheme.colors.ink2)
@@ -336,6 +351,8 @@ private fun CurrentStepBody(
             Text(fc.body, Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.ink2)
         }
         PillButton(PhoneSetupCopy.fixLabel(f.fix), primary = true, tag = "setup-fix") { onFailureFix(f.fix) }
+        // 自动找不到端口:让用户照着「无线调试」页面填
+        if (step == SetupStep.Connect && f.reason == BuiltinShellFailure.ConnectFailed) onConnectPort?.let { ConnectPort(it) }
         if (view.phase == SetupPhase.Failed) onDiagnostics?.let { LinkText(PhoneSetupCopy.DIAGNOSTICS, "setup-diagnostics-failed", it) }
     }
     // 没成功时最可能的原因在前面哪一步:说清楚,给回去的按钮
@@ -479,11 +496,42 @@ private fun ManualCode(askPort: Boolean, onSubmit: (String, Int?) -> Unit) {
     }
 }
 
+/** 用户填的无线调试端口:可能整段粘了「IP 地址和端口」(取最后一个冒号后面)、带空格或全角数字;不在 1–65535 为 null。 */
+internal object ConnectPortInput {
+    fun parse(text: String): Int? {
+        val tail = text.substringAfterLast(':').substringAfterLast('：')
+        val digits = tail.filterNot { it.isWhitespace() }.map { c -> if (c in '０'..'９') '0' + (c - '０') else c }.joinToString("")
+        return PairingCode.port(digits)
+    }
+}
+
+/** 连不上时的兜底:填「无线调试」页面上的端口,点「连接」。 */
 @Composable
-private fun WorkingLine() {
+private fun ConnectPort(onConnect: (Int) -> Unit) {
+    var port by rememberSaveable { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        port, { port = it; invalid = false }, Modifier.fillMaxWidth().padding(top = 10.dp).keepsKeyboard().testTag("setup-connect-port"),
+        label = { Text(PhoneSetupCopy.CONNECT_PORT_LABEL) },
+        supportingText = { Text(if (invalid) PhoneSetupCopy.PORT_INVALID else PhoneSetupCopy.CONNECT_PORT_HINT, color = if (invalid) MikaTheme.colors.bad else MikaTheme.colors.ink3) },
+        singleLine = true, isError = invalid,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+    )
+    PillButton(PhoneSetupCopy.CONNECT_PORT_SUBMIT, primary = false, tag = "setup-connect-port-submit") {
+        val p = ConnectPortInput.parse(port)
+        invalid = p == null
+        if (p != null) onConnect(p)
+    }
+}
+
+@Composable
+private fun WorkingLine(scanning: Boolean) {
     Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CircularProgressIndicator(Modifier.size(16.dp), color = MikaTheme.colors.accent, strokeWidth = 2.dp)
-        Text(PhoneSetupCopy.WORKING, fontSize = 13.5.sp, color = MikaTheme.colors.ink2)
+        Text(
+            if (scanning) PhoneSetupCopy.SCANNING_PORTS else PhoneSetupCopy.WORKING, Modifier.testTag("setup-working"),
+            fontSize = 13.5.sp, color = MikaTheme.colors.ink2,
+        )
     }
 }
 

@@ -66,7 +66,7 @@
     <string name="fail_wifi_not_allowed">Wireless debugging isn’t allowed on this Wi-Fi yet</string>
     <string name="fail_wifi_not_allowed_body">Mika turned on Wireless debugging, but the system didn’t allow it on this Wi-Fi. Turn on “Wireless debugging” once yourself; when asked, tick “Always allow on this network” and tap Allow. After that Mika can turn it on by itself on this Wi-Fi.</string>
     <string name="fail_connect">Couldn’t connect to Wireless debugging</string>
-    <string name="fail_connect_body">Make sure “Wireless debugging” is on and the phone is on Wi-Fi, then retry.</string>
+    <string name="fail_connect_body">Couldn’t find the Wireless debugging port. You can: turn “Wireless debugging” off and on again, then retry; switch to a phone hotspot or your home Wi-Fi; or enter the port below.</string>
     <string name="fail_revoked">Pairing expired</string>
     <string name="fail_revoked_body">The system may have revoked it after a long time unused, or it was removed. Just pair again. Turn on “Disable adb authorization timeout” in Developer options so it won’t expire again.</string>
     <string name="fail_helper">Connected, but couldn’t get ready</string>
@@ -116,4 +116,8 @@
     <string name="phone_pairing_channel_off">The pairing code goes into a notification, so turn on Mika’s “%1$s” notifications first.</string>
     <string name="phone_open_pairing_channel">Turn on “%1$s” notifications</string>
     <string name="phone_pairing_lowered">Mika’s “%1$s” notifications won’t pop up at the top of the screen now. Turn on “Pop on screen” so you can enter the code right over the pairing window; otherwise swipe down to the notification shade to enter it.</string>
+    <string name="phone_scanning_ports">Looking for the Wireless debugging port on this phone…</string>
+    <string name="phone_connect_port_label">Enter the Wireless debugging port</string>
+    <string name="phone_connect_port_hint">On the “Wireless debugging” page, the number after the colon in “IP address &amp; port”, e.g. 41235</string>
+    <string name="phone_connect_port_submit">Connect</string>
 </resources>

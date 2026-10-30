@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.chatgpt
 
+import com.wangzan101.mika.core.adb.OwnListeningPorts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -17,6 +18,9 @@ import java.net.URLDecoder
  */
 class LoopbackCallback private constructor(private val server: ServerSocket) : Closeable {
     val port: Int get() = server.localPort
+
+    // 找无线调试端口时扫本机,别扫到自己这个监听
+    init { OwnListeningPorts.add(server.localPort) }
     val redirectUri: String get() = "http://$HOST:$port$PATH"
 
     /**
@@ -62,6 +66,7 @@ class LoopbackCallback private constructor(private val server: ServerSocket) : C
     }
 
     override fun close() {
+        OwnListeningPorts.remove(server.localPort)
         runCatching { server.close() }
     }
 

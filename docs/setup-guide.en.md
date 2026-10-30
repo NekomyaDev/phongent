@@ -178,6 +178,12 @@ Nothing to do here. Once paired, Mika connects and gets ready by itself, usually
 
 If you skipped step 3, Mika now turns on its own accessibility service. You can see Mika switched on in the system's Accessibility settings.
 
+To find the Wireless debugging port, Mika first tries the one it used last time, the one the system reports and the one announced on the local network. If none of these works (some routers block those announcements), it searches this phone itself; the wizard shows "Looking for the Wireless debugging port on this phone…" for up to about ten seconds. It only looks at this phone, never at other devices on the same Wi-Fi.
+
+If it still can't find it, the "Connect automatically" step shows "Enter the Wireless debugging port": open the system's "Wireless debugging" page, look at the "IP address & port" line, enter **the number after the colon** (for example `41235` in `192.168.1.5:41235`) and tap "Connect". Mika remembers it once connected. The number changes when you turn Wireless debugging off and on; Mika can usually find the new one by itself, otherwise just enter it again.
+
+While connecting and after a failed connection, "Not now" is always at the bottom, so you can leave at any time and continue later from Settings.
+
 If pairing or connecting fails, Mika uses what it could read to say which earlier step is the most likely cause (for example "“Wireless debugging” seems to be off" or "This phone doesn’t let Mika read the “Wireless debugging” switch"), with a button such as "Back to “Turn on Wireless debugging”" that takes you back to redo that step.
 
 ---
@@ -202,6 +208,7 @@ If pairing or connecting fails, Mika uses what it could read to say which earlie
 | "Wrong or expired pairing code" | The code changes each time the pairing dialog opens. Go back to "Wireless debugging", tap "Pair device with pairing code" again and enter the new 6 digits. |
 | "The pairing window closed" | Keep the pairing dialog open while entering the code: don't switch apps, press Back or lock the screen. Open the dialog again and enter the code. |
 | Pairing worked, but "Connect automatically" fails | Make sure "Wireless debugging" is still on and the phone is on Wi-Fi, then tap "Retry". If that doesn't help, tap "Pair again". If the wizard points at an earlier step, tap "Back to “…”" to redo it. |
+| Stuck at "Connect automatically" / can't find the Wireless debugging port | Turn "Wireless debugging" off and on, then tap "Retry"; switch to a phone hotspot or your home Wi-Fi (some routers stop devices from discovering each other); or in "Enter the Wireless debugging port", enter the number after the colon in "IP address & port" on the "Wireless debugging" page and tap "Connect". |
 | A switch is on but the wizard stays on that step | Some phones report switches wrong. Tap "I’ve turned it on, next" to continue; what counts in the end is pairing and connecting. |
 | "Wireless debugging isn't allowed on this Wi-Fi yet" | Turn on "Wireless debugging" once yourself; in the dialog, tick "Always allow on this network" and tap "Allow". |
 | "Not connected to Wi-Fi" | Join any Wi-Fi network (internet access not required); Mika resumes by itself. |
