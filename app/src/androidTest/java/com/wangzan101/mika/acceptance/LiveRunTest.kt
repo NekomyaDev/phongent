@@ -111,7 +111,7 @@ class LiveRunTest {
         val store = ProviderStore.get(context)
         val cfg = store.configFor(ModelRole.Main) ?: error("no main model configured")
         val recorder = Recorder(::note)
-        testTasks.modelFactory = { ctx -> TaskEnvironment.defaultModelFactory(ctx)?.let { recorder.wrap(it) } }
+        testTasks.modelFactory = { ctx, s -> TaskEnvironment.defaultModelFactory(ctx, s)?.let { recorder.wrap(it) } }
         note("model=${cfg.model} goal=$goal")
 
         compose.typeAndSend(goal!!)

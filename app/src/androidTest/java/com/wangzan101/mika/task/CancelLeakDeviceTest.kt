@@ -32,9 +32,9 @@ class CancelLeakDeviceTest {
         DeviceSupport.shell()
         DeviceSupport.service()
         sh("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
-        testTasks.modelFactory = { models[handed.getAndIncrement().coerceAtMost(ROUNDS - 1)] }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> models[handed.getAndIncrement().coerceAtMost(ROUNDS - 1)] }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
     }
 
     @After

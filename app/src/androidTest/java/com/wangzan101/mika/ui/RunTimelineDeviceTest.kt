@@ -49,9 +49,9 @@ class RunTimelineDeviceTest {
     fun setUp() {
         DeviceSupport.shell()
         DeviceSupport.service()
-        testTasks.modelFactory = { model }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> model }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
         compose.runOnUiThread { vm.newConversation() }
     }
 

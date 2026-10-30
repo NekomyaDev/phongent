@@ -8,6 +8,7 @@ import com.wangzan101.mika.core.model.AnthropicModel
 import com.wangzan101.mika.core.model.BearerToken
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ChatModel
+import com.wangzan101.mika.core.model.ClientHeaders
 import com.wangzan101.mika.core.model.GeminiModel
 import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
@@ -17,6 +18,7 @@ import com.wangzan101.mika.core.model.ModelError
 import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.core.model.OpenAiCompatModel
 import com.wangzan101.mika.core.model.PromptCaching
 import com.wangzan101.mika.core.model.ResponsesModel
@@ -89,6 +91,7 @@ data class ProviderConfig(
  * 一个已连接的服务商:名字、接口类型、地址;Key 单独加密保存。
  * [models] 是最近一次列出的模型(「测试并保存」或刷新时记下,和配置存在同一个文件里);
  * 为 null 表示还没列过,空列表表示列过但服务不提供列表(或一个也没有)。
+ * [sessionHeader] 是它要求放对话会话号的请求头名(来自预设,见 [ProviderPreset.sessionHeader]);不要的为 null。
  */
 data class Provider(
     val id: String,
@@ -96,6 +99,7 @@ data class Provider(
     val kind: ProviderConfig.Kind,
     val baseUrl: String,
     val models: List<ListedModel>? = null,
+    val sessionHeader: String? = null,
 ) {
     val key: String get() = ProviderConnection.keyOf(kind, baseUrl, name)
 }
@@ -153,6 +157,12 @@ data class RoleChoices(
 }
 
 /**
+ * 建一个模型客户端时额外给的:[headers] 每个请求都带(客户端标识、会话号,见 [ClientHeaders]);
+ * [maxOutputTokens] 限制回复长度(连接测试用),null 按适配器默认。
+ */
+data class ClientSetup(val headers: Map<String, String> = emptyMap(), val maxOutputTokens: Int? = null)
+
+/**
  * 服务商、模型配置的存取与用途选择。配置存成 JSON 文件,API Key 经 [KeyCipher] 加密后另存一个文件,每个服务商一份。
  *
  * 用户只管两层:连了哪些服务商、每个用途([RoleChoices])用哪个模型。模型配置([ProviderConfig])是内部的一层:
@@ -171,16 +181,19 @@ class ProviderStore(
     private val cipher: KeyCipher,
     private val usage: UsageSink = UsageSink { _, _ -> },
     private val newId: () -> String = { UUID.randomUUID().toString() },
-    private val modelLister: suspend (ProviderConfig.Kind, String, String?) -> ModelListResult = ::listAvailable,
+    /** 发给模型服务的 User-Agent;App 给 `Mika/<版本>`。 */
+    private val userAgent: String = "Mika",
+    /** 列模型:接口类型、地址、Key、每个请求都带的头。 */
+    private val modelLister: suspend (ProviderConfig.Kind, String, String?, Map<String, String>) -> ModelListResult = ::listAvailable,
     /** 「用 ChatGPT 登录」的授权服务(换令牌、刷新、注销)。 */
     val chatGptAuth: ChatGptAuth = defaultChatGptAuth,
     /**
-     * 建可调用的模型:配置、Key、服务商列表里给这个模型单独指定的接口(没有为 null,按配置的接口类型和地址)。
+     * 建可调用的模型:配置、Key、服务商列表里给这个模型单独指定的接口(没有为 null,按配置的接口类型和地址)、请求头等。
      * 为 null 时用内置的适配器(测试里换成假的)。
      */
-    modelFactory: ((ProviderConfig, String?, ModelEndpoint?) -> ChatModel)? = null,
+    modelFactory: ((ProviderConfig, String?, ModelEndpoint?, ClientSetup) -> ChatModel)? = null,
 ) {
-    private val modelFactory: (ProviderConfig, String?, ModelEndpoint?) -> ChatModel = modelFactory ?: ::buildModel
+    private val modelFactory: (ProviderConfig, String?, ModelEndpoint?, ClientSetup) -> ChatModel = modelFactory ?: ::buildModel
     /** 每个 ChatGPT 服务商一份:同一时刻只有一个在换令牌。 */
     private val chatGptTokens = mutableMapOf<String, ChatGptTokens>()
     private val configFile = File(dir, CONFIG_FILE)
@@ -247,8 +260,11 @@ class ProviderStore(
      * [apiKey] 为 null 时不改已存的 Key。
      */
     @Synchronized
-    fun connect(name: String, kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, models: List<ListedModel>): Provider {
-        val p = findOrAddProvider(name, kind, baseUrl).copy(models = models)
+    fun connect(
+        name: String, kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, models: List<ListedModel>,
+        sessionHeader: String? = ProviderPresets.forBaseUrl(baseUrl)?.sessionHeader,
+    ): Provider {
+        val p = findOrAddProvider(name, kind, baseUrl).copy(models = models, sessionHeader = sessionHeader)
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
         if (apiKey != null) setKey(p.id, apiKey)
         writeConfig()
@@ -348,23 +364,27 @@ class ProviderStore(
     /**
      * 这个用途用的模型,套好计量;没选、不用时为 null。用量记在 [role] 名下:「用主模型」的看图、轻量调用
      * 记作看图、轻量,服务商和模型是主模型那条配置的。这是 App 里建可调用模型的唯一入口。
+     * [session] 是这次调用属于的对话(同一段对话里建的模型都给同一个);服务商声明了会话头的,每个请求都带上它。
      */
-    fun modelFor(role: ModelRole): ChatModel? = configFor(role)?.let { cfg ->
-        val source = UsageSource(cfg.providerId, provider(cfg.providerId)?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))
-        modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg)).metered(source, usage)
+    fun modelFor(role: ModelRole, session: ModelSession = ModelSession.fresh()): ChatModel? = configFor(role)?.let { cfg ->
+        val p = provider(cfg.providerId)
+        val source = UsageSource(cfg.providerId, p?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))
+        modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg), ClientSetup(headers(p?.sessionHeader, session))).metered(source, usage)
     }
+
+    private fun headers(sessionHeader: String?, session: ModelSession) = ClientHeaders.of(userAgent, sessionHeader, session)
 
     /** 服务商最近一次列出的模型里,给这个模型单独指定的接口;每次建模型时现查,重新列过就用新的。 */
     private fun endpointOf(cfg: ProviderConfig): ModelEndpoint? =
         provider(cfg.providerId)?.models?.firstOrNull { it.id == cfg.model }?.endpoint
 
-    /** 列出这个服务商的可用模型(见 [ModelCatalog])。 */
-    suspend fun listModels(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?): ModelListResult =
-        modelLister(kind, baseUrl, apiKey)
+    /** 列出这个服务商的可用模型(见 [ModelCatalog]);不属于任何对话,声明了会话头的用新的会话号。 */
+    suspend fun listModels(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String? = null): ModelListResult =
+        modelLister(kind, baseUrl, apiKey, headers(sessionHeader, ModelSession.fresh()))
 
     /** 重新列一个已连接服务商的模型:用存着的 Key;ChatGPT 用登录的访问令牌(快过期先换新的)。 */
     suspend fun listModels(p: Provider): ModelListResult {
-        if (p.kind != ProviderConfig.Kind.ChatGpt) return listModels(p.kind, p.baseUrl, providerKey(p.id))
+        if (p.kind != ProviderConfig.Kind.ChatGpt) return listModels(p.kind, p.baseUrl, providerKey(p.id), p.sessionHeader)
         val token = try {
             tokensFor(p.id).get(fresh = false)
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -435,16 +455,26 @@ class ProviderStore(
     }
 
     /** 模型单独指定了接口的,按它的协议选适配器、用它的地址;否则按配置的接口类型和地址。Key 都用服务商的。 */
-    private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?): ChatModel {
+    /**
+     * 请求头四种协议一样带。回复上限([ClientSetup.maxOutputTokens])只给 Messages(本来就必填)和 generateContent;
+     * Chat Completions 不给(有的模型只认 `max_tokens`、有的只认 `max_completion_tokens`,给错了整个请求被拒,
+     * 连接测试就会误报),Responses 也不给(ChatGPT 套餐那条路不收 `max_output_tokens`)。
+     */
+    private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?, setup: ClientSetup): ChatModel {
         val (kind, baseUrl) = adapterFor(cfg, endpoint)
         return when (kind) {
             ProviderConfig.Kind.OpenAiCompat ->
-                OpenAiCompatModel(baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField)
-            ProviderConfig.Kind.Anthropic -> AnthropicModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
-            ProviderConfig.Kind.Gemini -> GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
-            ProviderConfig.Kind.OpenAiResponses -> ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http)
+                OpenAiCompatModel(baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField, setup.headers)
+            ProviderConfig.Kind.Anthropic -> AnthropicModel(
+                baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http,
+                maxTokens = setup.maxOutputTokens ?: DEFAULT_ANTHROPIC_MAX_TOKENS, headers = setup.headers,
+            )
+            ProviderConfig.Kind.Gemini ->
+                GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http, setup.headers, setup.maxOutputTokens)
+            ProviderConfig.Kind.OpenAiResponses ->
+                ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http, headers = setup.headers)
             ProviderConfig.Kind.ChatGpt ->
-                ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true)
+                ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true, headers = setup.headers)
         }
     }
 
@@ -538,6 +568,8 @@ class ProviderStore(
         name = o.str("name"),
         kind = ProviderConfig.Kind.valueOf(o.str("kind")),
         baseUrl = o.str("baseUrl"),
+        // 旧版本存下的没有这一项:按地址对得上的预设补上(读入后写回文件时记进去)
+        sessionHeader = o["sessionHeader"]?.jsonPrimitive?.content ?: ProviderPresets.forBaseUrl(o.str("baseUrl"))?.sessionHeader,
         models = o["models"]?.jsonArray?.map { e ->
             val m = e.jsonObject
             ListedModel(
@@ -600,6 +632,7 @@ class ProviderStore(
                 _providers.value.forEach { p ->
                     addJsonObject {
                         put("id", p.id); put("name", p.name); put("kind", p.kind.name); put("baseUrl", p.baseUrl)
+                        p.sessionHeader?.let { put("sessionHeader", it) }
                         p.models?.let { models ->
                             putJsonArray("models") {
                                 models.forEach { m ->
@@ -688,22 +721,27 @@ class ProviderStore(
         /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
         const val CHATGPT_NAME = "ChatGPT"
 
+        private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
+
         /**
          * 列模型的接口:OpenAI 兼容、Responses 和 ChatGPT 都是 `GET {base}/models`(Bearer;ChatGPT 的 [apiKey] 是访问令牌)。
+         * [headers] 每个请求都带(见 [ClientHeaders])。
          */
-        suspend fun listAvailable(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?): ModelListResult = when (kind) {
-            ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> catalog.openAiCompat(baseUrl, apiKey)
-            ProviderConfig.Kind.Anthropic -> catalog.anthropic(baseUrl, apiKey.orEmpty())
-            ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty())
-        }
+        suspend fun listAvailable(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, headers: Map<String, String>): ModelListResult =
+            when (kind) {
+                ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt ->
+                    catalog.openAiCompat(baseUrl, apiKey, headers)
+                ProviderConfig.Kind.Anthropic -> catalog.anthropic(baseUrl, apiKey.orEmpty(), headers)
+                ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty(), headers)
+            }
 
         /** 调用这个模型用哪种适配器、交给它什么 Base URL。 */
         internal fun adapterFor(cfg: ProviderConfig, endpoint: ModelEndpoint?): Pair<ProviderConfig.Kind, String> =
             if (endpoint == null) cfg.kind to cfg.baseUrl else ProviderConfig.Kind.of(endpoint.protocol) to endpoint.adapterBaseUrl
 
         /** 产品里的那份(App 建):配置在 files/settings 下,Key 用 Android 密钥库加密,用量记到 [usage]。 */
-        fun create(context: Context, usage: UsageSink): ProviderStore =
-            ProviderStore(File(context.applicationContext.filesDir, "settings"), KeystoreKeyCipher(), usage)
+        fun create(context: Context, usage: UsageSink, userAgent: String): ProviderStore =
+            ProviderStore(File(context.applicationContext.filesDir, "settings"), KeystoreKeyCipher(), usage, userAgent = userAgent)
 
         /** App 内共用的那份(经 [Owner] 给出)。 */
         fun get(context: Context): ProviderStore = (context.applicationContext as? Owner)?.providers

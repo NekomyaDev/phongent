@@ -36,6 +36,10 @@ class GeminiModel(
     private val model: String,
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
+    /** 每个请求都带的头(见 [ClientHeaders]);Key 的头由适配器自己加。 */
+    private val headers: Map<String, String> = emptyMap(),
+    /** 回复最多多少 token(`generationConfig.maxOutputTokens`);null 不限,按服务端默认。 */
+    private val maxOutputTokens: Int? = null,
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/v1beta/models/$model:generateContent"
@@ -74,8 +78,10 @@ class GeminiModel(
                 })
             })
             put("contents", buildContents(messages))
+            maxOutputTokens?.let { n -> putJsonObject("generationConfig") { put("maxOutputTokens", n) } }
         }
         return Request.Builder().url(if (stream) streamEndpoint else endpoint)
+            .withHeaders(headers)
             .header("x-goog-api-key", apiKey)
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()

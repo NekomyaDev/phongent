@@ -49,9 +49,9 @@ class SandboxTaskDeviceTest {
         DeviceSupport.shell()
         DeviceSupport.service()
         sh("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
-        testTasks.modelFactory = { model }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> model }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
         watch.launch { DeviceTaskState.state.collect { states += it } }
     }
 

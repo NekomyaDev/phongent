@@ -8,6 +8,7 @@ import com.wangzan101.mika.core.model.ModelEndpoint
 import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelReply
 import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.core.model.StopReason
 import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.model.Usage
@@ -32,8 +33,11 @@ class ProviderStoreTest {
     private val built = mutableListOf<Pair<ProviderConfig, String?>>()
     private val endpoints = mutableListOf<ModelEndpoint?>()
 
-    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }) { cfg, apiKey, endpoint ->
+    private val setups = mutableListOf<ClientSetup>()
+
+    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3") { cfg, apiKey, endpoint, setup ->
         built += cfg to apiKey
+        setups += setup
         endpoints += endpoint
         FakeModel(cfg.capabilities)
     }
@@ -509,12 +513,76 @@ class ProviderStoreTest {
         assertEquals(ProviderConfig.Kind.Anthropic to "https://api.anthropic.com", ProviderStore.adapterFor(anthropicConfig, null))
     }
 
+    // ---------- 请求头 ----------
+
+    /** 声明了会话头的服务商:同一段对话建的模型带同一个会话号,换一段对话就换;User-Agent 每个都带。 */
+    @Test
+    fun sessionHeaderIsStableWithinAConversationAndDiffersAcross() {
+        val s = store()
+        val p = s.connect("Go", ProviderConfig.Kind.OpenAiCompat, "https://go.test/v1", "k", listOf(ListedModel("m1")), sessionHeader = "x-test-session")
+        s.use(ModelRole.Main, p.id, "m1", none)
+        val a = ModelSession.of("conv-a")
+        s.modelFor(ModelRole.Main, a); s.modelFor(ModelRole.Light, a); s.modelFor(ModelRole.Main, ModelSession.of("conv-b"))
+        val sent = setups.map { it.headers["x-test-session"] }
+        assertEquals(listOf(a.id, a.id, ModelSession.of("conv-b").id), sent)
+        assertTrue(sent[0] != sent[2])
+        assertTrue(setups.all { it.headers["User-Agent"] == "Mika/1.2.3" })
+    }
+
+    /** 列表把模型指到 Responses 的(同一服务商下只说这一种协议的模型):走真的 Responses 适配器,照样带客户端标识和会话号。 */
+    @Test
+    fun responsesRoutedModelCarriesTheSessionHeader() = runTest {
+        val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
+        try {
+            val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3")
+            val responsesBase = server.url("/v1").toString()
+            val listed = ListedModel("r-only", endpoint = ModelEndpoint(ModelProtocol.Responses, responsesBase))
+            val p = s.connect("Go", ProviderConfig.Kind.OpenAiCompat, "https://go.test/v1", "k", listOf(listed), sessionHeader = "x-test-session")
+            s.use(ModelRole.Main, p.id, "r-only", none)
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBody("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"))
+            val session = ModelSession.of("conv-a")
+            s.modelFor(ModelRole.Main, session)!!.complete("s", emptyList(), emptyList())
+            val req = server.takeRequest()
+            assertEquals("/v1/responses", req.path)
+            assertEquals("Mika/1.2.3", req.getHeader("User-Agent"))
+            assertEquals(session.id, req.getHeader("x-test-session"))
+            assertEquals("Bearer k", req.getHeader("Authorization"))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun noSessionHeaderForProvidersThatDoNotDeclareIt() {
+        val s = store()
+        val p = connected(s)
+        s.use(ModelRole.Main, p.id, "m1", none)
+        s.modelFor(ModelRole.Main, ModelSession.of("conv-a"))
+        assertEquals(mapOf("User-Agent" to "Mika/1.2.3"), setups.single().headers)
+    }
+
+    /** 会话头随服务商存下;旧版本存下的(没有这一项)按地址对得上的预设补上,预设的地址就会带。 */
+    @Test
+    fun sessionHeaderPersistsAndIsFilledFromThePresetForOldFiles() {
+        val goUrl = ProviderPresets.all.first { it.sessionHeader != null }
+        val s = store()
+        val p = s.connect(goUrl.label, goUrl.kind, goUrl.baseUrl, "k", emptyList())
+        assertEquals(goUrl.sessionHeader, p.sessionHeader)
+        assertEquals(goUrl.sessionHeader, store().provider(p.id)?.sessionHeader)
+        val f = File(tmp.root, "providers.json")
+        f.writeText(f.readText().replace(",\"sessionHeader\":\"${goUrl.sessionHeader}\"", ""))
+        assertFalse(f.readText().contains("sessionHeader"))
+        assertEquals(goUrl.sessionHeader, store().provider(p.id)?.sessionHeader)
+        assertTrue("written back", f.readText().contains("sessionHeader"))
+    }
+
     // ---------- 用量 ----------
 
     @Test
     fun everyModelHandedOutIsMeteredUnderTheRoleItWasAskedFor() = runTest {
         val seen = mutableListOf<Pair<UsageSource, Usage?>>()
-        val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }) { cfg, _, _ -> FakeModel(cfg.capabilities) }
+        val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }) { cfg, _, _, _ -> FakeModel(cfg.capabilities) }
         val p = connected(s, name = "甲")
         s.use(ModelRole.Main, p.id, "m1", none)
         s.choose(ModelRole.Vision, RoleChoice.SameAsMain)

@@ -43,6 +43,7 @@ import com.wangzan101.mika.core.memory.MemoryExtractor
 import com.wangzan101.mika.core.memory.MemoryStore
 import com.wangzan101.mika.core.memory.UserUtterances
 import com.wangzan101.mika.core.model.ChatModel
+import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.core.skills.SkillDrafter
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.memory.MemoryRuntime
@@ -150,6 +151,8 @@ class TaskRun(
     /** 自己的一份;显示中时同步写到服务对外的那份。[show] 时整份抄过去。 */
     /** App 给的模型来源、评测钩子、屏幕画面的开关。 */
     private val env = TaskEnvironment.of(service)
+    /** 这段对话对外的会话号:这次运行建的模型(主、轻量、看图,及核查、意图判断、停止交代等旁路)都用它。 */
+    private val session = ModelSession.of(conversationId)
     /** App 给的手机服务(共用的 shell 连接、「去设置」提示)、记忆、经验路线、异常退出后的恢复。 */
     private val phoneServices = PhoneServices.of(service)
     private val memoryRuntime = MemoryRuntime.of(service)
@@ -396,9 +399,9 @@ class TaskRun(
         )
         sideScope = side
         try {
-            val model = env.modelFactory(service) ?: return TaskState.Failed(tr(R.string.fail_no_main_model), FailKind.Environment)
-            val light = env.lightModelFactory(service)
-            val vision = env.visionModelFactory(service)
+            val model = env.modelFactory(service, session) ?: return TaskState.Failed(tr(R.string.fail_no_main_model), FailKind.Environment)
+            val light = env.lightModelFactory(service, session)
+            val vision = env.visionModelFactory(service, session)
 
             val (knowledge, skills) = withContext(Dispatchers.IO) {
                 // 用户对某个 App/站点的补充放在私有目录 personal/apps、personal/sites 下
@@ -829,7 +832,7 @@ class TaskRun(
         if (!StopSummary.worthSaying(events, draft)) return null
         // 还没开出模型就停下的(准备阶段):按设置现取
         val (main, light) = if (k != null) k.model to k.light else withContext(Dispatchers.IO) {
-            runCatching { env.modelFactory(service) }.getOrNull() to runCatching { env.lightModelFactory(service) }.getOrNull()
+            runCatching { env.modelFactory(service, session) }.getOrNull() to runCatching { env.lightModelFactory(service, session) }.getOrNull()
         }
         val labels = ToolLabels(knownTools())
         return StopSummary(light ?: main, main).summarize(k?.agent?.taskText ?: goal, events, draft, labels::label) {

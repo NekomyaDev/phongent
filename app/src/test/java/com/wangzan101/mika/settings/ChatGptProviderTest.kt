@@ -30,13 +30,15 @@ class ChatGptProviderTest {
     private lateinit var auth: MockWebServer
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
     private val listCalls = mutableListOf<Triple<ProviderConfig.Kind, String, String?>>()
+    private val listHeaders = mutableListOf<Map<String, String>>()
 
     @Before fun setUp() { auth = MockWebServer().also { it.start() } }
     @After fun tearDown() { auth.shutdown() }
 
     private fun store() = ProviderStore(
         tmp.root, AesGcmKeyCipher { key },
-        modelLister = { kind, url, token -> listCalls += Triple(kind, url, token); ModelListResult.Ok(listOf(ListedModel("gpt-x"))) },
+        userAgent = "Mika/1.2.3",
+        modelLister = { kind, url, token, headers -> listCalls += Triple(kind, url, token); listHeaders += headers; ModelListResult.Ok(listOf(ListedModel("gpt-x"))) },
         chatGptAuth = ChatGptAuth(OkHttpClient(), auth.url("/").toString().trimEnd('/')),
     )
 
@@ -66,6 +68,9 @@ class ChatGptProviderTest {
         tmp.root.walk().filter(File::isFile).forEach { f -> assertFalse(f.name, f.readText().contains("secret-")) }
         store().listModels(p)
         assertEquals(Triple(ProviderConfig.Kind.ChatGpt, ChatGptAuth.API_BASE, "secret-access"), listCalls.single())
+        // 客户端标识照带;ChatGPT 没声明会话头,不发会话号
+        assertEquals(mapOf("User-Agent" to "Mika/1.2.3"), listHeaders.single())
+        assertNull(p.sessionHeader)
         // 再登录一次是更新同一家,不新添
         s.connectChatGpt(session().copy(accessToken = "secret-2"), emptyList())
         assertEquals(1, s.providers.value.size)

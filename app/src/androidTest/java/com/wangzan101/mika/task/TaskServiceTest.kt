@@ -65,9 +65,9 @@ class TaskServiceTest {
         DeviceSupport.service()
         sh("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
         priorAudio = shell.getAudioMode(SETTINGS)!!
-        testTasks.modelFactory = { models[handed.getAndIncrement().coerceAtMost(MAX_TASKS - 1)] }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> models[handed.getAndIncrement().coerceAtMost(MAX_TASKS - 1)] }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
     }
 
     @After
@@ -116,7 +116,7 @@ class TaskServiceTest {
     @Test
     fun verifierUsesLightModel() {
         val lightChecks = AtomicInteger()
-        testTasks.lightModelFactory = {
+        testTasks.lightModelFactory = { _, _ ->
             object : ChatModel {
                 override val capabilities = Capabilities(toolCalls = false, vision = false, contextTokens = 8_000, reasoning = false)
                 override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
@@ -245,7 +245,7 @@ class TaskServiceTest {
     fun stopLeavesASummaryAsTheAnswer() {
         val asked = AtomicInteger()
         val gate = java.util.concurrent.CountDownLatch(1)
-        testTasks.lightModelFactory = {
+        testTasks.lightModelFactory = { _, _ ->
             object : ChatModel {
                 override val capabilities = Capabilities(toolCalls = false, vision = false, contextTokens = 8_000, reasoning = false)
                 override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
@@ -279,7 +279,7 @@ class TaskServiceTest {
         pollUntil(10_000) { DeviceTaskState.busy.value.takeIf { !it } }
 
         // 轻量模型出错、主模型交白卷:按记录直接拼
-        testTasks.lightModelFactory = {
+        testTasks.lightModelFactory = { _, _ ->
             object : ChatModel {
                 override val capabilities = Capabilities(toolCalls = false, vision = false, contextTokens = 8_000, reasoning = false)
                 override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply =

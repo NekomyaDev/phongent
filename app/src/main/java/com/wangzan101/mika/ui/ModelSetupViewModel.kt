@@ -79,6 +79,9 @@ data class AddForm(
     /** 存成服务商时用的名字:预设用预设名,自定义用地址的主机名。 */
     val providerName: String get() = if (isCustom) ProviderConnection.nameForUrl(baseUrl) else preset
 
+    /** 这家要放会话号的请求头名:选的预设声明了的用它;自定义的地址对得上某个预设也用那个预设的。 */
+    val sessionHeader: String? get() = presetFor(preset).sessionHeader ?: ProviderPresets.forBaseUrl(baseUrl.trim())?.sessionHeader
+
     companion object {
         fun of(p: ProviderPreset) = AddForm(p.label, p.kind, p.baseUrl, "")
         fun presetFor(label: String): ProviderPreset = ProviderPresets.all.firstOrNull { it.label == label } ?: ProviderPresets.custom
@@ -210,7 +213,7 @@ class ModelSetupViewModel(
         testJob = scope.launch {
             val key = f.apiKey.trim()
             val baseUrl = f.baseUrl.trim()
-            val models = when (val r = withContext(io) { store.listModels(f.kind, baseUrl, key.ifEmpty { null }) }) {
+            val models = when (val r = withContext(io) { store.listModels(f.kind, baseUrl, key.ifEmpty { null }, f.sessionHeader) }) {
                 is ModelListResult.Ok -> r.models
                 is ModelListResult.Failed -> {
                     if (r.reason != ListFailure.NotSupported) {
@@ -221,7 +224,7 @@ class ModelSetupViewModel(
                 }
             }
             withContext(io) {
-                val p = store.connect(f.providerName, f.kind, baseUrl, key, models)
+                val p = store.connect(f.providerName, f.kind, baseUrl, key, models, f.sessionHeader)
                 if (store.roles.value.main == null) {
                     val options = ModelOptions.ofProvider(p, store.list())
                     (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }

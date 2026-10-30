@@ -54,6 +54,8 @@ class ResponsesModel(
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
     private val chatGptPlan: Boolean = false,
+    /** 每个请求都带的头(见 [ClientHeaders]);令牌的头由适配器自己加。这个接口不给回复上限(套餐那条路不收)。 */
+    private val headers: Map<String, String> = emptyMap(),
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trim().trimEnd('/') + "/responses"
@@ -100,6 +102,7 @@ class ResponsesModel(
 
     private fun request(bearer: String?, system: String, messages: List<Message>, tools: List<ToolSpec>, includeReasoning: Boolean): Request =
         Request.Builder().url(endpoint)
+            .withHeaders(headers)
             .apply { if (!bearer.isNullOrEmpty()) header("Authorization", "Bearer $bearer") }
             .header("Accept", "text/event-stream")
             .post(body(system, messages, tools, includeReasoning).toString().toRequestBody("application/json".toMediaType()))

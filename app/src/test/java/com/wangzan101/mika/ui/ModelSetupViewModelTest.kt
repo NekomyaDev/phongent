@@ -43,8 +43,8 @@ class ModelSetupViewModelTest {
     private fun store() = ProviderStore(
         tmp.root, AesGcmKeyCipher { key },
         newId = { "id${++ids}" },
-        modelFactory = { cfg, _, _ -> Fake(cfg.capabilities) },
-        modelLister = { kind, url, apiKey -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
+        modelFactory = { cfg, _, _, _ -> Fake(cfg.capabilities) },
+        modelLister = { kind, url, apiKey, _ -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
     )
 
     private class Fake(override val capabilities: Capabilities) : ChatModel {

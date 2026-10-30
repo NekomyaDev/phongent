@@ -56,9 +56,9 @@ class TakeoverTest {
         DeviceSupport.service()
         sh("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
         priorAudio = shell.getAudioMode(SETTINGS)!!
-        testTasks.modelFactory = { model }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> model }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
     }
 
     @After

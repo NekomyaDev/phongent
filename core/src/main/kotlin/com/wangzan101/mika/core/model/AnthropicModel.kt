@@ -32,6 +32,8 @@ class AnthropicModel(
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
     private val maxTokens: Int = 4096,
+    /** 每个请求都带的头(见 [ClientHeaders]);Key 的头由适配器自己加。 */
+    private val headers: Map<String, String> = emptyMap(),
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/v1/messages"
@@ -76,6 +78,7 @@ class AnthropicModel(
             put("messages", buildMessages(messages))
         }
         return Request.Builder().url(endpoint)
+            .withHeaders(headers)
             .header("x-api-key", apiKey)
             .header("anthropic-version", "2023-06-01")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))

@@ -103,25 +103,26 @@ sealed interface ModelListResult {
  *   `inputTokenLimit` 是上下文,`thinking` 是推理。不给工具调用和看图信息。
  */
 class ModelCatalog(private val http: OkHttpClient) {
+    // 各方法的 headers:每个请求都带的头(见 [ClientHeaders]);Key 的头由这里自己加
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun openAiCompat(baseUrl: String, apiKey: String?): ModelListResult = run {
+    suspend fun openAiCompat(baseUrl: String, apiKey: String?, headers: Map<String, String> = emptyMap()): ModelListResult = run {
         val url = endpoint(baseUrl, "/models") ?: return@run badUrl()
-        val req = Request.Builder().url(url).get()
+        val req = Request.Builder().url(url).get().withHeaders(headers)
             .apply { if (!apiKey.isNullOrEmpty()) header("Authorization", "Bearer $apiKey") }.build()
         val root = fetch(req).getOrElse { return@run it.asFailure() }
         val data = (root["data"] ?: root["models"]) as? JsonArray ?: return@run ModelListResult.Failed(ListFailure.BadResponse)
         ModelListResult.Ok(data.mapNotNull { (it as? JsonObject)?.let(::openAiModel) }.distinctBy { it.id })
     }
 
-    suspend fun anthropic(baseUrl: String, apiKey: String): ModelListResult = run {
+    suspend fun anthropic(baseUrl: String, apiKey: String, headers: Map<String, String> = emptyMap()): ModelListResult = run {
         val base = endpoint(baseUrl, "/v1/models") ?: return@run badUrl()
         val all = mutableListOf<ListedModel>()
         var after: String? = null
         repeat(MAX_PAGES) {
             val url = base.newBuilder().addQueryParameter("limit", "1000")
                 .apply { if (after != null) addQueryParameter("after_id", after) }.build()
-            val req = Request.Builder().url(url).get()
+            val req = Request.Builder().url(url).get().withHeaders(headers)
                 .header("x-api-key", apiKey).header("anthropic-version", "2023-06-01").build()
             val root = fetch(req).getOrElse { return@run it.asFailure() }
             val data = root["data"] as? JsonArray ?: return@run ModelListResult.Failed(ListFailure.BadResponse)
@@ -132,14 +133,14 @@ class ModelCatalog(private val http: OkHttpClient) {
         ModelListResult.Ok(all.distinctBy { it.id })
     }
 
-    suspend fun gemini(baseUrl: String, apiKey: String): ModelListResult = run {
+    suspend fun gemini(baseUrl: String, apiKey: String, headers: Map<String, String> = emptyMap()): ModelListResult = run {
         val base = endpoint(baseUrl, "/v1beta/models") ?: return@run badUrl()
         val all = mutableListOf<ListedModel>()
         var token: String? = null
         repeat(MAX_PAGES) {
             val url = base.newBuilder().addQueryParameter("pageSize", "1000")
                 .apply { if (token != null) addQueryParameter("pageToken", token) }.build()
-            val req = Request.Builder().url(url).get().header("x-goog-api-key", apiKey).build()
+            val req = Request.Builder().url(url).get().withHeaders(headers).header("x-goog-api-key", apiKey).build()
             val root = fetch(req).getOrElse { return@run it.asFailure() }
             val data = root["models"] as? JsonArray ?: JsonArray(emptyList())
             all += data.mapNotNull { (it as? JsonObject)?.let(::geminiModel) }

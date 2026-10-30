@@ -3,6 +3,7 @@ package com.wangzan101.mika.task
 import android.content.Context
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.settings.ProviderStore
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -16,12 +17,15 @@ class TaskEnvironment {
     /** 显示中的任务正在用内置浏览器(画中画要显示网页画面)。 */
     val webScreenOpen = MutableStateFlow(false)
 
+    // 三个工厂的 ModelSession 是这次调用属于的对话(ModelSession.of(对话 id)):同一段对话里建的模型都给同一个,
+    // 服务商要会话号的就照它路由、复用缓存
+
     /** 主模型来自设置里的模型配置;测试可换成脚本模型。 */
-    @Volatile var modelFactory: (Context) -> ChatModel? = defaultModelFactory
+    @Volatile var modelFactory: (Context, ModelSession) -> ChatModel? = defaultModelFactory
     /** 轻量模型(列成功标准等);为空时由主模型兼任。测试换主模型时一并换掉,免得调到设置里的真模型。 */
-    @Volatile var lightModelFactory: (Context) -> ChatModel? = defaultLightModelFactory
+    @Volatile var lightModelFactory: (Context, ModelSession) -> ChatModel? = defaultLightModelFactory
     /** 视觉模型(核查时看截图);设置里没有能看图的模型时为空。 */
-    @Volatile var visionModelFactory: (Context) -> ChatModel? = defaultVisionModelFactory
+    @Volatile var visionModelFactory: (Context, ModelSession) -> ChatModel? = defaultVisionModelFactory
 
     /** 评测跑器用的钩子;产品里全是默认值。 */
     val evalHooks = EvalHooks()
@@ -32,9 +36,9 @@ class TaskEnvironment {
     }
 
     companion object {
-        val defaultModelFactory: (Context) -> ChatModel? = { ProviderStore.get(it).modelFor(ModelRole.Main) }
-        val defaultLightModelFactory: (Context) -> ChatModel? = { ProviderStore.get(it).modelFor(ModelRole.Light) }
-        val defaultVisionModelFactory: (Context) -> ChatModel? = { ProviderStore.get(it).modelFor(ModelRole.Vision) }
+        val defaultModelFactory: (Context, ModelSession) -> ChatModel? = { c, s -> ProviderStore.get(c).modelFor(ModelRole.Main, s) }
+        val defaultLightModelFactory: (Context, ModelSession) -> ChatModel? = { c, s -> ProviderStore.get(c).modelFor(ModelRole.Light, s) }
+        val defaultVisionModelFactory: (Context, ModelSession) -> ChatModel? = { c, s -> ProviderStore.get(c).modelFor(ModelRole.Vision, s) }
 
         fun of(context: Context): TaskEnvironment = (context.applicationContext as Owner).tasks
     }

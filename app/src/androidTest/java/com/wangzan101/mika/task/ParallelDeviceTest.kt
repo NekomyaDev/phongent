@@ -52,9 +52,9 @@ class ParallelDeviceTest {
         priorFlags = killRecord.takeIf { it.exists() }?.let { runCatching { SpeedFlags.parse(JSONObject(it.readText()).getString(FLAGS_KEY)) }.getOrNull() }
             ?: flags.speedFlags()
         flags.setSpeed(priorFlags.copy(parallelTasks = true))
-        testTasks.modelFactory = { models[handedOut.getAndIncrement().coerceAtMost(1)] }
-        testTasks.lightModelFactory = { null }
-        testTasks.visionModelFactory = { null }
+        testTasks.modelFactory = { _, _ -> models[handedOut.getAndIncrement().coerceAtMost(1)] }
+        testTasks.lightModelFactory = { _, _ -> null }
+        testTasks.visionModelFactory = { _, _ -> null }
     }
 
     @After

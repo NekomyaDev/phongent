@@ -29,6 +29,7 @@ import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.confirm.ConfirmationNotifier
 import com.wangzan101.mika.core.agent.AgentLoop
 import com.wangzan101.mika.core.agent.Conversation
+import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.RunOutcome
 import com.wangzan101.mika.core.agent.TaskState
@@ -281,7 +282,11 @@ class TaskService : Service() {
         scope.launch(Dispatchers.IO) {
             runCatching {
                 val env = TaskEnvironment.of(this@TaskService)
-                ConversationTitler.ensure(store, id, first) { listOfNotNull(env.lightModelFactory(this@TaskService), env.modelFactory(this@TaskService)) }
+                // 起标题也属于这段对话,和对话里的任务用同一个会话号
+                val session = ModelSession.of(id)
+                ConversationTitler.ensure(store, id, first) {
+                    listOfNotNull(env.lightModelFactory(this@TaskService, session), env.modelFactory(this@TaskService, session))
+                }
             }.onFailure { if (it is CancellationException) throw it }
         }
     }

@@ -33,6 +33,8 @@ class OpenAiCompatModel(
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
     reasoningField: String? = null,
+    /** 每个请求都带的头(客户端标识、服务商要的会话号等,见 [ClientHeaders]);Key 的头由适配器自己加。 */
+    private val headers: Map<String, String> = emptyMap(),
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/chat/completions"
@@ -89,6 +91,7 @@ class OpenAiCompatModel(
             }
         }
         return Request.Builder().url(endpoint)
+            .withHeaders(headers)
             .apply { if (!apiKey.isNullOrEmpty()) header("Authorization", "Bearer $apiKey") }
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
