@@ -1,0 +1,193 @@
+# Setting up phone control, step by step
+
+[简体中文](setup-guide.md) | English
+
+This guide walks you through "Set up phone control" in Mika. No technical knowledge needed; just follow along. It takes about 3 to 5 minutes.
+
+## Before you start
+
+- **What you need**: an Android phone running Android 13 or later (Mika installs on older versions but can't use apps there), connected to any Wi-Fi network (internet access not required, just being connected is enough).
+- **Why this is needed**: Mika uses apps for you on an invisible "background screen", so you can keep using your own screen. To do that, Mika borrows Android's built-in "Wireless debugging" to start a small built-in helper.
+- **Everything happens on the phone**: no computer, no cable.
+- **You do it once**: after pairing once, Mika connects by itself. Even if the system later turns wireless debugging off, Mika turns it back on, with your permission.
+- **Optional**: web, files and chat work without it. You only need it for tasks that use apps on your phone.
+
+> The paths below follow stock Android. Some phones name or place menus differently. If you can't find something, use the search box at the top of system Settings (search for "Build number", "Developer options" or "Wireless debugging").
+
+## Where to find the wizard
+
+- The first time you open Mika, "Set up phone control" is the last step after setting up a model.
+- If you tapped "Not now" back then, that's fine: open Mika's Settings and tap the notice in the status card at the top, or go to Settings › Phone control › Pair again.
+- If a task needs your phone before you've set it up, a line appears in the chat; tap "Open Settings".
+
+The wizard is a numbered checklist of six steps. **Each step ticks itself off when it's done**: Mika checks the system switches by itself, so there's no "Next" button to press. The current step is highlighted and has a button that takes you straight to the right system settings page; when you're done there, press Back to return to Mika.
+
+<!-- Screenshot: the six-step checklist in "Set up phone control" -->
+
+---
+
+## Step 1: Turn on Developer options
+
+**In Mika**: tap "Open About phone".
+
+**In system settings**:
+
+1. Go to Settings › About phone.
+2. Scroll all the way down to "Build number".
+3. **Tap "Build number" 7 times quickly in a row.** Along the way you'll see "You are now X steps away from being a developer". If your phone has a screen lock, you'll be asked for your PIN or password once.
+4. When you see "You are now a developer!" (or similar), you're done.
+
+<!-- Screenshot: "Build number" on the About phone page -->
+
+**How to tell it worked**: back in Mika, step 1 shows "On" with a tick.
+
+**Common snags**:
+
+- Can't find "Build number": on some phones it's inside "Software information" or "Version" under "About phone". You can also search Settings for "Build number".
+- Nothing happens: tap in quick succession without long pauses.
+- "No need, you are already a developer": it was already on; just go back to Mika.
+
+## Step 2: Turn on USB debugging
+
+**In Mika**: tap "Open Developer options".
+
+**In system settings**:
+
+1. Go to Settings › System › Developer options (Mika takes you there).
+2. Scroll to "USB debugging" and turn it on.
+3. When asked "Allow USB debugging?", tap "OK".
+
+<!-- Screenshot: the "USB debugging" switch in Developer options -->
+
+**No cable needed.** With it on, Mika can keep working even when Wi-Fi is off, once pairing is done.
+
+**How to tell it worked**: back in Mika, step 2 is ticked.
+
+**Common snags**:
+
+- Can't find "Developer options": on stock Android it's under Settings › System; some phones put it under "Additional settings" or similar. Searching Settings for "Developer options" is fastest.
+- **Keep USB debugging on** from now on. Turning it off stops phone control.
+
+## Step 3: Turn on Mika's accessibility (we suggest skipping this)
+
+**Suggestion: just tap "Skip, I'll enter the code myself".**
+
+Why we suggest skipping:
+
+- Once pairing is done, Mika turns on its own accessibility service **by itself** ("Turn on accessibility for me" in Settings › Recovery & repair is on by default). You don't have to hunt for it in system settings.
+- Doing it by hand can get stuck: if Mika wasn't installed from an app store (for example, you downloaded the APK from a web page), Android marks accessibility as a "Restricted setting" and won't let you turn it on directly. When Mika turns it on after pairing, this restriction doesn't get in the way.
+
+The only cost of skipping: in the next steps you type the 6-digit pairing code yourself once (it's easy, see step 5).
+
+<!-- Screenshot: "Skip, I'll enter the code myself" under the accessibility step -->
+
+**If accessibility is already on**: this step ticks itself off and Mika reads the pairing code by itself, which is even easier.
+
+**If you really want to turn it on by hand now**: tap "Open Accessibility settings", find Mika in the list, turn it on and confirm. If the switch is greyed out or you see "Restricted setting":
+
+1. Go back to Mika and tap "Can't turn it on? Allow restricted settings in App info first" (or go to Settings › Apps › Mika yourself).
+2. On the "App info" page, tap ⋮ (three dots) at the top right and choose "Allow restricted settings", then confirm.
+3. Go back to Accessibility settings and turn Mika on.
+
+<!-- Screenshot: "Allow restricted settings" in the ⋮ menu on App info -->
+
+> Note: "Allow restricted settings" only appears in the ⋮ menu **after you've tried once** to turn on accessibility and the system blocked it.
+
+## Step 4: Turn on Wireless debugging
+
+**First make sure the phone is on Wi-Fi** (internet access not required).
+
+**In Mika**: tap "Open Developer options".
+
+**In system settings**:
+
+1. In Developer options, scroll to "Wireless debugging" and turn on the **switch** on its right.
+2. When the system asks "Allow wireless debugging on this network?": **tick "Always allow on this network"**, then tap "Allow". With that ticked, Mika can turn wireless debugging on by itself on this Wi-Fi in future.
+
+<!-- Screenshot: "Wireless debugging" in Developer options -->
+<!-- Screenshot: the "Allow wireless debugging" dialog with the "Always allow on this network" checkbox -->
+
+**How to tell it worked**: back in Mika, step 4 is ticked.
+
+**Common snags**:
+
+- The switch turns itself off again: usually the phone isn't on Wi-Fi, or "Allow" wasn't tapped in the dialog. Join Wi-Fi and try again.
+- The switch is on but Mika stays on this step: some phones don't report this switch. Tap "I've turned it on" to continue.
+
+## Step 5: Pair with a code
+
+**The one thing that trips people up**: the pairing code only works while the system's pairing dialog is open. **As soon as the dialog closes (switching apps, pressing Back, locking the screen), the code is no longer valid.** So stay on the pairing dialog while you enter the code; don't switch apps.
+
+**Before you start**: at this step Mika asks for permission to send notifications. Please tap "Allow": without accessibility, the pairing code is entered in Mika's notification.
+
+**In Mika**: tap "Open Wireless debugging".
+
+**In system settings**:
+
+1. Mika takes you to Developer options with the "Wireless debugging" row highlighted. **Tap the words "Wireless debugging"** (not the switch) to open its page.
+2. Tap "Pair device with pairing code".
+3. A dialog appears with a **6-digit pairing code** and an "IP address & port".
+
+<!-- Screenshot: "Pair device with pairing code" on the Wireless debugging page -->
+<!-- Screenshot: the pairing dialog showing the 6-digit code -->
+
+Then one of two things happens:
+
+### Case A: accessibility is already on — nothing to do
+
+The wizard shows a green hint: "When the code appears, wait a few seconds — Mika reads it and finishes pairing." Stay on the pairing dialog and **wait a few seconds**. Mika reads the code and pairs by itself, and the dialog closes on its own.
+
+### Case B: accessibility is off (you skipped step 3) — enter the code in the notification
+
+1. **Don't leave the pairing dialog.** Note the 6 digits.
+2. Within a few seconds, Mika's notification "Mika: pull down here to enter the pairing code" pops up at the top of the screen.
+   - If it doesn't pop up, or disappears quickly: **swipe down from the top of the screen** to open the notification shade, and you'll find it there. Pulling down the shade doesn't close the pairing dialog.
+3. Tap "Enter pairing code" on the notification. An input box appears.
+4. Type the 6 digits and tap send (the arrow next to the box).
+5. The notification changes to "Pairing…", then a few seconds later to "Phone control is set up".
+
+<!-- Screenshot: Mika's "Enter pairing code" notification with the input box in the notification shade -->
+
+**Tips**:
+
+- Allow Mika's notifications first. If you haven't, the wizard shows a note and an "Allow notifications" button.
+- If the wizard shows an orange note saying "Needs you" and "Task results" notifications won't pop up: that's about notifications during later tasks, not pairing. You can tap "Turn on", or ignore it for now.
+- If the code was wrong or expired, the notification says so; just enter it again. If the pairing dialog has already closed, go back to "Wireless debugging" and tap "Pair device with pairing code" again to get a **new** code, then enter the new one.
+- Still no notification? The wizard has "No notification? Enter it here". But going back to Mika closes the pairing dialog, so use **split screen**: the pairing dialog on one side, Mika on the other. If Mika hasn't found the pairing dialog yet, it asks for one more number: the digits after the colon in "IP address & port" in the pairing dialog.
+
+**How to tell it worked**: back in Mika, step 5 shows "Paired".
+
+## Step 6: Connect automatically
+
+Nothing to do here. Once paired, Mika connects and gets ready by itself, usually in a few seconds. When you see "Phone control is set up", you're done.
+
+<!-- Screenshot: the wizard showing "Phone control is set up" -->
+
+If you skipped step 3, Mika now turns on its own accessibility service. You can see Mika switched on in the system's Accessibility settings.
+
+---
+
+## After setup
+
+- **Keep USB debugging on.** Turning it off stops phone control.
+- **The system may turn wireless debugging off**: Android turns it off when Wi-Fi disconnects or changes, and after a restart. That's normal. Mika doesn't need it day to day, only when restarting its built-in helper (for example after a phone restart or a Mika update). "Turn on Wireless debugging automatically" and "Restore after restart" in Settings › Recovery & repair are on by default, so Mika turns it back on for you while on Wi-Fi, with no new pairing code.
+- **The first time on a new Wi-Fi network**: the system hasn't allowed wireless debugging on that network yet, so Mika can't turn it on. Turn on "Wireless debugging" once yourself and, in the dialog, **tick "Always allow on this network"** and tap "Allow". After that, nothing more to do on that Wi-Fi.
+- **To start over**: Settings › Phone control › Pair again.
+- **To stop using it**: Settings › Phone control › Unpair. You can also remove Mika under Wireless debugging › Paired devices in system settings.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| Can't find "Developer options" | Do step 1 first (tap "Build number" 7 times in "About phone"). Once on, stock Android has it under Settings › System › Developer options; other phones may put it under "Additional settings" or similar. Search Settings for "Developer options". |
+| Can't find "Build number" | Scroll down in "About phone"; on some phones it's inside "Software information" or "Version". Or search Settings for "Build number". |
+| The Wireless debugging switch turns itself off | Make sure you're on Wi-Fi; in the dialog that appears when you turn it on, tap "Allow" and tick "Always allow on this network". After changing Wi-Fi, allow it once more on the new network. |
+| No pairing notification from Mika | Check that Mika is allowed to send notifications (the wizard reminds you); swipe down from the top to open the notification shade; if it's still not there, use "No notification? Enter it here" in the wizard together with split screen. |
+| "Wrong or expired pairing code" | The code changes each time the pairing dialog opens. Go back to "Wireless debugging", tap "Pair device with pairing code" again and enter the new 6 digits. |
+| "The pairing window closed" | Keep the pairing dialog open while entering the code: don't switch apps, press Back or lock the screen. Open the dialog again and enter the code. |
+| Pairing worked, but "Connect automatically" fails | Make sure "Wireless debugging" is still on and the phone is on Wi-Fi, then tap "Retry". If that doesn't help, tap "Pair again". |
+| "Wireless debugging isn't allowed on this Wi-Fi yet" | Turn on "Wireless debugging" once yourself; in the dialog, tick "Always allow on this network" and tap "Allow". |
+| "Not connected to Wi-Fi" | Join any Wi-Fi network (internet access not required); Mika resumes by itself. |
+| "Pairing expired" | Pair again. Turn on "Disable adb authorization timeout" in Developer options so it won't expire again. |
+| Mika's accessibility switch is greyed out / "Restricted setting" | Recommended: skip that step; Mika turns it on after pairing. To do it by hand: try turning it on once so the system blocks it, then go to Settings › Apps › Mika, tap ⋮ at the top right › Allow restricted settings, and go back to Accessibility settings to turn Mika on. |
+| Accessibility still off after pairing | Check that "Turn on accessibility for me" in Settings › Recovery & repair is on, and wait a few seconds; if it's still off, turn it on by hand as in the row above. |
