@@ -50,7 +50,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import com.wangzan101.mika.task.testTasks
 import com.wangzan101.mika.task.TaskEnvironment
 
@@ -263,11 +263,14 @@ class ChatScreenDeviceTest {
         val prior = flags.speedFlags()
         flags.setSpeed(prior.copy(parallelTasks = true))
         val models = listOf(ScriptedModel().apply { intent = "ACT" }, ScriptedModel().apply { intent = "ACT" })
-        val handed = AtomicInteger()
-        testTasks.modelFactory = { models[handed.getAndIncrement().coerceAtMost(1)] }
+        // 模型工厂不只任务开工时取:新对话起标题也在后台另取一次,先后不定。按次数轮换会让第一个任务拿到第二个模型;
+        // 改成第一个任务真的问过模型之前都给第一个,之后都给第二个(起标题的那一问哪个模型都固定回答)
+        val firstStarted = AtomicBoolean(false)
+        testTasks.modelFactory = { if (firstStarted.get()) models[1] else models[0] }
         try {
             compose.runOnUiThread { assertTrue(vm.send("第一个任务", anyway)) }
             assertEquals(1, models[0].awaitCall().number)
+            firstStarted.set(true)
             val first = vm.ui.value.conversationId
             compose.runOnUiThread {
                 vm.newConversation()

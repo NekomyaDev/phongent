@@ -152,7 +152,7 @@ class AboutScreenTest {
         compose.onNodeWithText(AboutCopy.UP_TO_DATE).assertIsDisplayed()
         compose.onNodeWithText("检查更新").performClick()
         assertEquals(1, calls.checks)
-        compose.onAllNodesWithTag("update-dot").assertCountEquals(0)
+        compose.onAllNodesWithTag("update-dot", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
@@ -171,7 +171,7 @@ class AboutScreenTest {
     fun updateRowOpensUpdateSheet() {
         val calls = about(UpdateState(latest = r020, update = r020, status = CheckStatus.Done))
         compose.onNodeWithText("0.2.0 可更新").assertIsDisplayed()
-        compose.onNodeWithTag("update-dot").assertExists()
+        compose.onNodeWithTag("update-dot", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("检查更新").performClick()
         compose.awaitOne("发现新版本 0.2.0")
         compose.onNodeWithText("当前 0.1.0 Beta · 2026-11-05 发布").assertExists()
@@ -219,11 +219,11 @@ class AboutScreenTest {
         }
         compose.onNodeWithText("设置").assertIsDisplayed()
         compose.onNodeWithText("关于 Mika").assertIsDisplayed()
-        compose.onNodeWithTag("update-dot").assertExists()
+        compose.onNodeWithTag("update-dot", useUnmergedTree = true).assertExists()
         val footer = compose.onNodeWithTag("drawer-footer").getUnclippedBoundsInRoot()
         val settings = compose.onNodeWithText("设置").getUnclippedBoundsInRoot()
         val about = compose.onNodeWithText("关于 Mika").getUnclippedBoundsInRoot()
-        val dot = compose.onNodeWithTag("update-dot").getUnclippedBoundsInRoot()
+        val dot = compose.onNodeWithTag("update-dot", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val mid = (footer.left + footer.right) / 2
         assertTrue(settings.right < mid)
         assertTrue(about.left > mid)
@@ -245,7 +245,7 @@ class AboutScreenTest {
             }
         }
         compose.onNodeWithText("关于 Mika").assertIsDisplayed()
-        compose.onAllNodesWithTag("update-dot").assertCountEquals(0)
+        compose.onAllNodesWithTag("update-dot", useUnmergedTree = true).assertCountEquals(0)
     }
 
     /** 设置首页「关于 Mika」一行:有新版写「x 可更新」带红点。 */
@@ -262,6 +262,6 @@ class AboutScreenTest {
         }
         scrollTo("0.2.0 可更新")
         compose.onNodeWithText("0.2.0 可更新").assertIsDisplayed()
-        compose.onNodeWithTag("update-dot").assertExists()
+        compose.onNodeWithTag("update-dot", useUnmergedTree = true).assertExists()
     }
 }

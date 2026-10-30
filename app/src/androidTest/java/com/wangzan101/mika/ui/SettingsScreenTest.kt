@@ -72,16 +72,11 @@ class SettingsScreenTest {
         home()
         compose.onNodeWithText("一切就绪").assertIsDisplayed()
         compose.onNodeWithText("基本").assertIsDisplayed()
-        compose.onNodeWithText("DeepSeek").assertIsDisplayed()
-        compose.onNodeWithText("可用").assertIsDisplayed()
-        scrollTo("网站登录")
-        compose.onNodeWithText("3 个").assertIsDisplayed()
-        compose.onNodeWithText("2 项").assertIsDisplayed()
-        scrollTo("记住的操作路线")
-        compose.onNodeWithText("8 条").assertIsDisplayed()
-        compose.onNodeWithText("已就绪").assertIsDisplayed()
-        scrollTo("关于 Mika")
-        compose.onNodeWithText("0.1.0").assertIsDisplayed()
+        // 首页一屏放不下(多了「语言」一行后更长):每个值先滚进视口再看
+        for (v in listOf("DeepSeek", "可用", "3 个", "2 项", "8 条", "已就绪", "0.1.0")) {
+            scrollTo(v)
+            compose.onNodeWithText(v).assertIsDisplayed()
+        }
     }
 
     @Test
@@ -298,10 +293,11 @@ class SettingsScreenTest {
         val picked = mutableListOf<CapsuleMode>()
         compose.setContent { CapsuleScreen(mode, onMode = { picked += it; mode = it }, onBack = {}) }
         compose.awaitOne("有任务时显示").assertIsDisplayed()
-        compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("无障碍服务", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("一直显示").performClick()
-        compose.onNodeWithText("关闭").performClick()
+        compose.onNodeWithText("关闭").performScrollTo().assertIsDisplayed()
+        // 脚注在三个选项下面,矮屏或大字号时要滚一下才看得到
+        compose.onNodeWithText("无障碍服务", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("一直显示").performScrollTo().performClick()
+        compose.onNodeWithText("关闭").performScrollTo().performClick()
         assertEquals(listOf(CapsuleMode.Always, CapsuleMode.Off), picked)
     }
 

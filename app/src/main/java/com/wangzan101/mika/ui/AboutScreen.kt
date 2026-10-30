@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -239,7 +241,11 @@ private fun AboutSheetFrame(title: String, sub: String?, tag: String, onDismiss:
         containerColor = c.surface,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(tag)) {
+        // 面板内容太高(矮屏、大字号)时整体能滚,底下的按钮总够得着
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(tag),
+        ) {
             Text(title, style = MikaType.Title, color = c.ink)
             sub?.let { Text(it, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3) }
             content()
@@ -315,10 +321,14 @@ private fun GroupSheet(onSave: () -> Unit, onAskMika: () -> Unit, onDismiss: () 
     val c = MikaTheme.colors
     // 点一次就够:连点不会开出第二个一样的任务
     var asked by remember { mutableStateOf(false) }
+    // 二维码最高占屏幕约三分之一,常见手机上不用滚就能看到底下的按钮
+    val qrHeight = (LocalConfiguration.current.screenHeightDp * 0.34f).coerceAtMost(280f).dp
+    val qr = painterResource(QrImage.RES)
     AboutSheetFrame(AboutCopy.GROUP_SHEET_TITLE, AboutCopy.GROUP_SHEET_SUB, "group-sheet", onDismiss) {
         Image(
-            painterResource(QrImage.RES), contentDescription = AboutCopy.GROUP_SHEET_TITLE,
-            Modifier.padding(top = 12.dp, bottom = 6.dp).align(Alignment.CenterHorizontally).width(220.dp)
+            qr, contentDescription = AboutCopy.GROUP_SHEET_TITLE,
+            Modifier.padding(top = 12.dp, bottom = 6.dp).align(Alignment.CenterHorizontally)
+                .height(qrHeight).aspectRatio(qr.intrinsicSize.width / qr.intrinsicSize.height)
                 .clip(RoundedCornerShape(12.dp))
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { onSave() }) }
                 .testTag("wechat-qr"),
