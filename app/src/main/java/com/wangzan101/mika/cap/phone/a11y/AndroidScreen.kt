@@ -1,7 +1,10 @@
 package com.wangzan101.mika.cap.phone.a11y
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Path
 import android.os.Bundle
 import android.os.SystemClock
@@ -28,6 +31,9 @@ import com.wangzan101.mika.core.uistate.ScreenEvent
 import com.wangzan101.mika.core.uistate.ScreenSnapshot
 import com.wangzan101.mika.core.uistate.VisibleTextLine
 import com.wangzan101.mika.core.uistate.SystemCommandResult
+import com.wangzan101.mika.core.uistate.SystemAction
+import com.wangzan101.mika.core.uistate.SystemActionResult
+import com.wangzan101.mika.cap.phone.shell.SystemIntents
 import com.wangzan101.mika.core.visual.FrameGrid
 import com.wangzan101.mika.core.uistate.Verification
 import com.wangzan101.mika.core.uistate.TextField
@@ -691,6 +697,73 @@ class AndroidScreen(
     }
 
     override suspend fun listApps(): List<Pair<String, String>> = withContext(Dispatchers.IO) { launchableApps(a11y.packageManager, a11y.packageName) }
+
+    // ---------- 系统动作 ----------
+
+    /**
+     * 经安卓标准 intent 做系统动作(见 [SystemIntents])。先在 Mika 这边查谁接(能力检测,不用建屏):没有就 not_supported;
+     * 有几个时按 [SystemIntents.choose] 直接指定一个。再交给内置助手启动到 Mika 的屏(第一次用时建屏),动作前后照常盯着主屏。
+     * 闹钟、计时器本该悄悄设好:之后读系统的下一个闹钟核对;App 却开了界面时照实报。闹钟列表、新日程要等那个 App 到最上面。
+     */
+    override suspend fun systemAction(action: SystemAction): SystemActionResult = withContext(Dispatchers.IO) {
+        val intent = SystemIntents.toIntent(SystemIntents.spec(action))
+        val pm = a11y.packageManager
+        val handlers = runCatching {
+            pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map {
+                SystemIntents.Handler(it.activityInfo.packageName, it.activityInfo.name, (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
+            }
+        }.getOrDefault(emptyList())
+        val default = runCatching { pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
+        val handler = SystemIntents.choose(handlers, default)
+            ?: return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
+        val pkg = handler.packageName
+        intent.component = android.content.ComponentName(pkg, handler.className)
+        if (checkOtherTasks && !action.silent && !reserve(pkg)) return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
+        val alarms = a11y.getSystemService(AlarmManager::class.java)
+        val alarmBefore = runCatching { alarms?.nextAlarmClock?.triggerTime }
+        val id = display.get().displayId
+        val topBefore = ScreenReader.topPackage(windows())
+        val w = armSpillWatch()
+        // 接手的页面要求的权限(设闹钟)shell 可能没有:备一个以 Mika 身份启动的
+        val asMika = PendingIntent.getActivity(a11y, SYSTEM_ACTION_REQUEST, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        when (runCatching { shell.startSystemAction(id, intent, asMika) }.getOrDefault(ShellService.START_ERROR)) {
+            ShellService.START_OK -> Unit
+            ShellService.START_IN_USE_ON_MAIN -> return@withContext SystemActionResult(ActionResult.Failed("app_in_use_by_user"), pkg)
+            ShellService.START_IN_USE_BY_OTHER -> return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
+            ShellService.START_UNRESOLVED -> return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
+            else -> return@withContext SystemActionResult(ActionResult.Failed("launch_failed"), pkg)
+        }
+        fun top() = ScreenReader.topPackage(windows())
+        var alarmAfter = alarmBefore.getOrNull()
+        if (action is SystemAction.SetAlarm && alarmBefore.isSuccess) {
+            // 时钟 App 多半在后台写好再登记:等系统的下一个闹钟变了,最多等一会儿
+            val deadline = SystemClock.uptimeMillis() + ALARM_WAIT_MS
+            while (SystemClock.uptimeMillis() < deadline) {
+                alarmAfter = runCatching { alarms?.nextAlarmClock?.triggerTime }.getOrNull()
+                if (alarmAfter != alarmBefore.getOrNull()) break
+                delay(ALARM_POLL_MS)
+            }
+        } else if (!action.silent) {
+            val deadline = SystemClock.uptimeMillis() + LAUNCH_WAIT_MS
+            while (top() != pkg && SystemClock.uptimeMillis() < deadline) delay(POLL_MS)
+        }
+        waitStable(SETTLE_CAP_MS)
+        val landed = top() == pkg
+        // 本该悄悄设好的,屏上却多了那个 App 的界面
+        val showing = action.silent && landed && topBefore != pkg
+        if (landed && (!action.silent || showing)) {
+            targetPackage = pkg
+            _target.value = TargetApp(pkg, runCatching { shell.topTaskId(displayId) }.getOrDefault(-1))
+        }
+        val hint = if (!action.silent && !landed) hintNotInFront(top(), pkg) else null
+        SystemActionResult(
+            ok(hint = hint, spill = takeSpill(w)), handledBy = pkg,
+            nextAlarmBefore = alarmBefore.getOrNull(), nextAlarmAfter = alarmAfter, alarmReadable = alarmBefore.isSuccess, showing = showing,
+        )
+    }
+
+    private fun hintNotInFront(top: String?, expected: String) =
+        "$expected took the action, but the screen shows ${top ?: "no app yet"}. Observe before acting."
 
     // ---------- 打开哪一个 ----------
 
@@ -1402,6 +1475,10 @@ class AndroidScreen(
         const val IN_USE_RETRY_MS = 3_000L
         const val IN_USE_POLL_MS = 500L
         const val POLL_MS = 100L
+        /** 设闹钟后等系统的下一个闹钟变,最多这么久、这么久看一次。 */
+        const val ALARM_WAIT_MS = 3_000L
+        const val ALARM_POLL_MS = 150L
+        const val SYSTEM_ACTION_REQUEST = 0x5A
         const val TYPE_ATTEMPTS = 2
         const val WEB_VIEW = "android.webkit.WebView"
         const val PASTE_WAIT_MS = 1_500L

@@ -212,6 +212,7 @@ Ending the task
 
 More tools come in when you first use them
 - Apps on the phone: phone_list_apps lists what is installed; phone_launch_app opens an app and brings in the tools to read and operate the phone screen.
+- Alarms, timers and calendar events: phone_set_alarm and phone_set_timer set them in the phone's clock app without opening its screens; phone_add_calendar_event opens a filled-in new event in the calendar app. Prefer them over operating those apps' screens.
 - Web pages: web_read_page reads a page's text by its url; web_navigate opens the page in the built-in browser and brings in the tools to read and operate it.
 - Files and commands: run_command runs a shell command in the Linux sandbox and brings in the file tools.
 
@@ -227,7 +228,7 @@ More tools come in when you first use them
 4. 自己选的路线遇到「不支持此浏览器」、强制下载 App,或者登录墙而用户不在,就换另一条路线,只换一次。网站拒绝内置浏览器时 App 装了就打开 App,否则 end_not_done;这种情况不需要用户接管。
 5. 不借别的 App 打开网页,也不借网页拉起 App 来绕过障碍。网页结果是 external_app_link,说明这个链接想打开 App:任务确实需要那个 App(不是为了绕过障碍),就在手机上打开它给出的包名,不要反复点这个链接。
 
-==== tools (14) ====
+==== tools (17) ====
 ## wait
 Wait briefly for an app to load or an animation to finish.
 {"type":"object","properties":{"seconds":{"type":"number","description":"0.2-10 seconds.","minimum":0.2,"maximum":10},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["seconds"],"additionalProperties":false}
@@ -271,6 +272,18 @@ List the apps installed on the phone, as package + label. Use an exact returned 
 ## phone_launch_app
 Open an installed app on the phone's virtual display by exact package name (cold=true restarts it from its initial screen). From your next call on you also get the tools that read and operate the phone screen (phone_observe, phone_tap, phone_type_text, ...).
 {"type":"object","properties":{"package":{"type":"string","description":"Exact package name, e.g. com.example.app."},"cold":{"type":"boolean","description":"Restart the app first (default false)."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["package"],"additionalProperties":false}
+
+## phone_set_alarm
+Set an alarm in the phone's clock app at a 24-hour local hour and minute, one call per alarm, without opening the clock's screens; the result says whether the system confirms it.
+{"type":"object","properties":{"hour":{"type":"integer","description":"Hour of day, 0-23 (24-hour clock).","minimum":0,"maximum":23},"minute":{"type":"integer","description":"Minute, 0-59.","minimum":0,"maximum":59},"label":{"type":"string","description":"Optional label shown with the alarm."},"days":{"type":"array","description":"Optional repeat days: MON, TUE, WED, THU, FRI, SAT, SUN. Omit for a one-time alarm.","maxItems":7,"items":{"type":"string"}},"vibrate":{"type":"boolean","description":"Optional: vibrate when it rings."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["hour","minute"],"additionalProperties":false}
+
+## phone_set_timer
+Start a countdown timer of a given number of seconds in the phone's clock app, without opening its screens.
+{"type":"object","properties":{"seconds":{"type":"integer","description":"Length of the timer in seconds, 1-86400.","minimum":1,"maximum":86400},"label":{"type":"string","description":"Optional label shown with the timer."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["seconds"],"additionalProperties":false}
+
+## phone_add_calendar_event
+Open the calendar's new-event screen on the phone with the details filled in; you then save it there with the phone screen tools that come with it.
+{"type":"object","properties":{"title":{"type":"string","description":"Event title."},"start":{"type":"string","description":"Start as local date-time yyyy-MM-ddTHH:mm (e.g. 2026-11-02T14:30), or a date yyyy-MM-dd with allDay=true."},"end":{"type":"string","description":"Optional end, same format as start. Defaults to one hour after start (one day for all-day events)."},"allDay":{"type":"boolean","description":"All-day event (default false)."},"location":{"type":"string","description":"Optional location."},"description":{"type":"string","description":"Optional notes."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["title","start"],"additionalProperties":false}
 
 ## web_navigate
 Open a web page (http or https only) in Mika's built-in browser. From your next call on you also get the tools that read and operate the page (web_observe, web_tap, web_type_text, ...). To only read a page's text, web_read_page with url is enough.

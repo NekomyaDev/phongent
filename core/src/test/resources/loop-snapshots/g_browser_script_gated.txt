@@ -1,15 +1,15 @@
 outcome: Failed(reason=下单需要用户确认,脚本没有执行, kind=GaveUp)
 
 ## main #1
-system: len=14350 #9d6ee9e2 | You are Mika, the user's personal assistant on their phone. Your job is to get ⏎…
-tools: #725862a0 [wait, ask_user, request_confirmation, end_not_done, phone_list_apps, phone_launch_app, web_navigate, web_read_page]
+system: len=14609 #1ab428a0 | You are Mika, the user's personal assistant on their phone. Your job is to get ⏎…
+tools: #b076ca83 [wait, ask_user, request_confirmation, end_not_done, phone_list_apps, phone_launch_app, phone_set_alarm, phone_set_timer, phone_add_calendar_event, web_navigate, web_read_page]
 user:
   text #607a43dc | 搜一下再下单
   ctx:runtime_state source="运行时" #583489b9 | 当前界面:还没读取当前界面或页面 ⏎…
 
 ## main #2
-system: len=20877 #999c07c7 | You are Mika, the user's personal assistant on their phone. Your job is to get ⏎…
-tools: #b2ec15fa [wait, ask_user, request_confirmation, end_not_done, view_past_screens, hand_to_user, handle_obstacle, phone_list_apps, phone_launch_app, web_observe, web_list_elements, web_tap, web_scroll, web_swipe, web_type_text, web_clear_text, web_back, web_press_key, web_diagnose, web_navigate, web_read_page, web_evaluate_js, web_tabs, web_downloads, web_upload, web_site_mode, web_script, web_interact, web_capture, web_wait_for]
+system: len=21136 #df2f87c9 | You are Mika, the user's personal assistant on their phone. Your job is to get ⏎…
+tools: #1c3e36bd [wait, ask_user, request_confirmation, end_not_done, view_past_screens, hand_to_user, handle_obstacle, phone_list_apps, phone_launch_app, phone_set_alarm, phone_set_timer, phone_add_calendar_event, web_observe, web_list_elements, web_tap, web_scroll, web_swipe, web_type_text, web_clear_text, web_back, web_press_key, web_diagnose, web_navigate, web_read_page, web_evaluate_js, web_tabs, web_downloads, web_upload, web_site_mode, web_script, web_interact, web_capture, web_wait_for]
 … 1 messages unchanged
 assistant:
   call main_1 web_navigate {"url":"https://shop.example.com/"}

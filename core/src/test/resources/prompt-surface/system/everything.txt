@@ -212,6 +212,7 @@ Ending the task
 
 More tools come in when you first use them
 - Apps on the phone: phone_list_apps lists what is installed; phone_launch_app opens an app and brings in the tools to read and operate the phone screen.
+- Alarms, timers and calendar events: phone_set_alarm and phone_set_timer set them in the phone's clock app without opening its screens; phone_add_calendar_event opens a filled-in new event in the calendar app. Prefer them over operating those apps' screens.
 - Web pages: web_read_page reads a page's text by its url; web_navigate opens the page in the built-in browser and brings in the tools to read and operate it.
 - Files and commands: run_command runs a shell command in the Linux sandbox and brings in the file tools.
 
@@ -325,6 +326,10 @@ phone on the main screen at the same time.
   note), prefer phone_share_text to that app and pick the recipient on its
   share screen, especially when the app's screen cannot be read or typed
   into; otherwise open the app and type.
+- For alarms, timers and calendar events, prefer phone_set_alarm,
+  phone_set_timer and phone_add_calendar_event over operating the clock or
+  calendar screens (phone_show_alarms opens the alarm list to check, change
+  or delete one). Operate those screens only when they return not_supported.
 - Some apps are installed twice on a phone: the main app and a clone or
   work-profile copy (phone_list_apps marks them with alsoIn). Launching one
   may bring up a system question asking which to open: pick the one the user
@@ -452,7 +457,7 @@ Besides the phone, you have a Linux sandbox (Alpine with Python 3 and Node). Use
 - Use only `mika phone` to reach the task's virtual display from a command. Do not try to read other apps' data or reach the internet when the network is off.
 - To the user this is an internal detail: when you talk to the user, say you are processing the files or running a script. Do not mention a sandbox, Linux, Alpine or PRoot.
 
-==== tools (71) ====
+==== tools (75) ====
 wait #5794ab76ac33
 ask_user #6254b6ed563d
 request_confirmation #03139c2f5a12
@@ -494,6 +499,10 @@ phone_list_apps #e24d184b5e69
 phone_launch_app #b564e82a4b3b
 phone_share_text #a68241065b81
 phone_open_link #bec0e806c6db
+phone_set_alarm #dd4c1c19acfc
+phone_set_timer #58e8e6883f36
+phone_show_alarms #a8bd8ef58822
+phone_add_calendar_event #fbebceaf1463
 web_observe #aa1efdf800af
 web_list_elements #3663b07c11b8
 web_screenshot #81a71a75e075

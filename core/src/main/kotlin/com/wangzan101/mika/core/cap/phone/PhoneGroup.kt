@@ -20,11 +20,13 @@ internal interface PhoneTool : AgentTool {
 }
 
 /**
- * 手机一组:那一套屏幕工具(读屏、看图、点、滑、输入、按键、诊断屏幕),再加列出、打开 App 与链接。按发给模型的顺序。
+ * 手机一组:那一套屏幕工具(读屏、看图、点、滑、输入、按键、诊断屏幕),再加列出、打开 App 与链接,
+ * 经系统标准接口设闹钟、计时器、日程。按发给模型的顺序。
  */
 internal object PhoneGroup {
     val tools: List<AgentTool> = ScreenTool.of(PHONE_FAMILY) + listOf(
         PhoneQuery, PhoneFind, PhoneExtract, PhoneCollect, PhoneWait, PhoneEventTool,
         PhoneDialog, PhoneGesture, PhoneRun, PhoneCommand, ListApps, LaunchApp, ShareText, OpenLink,
+        SetAlarm, SetTimer, ShowAlarms, AddCalendarEvent,
     )
 }

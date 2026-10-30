@@ -126,6 +126,9 @@ The point you gave did not take the text.
 ## failure.cannot_share
 That app cannot receive shared text (it has no screen for an Android text share). Open it with phone_launch_app and type the text there instead.
 
+## failure.not_supported
+No app on this phone takes this standard Android action. Do not retry it: open the clock or calendar app with phone_launch_app and do it on its screens instead.
+
 ## failure.not_editable
 That element is not a text field, and no text field had focus after tapping it. Observe and pass the ref of the actual input field.
 
@@ -317,6 +320,21 @@ The element list has no field, so select-all and delete were sent, but nothing o
 
 ## share.opened
 The app's share screen is open with the text. Pick the recipient (or where to post) and confirm sending there yourself; nothing has been sent yet. Check the result afterwards.
+
+## alarm.earlier_first
+The clock app took the alarm. The system only reports the next alarm, which is an earlier one ({{next}}), so this one cannot be confirmed from here; only if the user needs certainty, check once with phone_show_alarms.
+
+## alarm.unconfirmed
+The clock app took the alarm, but the system does not report it as an upcoming alarm. Check once with phone_show_alarms and observe the list before telling the user it is set.
+
+## alarms.opened
+The clock's alarm list is open on the phone screen. Observe it to check, change or delete alarms there.
+
+## calendar.opened
+The calendar's new-event screen is open with these details filled in; nothing is saved yet. Observe it, check the fields, tap its save button yourself, then check the result.
+
+## system_action.screen_opened
+The app opened its own screen on the phone instead of finishing on its own: observe it and confirm or save there.
 
 ## type.not_applied
 The text did not appear in the field after a retry. Observe the screen, tap the right field, then type again.

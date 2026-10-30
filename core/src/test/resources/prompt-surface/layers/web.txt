@@ -212,6 +212,7 @@ Ending the task
 
 More tools come in when you first use them
 - Apps on the phone: phone_list_apps lists what is installed; phone_launch_app opens an app and brings in the tools to read and operate the phone screen.
+- Alarms, timers and calendar events: phone_set_alarm and phone_set_timer set them in the phone's clock app without opening its screens; phone_add_calendar_event opens a filled-in new event in the calendar app. Prefer them over operating those apps' screens.
 - Web pages: web_read_page reads a page's text by its url; web_navigate opens the page in the built-in browser and brings in the tools to read and operate it.
 - Files and commands: run_command runs a shell command in the Linux sandbox and brings in the file tools.
 
@@ -330,7 +331,7 @@ Mika 自带一个看不见的内置浏览器,你可以在网页上办事。
 - 下载的文件存在工作区 /workspace/downloads/ 下。只有 web_downloads 里 status=done,才能说「已下载」。下载失败时 error 写着原因(带上出错的类型),照原因决定重试、换个链接,还是如实告诉用户。
 - web_upload 要传文件选择控件(读屏里 role 为 file 的元素)的编号,只能上传 /workspace/ 下的文件。用户要上传自己手机里的文件,请他先把文件作为附件发到对话里(会放进 /workspace/inbox/)。
 
-==== tools (40) ====
+==== tools (43) ====
 ## wait
 Wait briefly for an app to load or an animation to finish.
 {"type":"object","properties":{"seconds":{"type":"number","description":"0.2-10 seconds.","minimum":0.2,"maximum":10},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["seconds"],"additionalProperties":false}
@@ -390,6 +391,18 @@ List the apps installed on the phone, as package + label. Use an exact returned 
 ## phone_launch_app
 Open an installed app on the phone's virtual display by exact package name (cold=true restarts it from its initial screen). From your next call on you also get the tools that read and operate the phone screen (phone_observe, phone_tap, phone_type_text, ...).
 {"type":"object","properties":{"package":{"type":"string","description":"Exact package name, e.g. com.example.app."},"cold":{"type":"boolean","description":"Restart the app first (default false)."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["package"],"additionalProperties":false}
+
+## phone_set_alarm
+Set an alarm in the phone's clock app at a 24-hour local hour and minute, one call per alarm, without opening the clock's screens; the result says whether the system confirms it.
+{"type":"object","properties":{"hour":{"type":"integer","description":"Hour of day, 0-23 (24-hour clock).","minimum":0,"maximum":23},"minute":{"type":"integer","description":"Minute, 0-59.","minimum":0,"maximum":59},"label":{"type":"string","description":"Optional label shown with the alarm."},"days":{"type":"array","description":"Optional repeat days: MON, TUE, WED, THU, FRI, SAT, SUN. Omit for a one-time alarm.","maxItems":7,"items":{"type":"string"}},"vibrate":{"type":"boolean","description":"Optional: vibrate when it rings."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["hour","minute"],"additionalProperties":false}
+
+## phone_set_timer
+Start a countdown timer of a given number of seconds in the phone's clock app, without opening its screens.
+{"type":"object","properties":{"seconds":{"type":"integer","description":"Length of the timer in seconds, 1-86400.","minimum":1,"maximum":86400},"label":{"type":"string","description":"Optional label shown with the timer."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["seconds"],"additionalProperties":false}
+
+## phone_add_calendar_event
+Open the calendar's new-event screen on the phone with the details filled in; you then save it there with the phone screen tools that come with it.
+{"type":"object","properties":{"title":{"type":"string","description":"Event title."},"start":{"type":"string","description":"Start as local date-time yyyy-MM-ddTHH:mm (e.g. 2026-11-02T14:30), or a date yyyy-MM-dd with allDay=true."},"end":{"type":"string","description":"Optional end, same format as start. Defaults to one hour after start (one day for all-day events)."},"allDay":{"type":"boolean","description":"All-day event (default false)."},"location":{"type":"string","description":"Optional location."},"description":{"type":"string","description":"Optional notes."},"reason":{"type":"string","description":"Optional short note on why you are calling this; not used for execution."}},"required":["title","start"],"additionalProperties":false}
 
 ## web_observe
 Look at the current web page. Returns the site (currentSite), url, title and tabId, and a fresh element snapshot (snapshotId + elements) of what is in view. A screenshot is added when the element list is clearly unreadable or mostly unlabeled. If the target is missing or ambiguous, request web_screenshot or web_find_visually. Prefer tapping a ref from this result with web_tap over guessing coordinates; to read the whole page, use web_read_page.

@@ -3,6 +3,10 @@
     <string name="tool_list_apps">List installed apps</string>
     <string name="tool_open_app">Open app</string>
     <string name="tool_share_text">Share text to app</string>
+    <string name="tool_set_alarm">Set alarm</string>
+    <string name="tool_set_timer">Set timer</string>
+    <string name="tool_show_alarms">Show alarms</string>
+    <string name="tool_add_calendar_event">Add calendar event</string>
     <string name="tool_scroll_find">Scroll to find</string>
     <string name="tool_wait_condition">Wait for screen condition</string>
     <string name="tool_wait_event">Wait for screen event</string>

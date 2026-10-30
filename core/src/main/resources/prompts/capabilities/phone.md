@@ -45,6 +45,10 @@ phone on the main screen at the same time.
   note), prefer phone_share_text to that app and pick the recipient on its
   share screen, especially when the app's screen cannot be read or typed
   into; otherwise open the app and type.
+- For alarms, timers and calendar events, prefer phone_set_alarm,
+  phone_set_timer and phone_add_calendar_event over operating the clock or
+  calendar screens (phone_show_alarms opens the alarm list to check, change
+  or delete one). Operate those screens only when they return not_supported.
 - Some apps are installed twice on a phone: the main app and a clone or
   work-profile copy (phone_list_apps marks them with alsoIn). Launching one
   may bring up a system question asking which to open: pick the one the user

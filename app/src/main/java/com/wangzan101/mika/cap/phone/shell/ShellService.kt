@@ -252,6 +252,53 @@ class ShellService(
     }
 
     /**
+     * 系统动作(见 [SystemIntents]):只放行那几种 intent。没有页面接返回 [START_UNRESOLVED];和 [startView] 一样,
+     * 接手的 App 在主屏有任务就不启动。先以 shell 身份启动;不成(接手的页面要求 shell 没有的权限,如设闹钟)时发出 Mika 做好的
+     * [asMika]:以 Mika 的身份启动(权限按 Mika 查),屏和后台启动按发出的这一方(shell)查,仍落在这块屏上。
+     */
+    override fun startSystemAction(displayId: Int, intent: Intent, asMika: android.app.PendingIntent?): Int = synchronized(launchLock) {
+        if (!ownDisplay(displayId)) return START_ERROR
+        if (!SystemIntents.allowed(intent.action, intent.dataString)) return START_INVALID_LINK
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val candidates = activitiesFor(intent, intent.type) ?: return START_ERROR
+        if (candidates.isEmpty()) return START_UNRESOLVED
+        try {
+            val onMain = tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet()
+            if (ShellLinks.inUse(candidates.map { it.first }.distinct(), onMain)) return START_IN_USE_ON_MAIN
+            if (onOtherOwnDisplay(candidates.map { it.first }.distinct(), displayId)) return START_IN_USE_BY_OTHER
+        } catch (t: Throwable) {
+            Log.e(TAG, "cannot inspect main-screen tasks", t)
+            return START_ERROR
+        }
+        val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
+        val asShell = try {
+            val start = taskManager.javaClass.methods.first { it.name == "startActivityAsUser" && it.parameterTypes.size == 12 }
+            val result = start.invoke(
+                taskManager, null, ShellContext.SHELL_PACKAGE, null, intent, intent.type, null, null,
+                0, 0, null, options.toBundle(), USER_CURRENT,
+            ) as Int
+            if (result < 0) Log.w(TAG, "startActivityAsUser(${intent.action}) -> $result")
+            result >= 0
+        } catch (t: Throwable) {
+            Log.w(TAG, "startActivityAsUser(${intent.action}) refused as shell", t)
+            false
+        }
+        if (asShell) return START_OK
+        if (asMika == null) return START_ERROR
+        // 安卓 14 起 PendingIntent 的发出方要明说允许它从后台启动页面
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            options.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+        }
+        return try {
+            asMika.send(context, 0, null, null, null, null, options.toBundle())
+            START_OK
+        } catch (t: Throwable) {
+            Log.w(TAG, "sending ${intent.action} as Mika failed", t)
+            START_ERROR
+        }
+    }
+
+    /**
      * 能接 [intent] 的页面,(包名, 完整类名)。系统接口在这一侧查不了时改问系统服务(见 [ActivityQuery]);都不行时为 null。
      * [type] 是 intent 的数据类型(命令里要单独给)。
      */
