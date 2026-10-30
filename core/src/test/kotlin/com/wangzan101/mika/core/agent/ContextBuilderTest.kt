@@ -148,6 +148,18 @@ class ContextBuilderTest {
         assertEquals("Step: used up (limit 60 steps)", body(null, step = 61)!!.lines()[1])
         assertEquals(ContextKind.RuntimeState, ContextBuilder.kindOf(b.runtimeState(null, null, null, 1, 60, t0).text))
     }
+
+    // 用户最近一句话的开头摆在生成处:模型照这句话的语言写给用户,读到的内容是别的语言也不跟着换
+    @Test fun runtimeStateQuotesUserWordsForReplyLanguage() {
+        val b = ContextBuilder(zone = utc)
+        fun last(words: String?) = ContextBuilder.bodyOf(Message(Role.User, listOf(b.runtimeState(null, null, null, 1, 60, 0, words)), Author.Mika))!!.lines().last()
+        assertEquals("Write to the user in the language of their latest message: \"Open Settings and\ntell me the version\"".replace("\n", " "),
+            last("  Open Settings and\n tell me the version "))
+        val long = last("Open the Settings app and tell me which Android version this phone is running and how much storage is used.")
+        assertTrue(long, long.endsWith("Open the Settings app and tell me which Android version this…\""))
+        assertEquals("Local time: 1970-01-01 00:00 Thursday", last(null))
+        assertEquals("Local time: 1970-01-01 00:00 Thursday", last("   "))
+    }
 }
 
 /**

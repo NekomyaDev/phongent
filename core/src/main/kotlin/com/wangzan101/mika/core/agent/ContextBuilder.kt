@@ -159,10 +159,12 @@ class ContextBuilder(
     fun notice(source: String, text: String): Message = Piece(ContextKind.Notice, source, body = text).message()
 
     /**
-     * 每轮一段的运行时状态:当前界面、第几步、本地时间。是一段文字,接在这一步最后一条消息的末尾(见 AgentLoop)。
+     * 每轮一段的运行时状态:当前界面、第几步、本地时间、用户最近一句话的开头。是一段文字,接在这一步最后一条消息的末尾(见 AgentLoop)。
      * [place] 是任务此刻在哪(App 或站点),[label] 是 App 名,[siteMode] 是 desktop / mobile(不知道为 null)。
+     * [userWords] 是用户最近一句话:读到的内容多是别的语言时,模型写给用户的话容易跟着换语言,紧挨着生成处摆出原话的开头,
+     * 让它照这句话的语言写;不在这里判断是哪种语言。
      */
-    fun runtimeState(place: Place?, label: String?, siteMode: String?, step: Int, maxSteps: Int, nowMs: Long): Part.Text {
+    fun runtimeState(place: Place?, label: String?, siteMode: String?, step: Int, maxSteps: Int, nowMs: Long, userWords: String? = null): Part.Text {
         val surface = when {
             place == null -> "no screen or page read yet"
             place.kind == PlaceKind.Site -> "website " + place.name +
@@ -177,7 +179,8 @@ class ContextBuilder(
         }
         val at = Instant.ofEpochMilli(nowMs).atZone(zone)
         val time = TIME.format(at) + " " + WEEKDAYS[at.dayOfWeek.value - 1]
-        return Part.Text(envelope(ContextKind.RuntimeState, "runtime", "Current place: $surface\nStep: $steps\nLocal time: $time"))
+        val language = userWords?.let(::excerpt)?.let { "\nWrite to the user in the language of their latest message: \"$it\"" }.orEmpty()
+        return Part.Text(envelope(ContextKind.RuntimeState, "runtime", "Current place: $surface\nStep: $steps\nLocal time: $time$language"))
     }
 
     private fun knowledgePiece(e: KnowledgeEntry, note: String, withLinks: Boolean): Piece {
@@ -250,6 +253,13 @@ class ContextBuilder(
         private val RANK = listOf(ContextKind.Memory, ContextKind.PriorTurns,
             ContextKind.AppKnowledge, ContextKind.SiteKnowledge, ContextKind.SkillsIndex, ContextKind.Skill)
         private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        private const val EXCERPT_CHARS = 60
+
+        /** 用户原话的开头:空白并成一个空格,超出 [EXCERPT_CHARS] 字截断加省略号;没有字为 null。 */
+        internal fun excerpt(words: String): String? {
+            val flat = words.trim().replace(Regex("\\s+"), " ").takeIf { it.isNotEmpty() } ?: return null
+            return if (flat.length <= EXCERPT_CHARS) flat else flat.take(EXCERPT_CHARS).trimEnd() + "…"
+        }
         private val WEEKDAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
         /** 统一外壳。正文里的结束标签转义掉,外壳不会被正文提前合上。 */
