@@ -23,7 +23,7 @@ class ToolRiskTest {
     /** 原来要过锁屏/暂停关卡的工具表。 */
     private val oldWriting = both("tap", "scroll", "swipe", "type_text", "clear_text", "back", "press_key", "diagnose") + setOf(
         "phone_launch_app", "phone_share_text", "phone_gesture", "hand_to_user",
-        "phone_set_alarm", "phone_set_timer", "phone_show_alarms", "phone_add_calendar_event",
+        "phone_set_alarm", "phone_set_timer", "phone_show_alarms", "phone_add_calendar_event", "phone_set_wheel",
         "web_navigate", "web_tabs", "web_upload", "web_interact", "web_site_mode", "phone_open_link",
     )
     private val oldSandbox = setOf("run_command", "run_bundled_script", "read_file", "write_file", "search_files", "share_file")

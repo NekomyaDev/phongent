@@ -129,7 +129,7 @@ internal object RecordedEvidence {
 
     private const val TAKEOVER_STATE = "waiting_takeover"
     private val PAGE_CHANGING = setOf(Verb.Tap, Verb.Back, Verb.PressKey, Verb.TypeText, Verb.Swipe, Verb.Interact, Verb.Script, Verb.OpenLink, Verb.LaunchApp, Verb.ShareText,
-        Verb.ShowAlarms, Verb.AddCalendarEvent)
+        Verb.ShowAlarms, Verb.AddCalendarEvent, Verb.SetWheel)
 
     private fun obj(s: String): JsonObject? = runCatching { Json.parseToJsonElement(s) as? JsonObject }.getOrNull()
     private fun JsonObject.s(k: String): String? = (this[k] as? JsonPrimitive)?.contentOrNull

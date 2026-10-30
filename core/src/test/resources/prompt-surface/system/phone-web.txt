@@ -310,6 +310,8 @@ phone on the main screen at the same time.
   phone_set_timer and phone_add_calendar_event over operating the clock or
   calendar screens (phone_show_alarms opens the alarm list to check, change
   or delete one). Operate those screens only when they return not_supported.
+- For wheel or drum pickers (time, date, region...), call phone_set_wheel once
+  per wheel instead of swiping it step by step.
 - Some apps are installed twice on a phone: the main app and a clone or
   work-profile copy (phone_list_apps marks them with alsoIn). Launching one
   may bring up a system question asking which to open: pick the one the user
@@ -420,7 +422,7 @@ Mika 自带一个看不见的内置浏览器,你可以在网页上办事。
 - 下载的文件存在工作区 /workspace/downloads/ 下。只有 web_downloads 里 status=done,才能说「已下载」。下载失败时 error 写着原因(带上出错的类型),照原因决定重试、换个链接,还是如实告诉用户。
 - web_upload 要传文件选择控件(读屏里 role 为 file 的元素)的编号,只能上传 /workspace/ 下的文件。用户要上传自己手机里的文件,请他先把文件作为附件发到对话里(会放进 /workspace/inbox/)。
 
-==== tools (55) ====
+==== tools (56) ====
 wait #5794ab76ac33
 ask_user #6254b6ed563d
 request_confirmation #03139c2f5a12
@@ -446,6 +448,7 @@ phone_wait #422d1d649ef0
 phone_event #dc1657f03e18
 phone_dialog #d4590fa126bf
 phone_gesture #7bfb6a51abb7
+phone_set_wheel #d8784a3e13d2
 phone_run #cea4dd41713b
 phone_system_command #e6964de4e2d9
 phone_list_apps #e24d184b5e69

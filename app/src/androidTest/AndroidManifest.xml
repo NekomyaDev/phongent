@@ -15,6 +15,8 @@
         <activity android:name="com.wangzan101.mika.a11y.PlainTestActivity" android:exported="true" />
         <activity android:name="com.wangzan101.mika.a11y.WebEditorTestActivity" android:exported="true" />
         <activity android:name="com.wangzan101.mika.a11y.FieldsTestActivity" android:exported="true" />
+        <!-- 滚轮测试页:两个原版数字滚轮 -->
+        <activity android:name="com.wangzan101.mika.cap.phone.a11y.WheelPickerTestActivity" android:exported="true" />
         <!-- 从应用上下文打开别的 App:重现「开到用户主屏上」 -->
         <activity android:name="com.wangzan101.mika.cap.phone.a11y.SpillTestActivity" android:exported="true" />
         <service android:name="com.wangzan101.mika.cap.phone.a11y.SpillLaunchService" android:process=":spill" android:exported="false" />

@@ -223,6 +223,13 @@ interface ScreenPort {
      * (第一次用时建屏,用户正在主屏用那个 App 时不打开)。不支持的端口返回 unsupported。
      */
     suspend fun systemAction(action: SystemAction): SystemActionResult = SystemActionResult(ActionResult.Failed("unsupported"))
+
+    /**
+     * 把编号 [ref] 那个滚轮(或滚轮里的一项)转到显示 [value]:在端口里一次做完(能输入就输入,能无障碍滚就一格格滚,
+     * 都不行就按一格多高拖),每做几下读回一次。不支持的端口报 unsupported。
+     */
+    suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome =
+        WheelOutcome(false, null, null, 0, "none", error = "unsupported")
     suspend fun waitStable(timeoutMs: Long): Boolean
     /**
      * 等这块屏的下一次界面变化,最多 [timeoutMs];等到返回 true。事件驱动的端口在有界面事件(无障碍事件、页面变动)时醒来,

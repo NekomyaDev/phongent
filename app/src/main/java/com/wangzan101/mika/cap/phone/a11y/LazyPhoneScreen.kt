@@ -9,6 +9,7 @@ import com.wangzan101.mika.core.uistate.VisibleTextLine
 import com.wangzan101.mika.core.uistate.SystemCommandResult
 import com.wangzan101.mika.core.uistate.SystemAction
 import com.wangzan101.mika.core.uistate.SystemActionResult
+import com.wangzan101.mika.core.uistate.WheelOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -54,6 +55,8 @@ class LazyPhoneScreen(
         built()?.openLink(action, uri, packageName) ?: unavailable()
     override suspend fun shareText(packageName: String, text: String): ActionResult = built()?.shareText(packageName, text) ?: unavailable()
     override suspend fun systemAction(action: SystemAction): SystemActionResult = built()?.systemAction(action) ?: SystemActionResult(unavailable())
+    override suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome =
+        port?.setWheel(ref, snapshotId, value) ?: WheelOutcome(false, null, null, 0, "none", error = "no_app_open")
 
     // ---------- 没接上之前:还没有打开的 App ----------
 

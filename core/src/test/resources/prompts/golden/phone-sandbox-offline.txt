@@ -298,6 +298,8 @@ phone on the main screen at the same time.
   phone_set_timer and phone_add_calendar_event over operating the clock or
   calendar screens (phone_show_alarms opens the alarm list to check, change
   or delete one). Operate those screens only when they return not_supported.
+- For wheel or drum pickers (time, date, region...), call phone_set_wheel once
+  per wheel instead of swiping it step by step.
 - Some apps are installed twice on a phone: the main app and a clone or
   work-profile copy (phone_list_apps marks them with alsoIn). Launching one
   may bring up a system question asking which to open: pick the one the user

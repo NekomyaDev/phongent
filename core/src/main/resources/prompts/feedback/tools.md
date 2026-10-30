@@ -129,6 +129,18 @@ That app cannot receive shared text (it has no screen for an Android text share)
 ## failure.not_supported
 No app on this phone takes this standard Android action. Do not retry it: open the clock or calendar app with phone_launch_app and do it on its screens instead.
 
+## failure.not_a_wheel
+That element is not a wheel picker, and none contains it. Observe and pass the ref of the wheel (or of the item it shows); for other lists use phone_scroll or phone_tap.
+
+## failure.wheel_at_end
+The wheel stopped at its end before showing that value: the value is not on this wheel (check the range, or whether another wheel holds it, such as AM/PM).
+
+## failure.wheel_unreadable
+The value the wheel shows could not be read, so it was not turned. Observe once (or take a screenshot) and set it with phone_swipe if needed.
+
+## failure.wheel_not_reached
+The wheel did not reach that value within the attempts allowed; value is what it shows now. Observe once and either call again or finish it with a short phone_swipe.
+
 ## failure.not_editable
 That element is not a text field, and no text field had focus after tapping it. Observe and pass the ref of the actual input field.
 

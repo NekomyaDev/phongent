@@ -33,6 +33,7 @@ import com.wangzan101.mika.core.uistate.VisibleTextLine
 import com.wangzan101.mika.core.uistate.SystemCommandResult
 import com.wangzan101.mika.core.uistate.SystemAction
 import com.wangzan101.mika.core.uistate.SystemActionResult
+import com.wangzan101.mika.core.uistate.WheelOutcome
 import com.wangzan101.mika.cap.phone.shell.SystemIntents
 import com.wangzan101.mika.core.visual.FrameGrid
 import com.wangzan101.mika.core.uistate.Verification
@@ -765,6 +766,23 @@ class AndroidScreen(
     private fun hintNotInFront(top: String?, expected: String) =
         "$expected took the action, but the screen shows ${top ?: "no app yet"}. Observe before acting."
 
+    // ---------- 滚轮 ----------
+
+    override suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome = withContext(Dispatchers.IO) {
+        if (!opened) return@withContext WheelOutcome(false, null, null, 0, "none", error = "no_app_open")
+        val (node, _) = resolve(ref, snapshotId) ?: return@withContext WheelOutcome(false, null, null, 0, "none", error = "ref_expired")
+        val driver = WheelDriver(
+            display.width, display.height,
+            quiet = { q, cap -> withEventClock { it.awaitQuiet(q, cap) } },
+            // 慢拖:按节奏走时末尾减速到停、松手不甩,免得转过头
+            drag = { points -> drag(points, WHEEL_DRAG_MS, bow = false) },
+            ocr = { readVisibleText() },
+            imeShown = { imeBox() != null },
+            back = { runCatching { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }.getOrDefault(false) },
+        )
+        driver.set(node, value)
+    }
+
     // ---------- 打开哪一个 ----------
 
     /** 最上面一个读得到的窗口(不论类型:系统的选择框有的是应用窗口,有的是系统窗口)所在的包。 */
@@ -1479,6 +1497,8 @@ class AndroidScreen(
         const val ALARM_WAIT_MS = 3_000L
         const val ALARM_POLL_MS = 150L
         const val SYSTEM_ACTION_REQUEST = 0x5A
+        /** 拖滚轮的时长:不短于节奏里的慢拖时长,松手时已经停住。 */
+        const val WHEEL_DRAG_MS = 1_000L
         const val TYPE_ATTEMPTS = 2
         const val WEB_VIEW = "android.webkit.WebView"
         const val PASTE_WAIT_MS = 1_500L

@@ -1202,6 +1202,7 @@ class ToolLabels(private val tools: ToolIndex, private val legacy: LegacyNames =
             "设计时器" to R.string.tool_set_timer,
             "查看闹钟" to R.string.tool_show_alarms,
             "添加日程" to R.string.tool_add_calendar_event,
+            "拨滚轮" to R.string.tool_set_wheel,
             "滚动查找" to R.string.tool_scroll_find,
             "等待界面条件" to R.string.tool_wait_condition,
             "等待界面事件" to R.string.tool_wait_event,

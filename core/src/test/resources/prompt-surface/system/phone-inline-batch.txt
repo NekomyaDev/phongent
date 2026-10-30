@@ -315,6 +315,8 @@ phone on the main screen at the same time.
   phone_set_timer and phone_add_calendar_event over operating the clock or
   calendar screens (phone_show_alarms opens the alarm list to check, change
   or delete one). Operate those screens only when they return not_supported.
+- For wheel or drum pickers (time, date, region...), call phone_set_wheel once
+  per wheel instead of swiping it step by step.
 - Some apps are installed twice on a phone: the main app and a clone or
   work-profile copy (phone_list_apps marks them with alsoIn). Launching one
   may bring up a system question asking which to open: pick the one the user
@@ -373,7 +375,7 @@ phone on the main screen at the same time.
 - If back does not change the page, use the page's own back control instead
   of pressing back again.
 
-==== tools (35) ====
+==== tools (36) ====
 wait #5794ab76ac33
 ask_user #6254b6ed563d
 request_confirmation #9baf652ef468
@@ -381,7 +383,7 @@ end_not_done #41d1f0f74c58
 view_past_screens #b821fbe3c1ed
 hand_to_user #f94f29a23847
 handle_obstacle #1a00c1e71b3c
-do_steps #077197a8adec
+do_steps #2b53d8570955
 phone_observe #9ffb6bf96600
 phone_list_elements #a2f676e3e547
 phone_tap #379f50552711
@@ -400,6 +402,7 @@ phone_wait #422d1d649ef0
 phone_event #dc1657f03e18
 phone_dialog #d4590fa126bf
 phone_gesture #7bfb6a51abb7
+phone_set_wheel #d8784a3e13d2
 phone_run #cea4dd41713b
 phone_system_command #e6964de4e2d9
 phone_list_apps #e24d184b5e69
