@@ -216,6 +216,7 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
             }
         }
     }
+    ui.toolWarning?.let { FooterNote(it, Modifier.testTag("setup-tool-warning"), color = c.warn) }
     if (ui.showForm) AddProviderForm(ui, actions)
     FooterNote(ModelsCopy.KEY_NOTE)
 }
@@ -257,20 +258,23 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
                     ProviderConfig.Kind.withApiKey.forEach { k -> SelectChip(ModelsCopy.kindLabel(k), f.kind == k, { actions.setKind(k) }, small = true) }
                 }
             }
+        }
+        if (f.urlEditable) {
             InputRow(
-                ModelSetupCopy.BASE_URL, f.baseUrl, actions.setBaseUrl, "https://…",
+                ModelSetupCopy.BASE_URL, f.baseUrl, actions.setBaseUrl, "https://…", first = !f.isCustom,
                 keyboard = KeyboardType.Uri, modifier = Modifier.testTag("setup-base-url"),
             )
         }
         InputRow(
             ModelSetupCopy.API_KEY, f.apiKey, actions.setApiKey,
-            if (f.keyRequired) ModelSetupCopy.KEY_HINT else ModelSetupCopy.KEY_OPTIONAL, first = !f.isCustom,
+            if (f.keyRequired) ModelSetupCopy.KEY_HINT else ModelSetupCopy.KEY_OPTIONAL, first = !f.urlEditable,
             keyboard = KeyboardType.Password, secret = !showKey, modifier = Modifier.testTag("setup-api-key"),
         ) {
             Text(if (showKey) stringResource(R.string.hide) else stringResource(R.string.show), Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent)
         }
     }
-    f.urlProblem?.takeIf { f.isCustom && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    f.urlProblem?.takeIf { f.urlEditable && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    if (f.isSelfHosted) FooterNote(ModelSetupCopy.SELF_HOSTED_NOTE, Modifier.testTag("setup-self-hosted"))
     f.unencryptedWarning?.let { FooterNote(it, Modifier.testTag("setup-url-unencrypted"), color = c.warn) }
     MikaButton(
         if (f.test == ListState.Running) ModelSetupCopy.TESTING else ModelSetupCopy.TEST_AND_SAVE,
@@ -408,6 +412,7 @@ object ModelSetupCopy {
     val TEST_AND_SAVE: String get() = tr(R.string.model_test_save)
     val TESTING: String get() = tr(R.string.model_testing)
     val TEST_NOTE: String get() = tr(R.string.model_test_note)
+    val SELF_HOSTED_NOTE: String get() = tr(R.string.model_self_hosted_note)
     val NEXT: String get() = tr(R.string.next)
 
     fun failed(reason: String) = tr(R.string.model_failed, reason)

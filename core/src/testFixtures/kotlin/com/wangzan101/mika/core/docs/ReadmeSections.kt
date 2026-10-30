@@ -37,6 +37,9 @@ object ReadmeSections {
     private fun kindName(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI 兼容"; else -> kind }
     private fun kindNameEn(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI-compatible"; else -> kind }
 
+    /** 「自定义」能选的接口类型:预设里出现过的,除了 Responses(只给 OpenAI 预设和模型列表写明的模型用,自定义里不选)。 */
+    private fun customKinds(presets: List<Preset>) = presets.map { it.kind }.filter { it != "OpenAiResponses" }.distinct()
+
     /** 「a、b、c」的英文写法:a, b or c。 */
     private fun orList(items: List<String>) =
         if (items.size <= 1) items.joinToString() else items.dropLast(1).joinToString(", ") + " or " + items.last()
@@ -65,10 +68,10 @@ object ReadmeSections {
         ).joinToString("\n")
     }
 
-    /** 一句话:有哪些预设(地址为空的「自定义」不算),自定义能接哪几类接口(预设里出现过的全部类型)。 */
+    /** 一句话:有哪些预设(地址为空的「自定义」不算),自定义能接哪几类接口(见 [customKinds])。 */
     fun providers(presets: List<Preset>): String {
         val names = presets.filter { it.baseUrl.isNotEmpty() }.joinToString("、") { it.label }
-        val kinds = presets.map { kindName(it.kind) }.distinct().joinToString("、")
+        val kinds = customKinds(presets).joinToString("、") { kindName(it) }
         return listOf(NOTE, "内置 $names 等服务商预设；其他服务商选「自定义」，$kinds 接口都能接。").joinToString("\n")
     }
 
@@ -76,7 +79,7 @@ object ReadmeSections {
     fun providersEn(presets: List<Preset>): String {
         val names = presets.filter { it.baseUrl.isNotEmpty() }.joinToString(", ") { it.label }
         val custom = presets.firstOrNull { it.baseUrl.isEmpty() }?.label
-        val kinds = orList(presets.map { kindNameEn(it.kind) }.distinct())
+        val kinds = orList(customKinds(presets).map { kindNameEn(it) })
         val pick = if (custom == null) "Custom" else "Custom ($custom)"
         return listOf(NOTE_EN, "Presets for $names and more; for any other provider pick $pick, which takes any $kinds endpoint.").joinToString("\n")
     }

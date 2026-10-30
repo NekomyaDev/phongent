@@ -14,6 +14,7 @@ import com.wangzan101.mika.settings.ProviderConfig
 import com.wangzan101.mika.settings.ProviderConnection
 import com.wangzan101.mika.settings.ProviderPreset
 import com.wangzan101.mika.settings.ProviderPresets
+import com.wangzan101.mika.settings.ProbeResult
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.settings.RoleChoice
 import com.wangzan101.mika.settings.RoleChoices
@@ -67,6 +68,12 @@ data class AddForm(
 ) {
     val isCustom: Boolean get() = preset == ProviderPresets.custom.label
 
+    /** 跑在用户自己机器上的服务(见 [ProviderPreset.selfHosted]):地址预填了本机的默认端口,要能改成那台机器的。 */
+    val isSelfHosted: Boolean get() = presetFor(preset).selfHosted
+
+    /** 地址要用户填或改:自定义,和自己跑的服务。 */
+    val urlEditable: Boolean get() = isCustom || isSelfHosted
+
     val urlProblem: String?
         get() = when {
             baseUrl.isBlank() -> tr(R.string.model_need_url)
@@ -78,8 +85,8 @@ data class AddForm(
     val unencryptedWarning: String?
         get() = if (urlProblem == null && LocalHosts.unencryptedRemote(baseUrl)) tr(R.string.model_url_unencrypted) else null
 
-    /** 自定义的 OpenAI 兼容接口(本地服务)可以不填 Key,其余都要。 */
-    val keyRequired: Boolean get() = !(isCustom && kind == ProviderConfig.Kind.OpenAiCompat)
+    /** 自己跑的服务和自定义的 OpenAI 兼容接口(多半是本地服务)可以不填 Key,其余都要。 */
+    val keyRequired: Boolean get() = !isSelfHosted && !(isCustom && kind == ProviderConfig.Kind.OpenAiCompat)
 
     val canTest: Boolean get() = urlProblem == null && (!keyRequired || apiKey.isNotBlank()) && test != ListState.Running
 
@@ -116,6 +123,8 @@ data class ModelSetupUi(
     val chatGptWelcome: Boolean = false,
     /** 退出登录时 ChatGPT 那边没确认注销(本机令牌已清)。 */
     val chatGptRevokeUnconfirmed: Boolean = false,
+    /** 刚存下的服务商,试调用的模型没调用工具(见 [ModelSetupViewModel.testAndSave]);再测试、选了主模型时清掉。 */
+    val toolWarning: String? = null,
 ) {
     /** 还没有服务商时表单总是展开。 */
     val showForm: Boolean get() = formOpen || providers.isEmpty()
@@ -212,14 +221,15 @@ class ModelSetupViewModel(
     }
 
     /**
-     * 测试并保存:列得出模型(或服务不提供列表),再让一个模型回一句话(见 [probeProblem])也成了,就存下这家服务商,表单清空收起;
-     * 哪一步不成就说原因、不存。
+     * 测试并保存:列得出模型(或服务不提供列表),再让一个模型调用一次工具(见 [probe])也成了,就存下这家服务商,表单清空收起;
+     * 哪一步不成就说原因、不存。接口通、模型却只回了话不调用工具:照样存下服务商,但不拿那个模型当主模型,
+     * 提醒一句([ModelSetupUi.toolWarning])。
      */
     fun testAndSave() {
         val f = _state.value.form
         if (!f.canTest) return
         testJob?.cancel()
-        _state.update { it.copy(form = it.form.copy(test = ListState.Running)) }
+        _state.update { it.copy(form = it.form.copy(test = ListState.Running), toolWarning = null) }
         testJob = scope.launch {
             val key = f.apiKey.trim()
             val baseUrl = f.baseUrl.trim()
@@ -233,40 +243,54 @@ class ModelSetupViewModel(
                     emptyList()
                 }
             }
-            probeProblem(f, baseUrl, key.ifEmpty { null }, models)?.let { problem ->
-                _state.update { it.copy(form = it.form.copy(test = ListState.Failed(problem))) }
+            val outcome = probe(f, baseUrl, key.ifEmpty { null }, models)
+            if (outcome is ProbeOutcome.Failed) {
+                _state.update { it.copy(form = it.form.copy(test = ListState.Failed(outcome.message))) }
                 return@launch
             }
+            val noTools = (outcome as? ProbeOutcome.NoToolCall)?.model
             withContext(io) {
                 val p = store.connect(f.providerName, f.kind, baseUrl, key, models, f.sessionHeader)
-                if (store.roles.value.main == null) {
+                if (noTools == null && store.roles.value.main == null) {
                     val options = ModelOptions.ofProvider(p, store.list())
                     (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
                 }
             }
-            _state.update { snapshot(it.copy(form = AddForm.of(ProviderPresets.all.first()), formOpen = false)) }
+            val warning = noTools?.let { tr(R.string.model_probe_no_tools, it) }
+            _state.update { snapshot(it.copy(form = AddForm.of(ProviderPresets.all.first()), formOpen = false, toolWarning = warning)) }
         }
     }
 
+    /** 试调用的结论:通过(或没有可试的模型)、[model] 没调用工具、失败([message] 是给人看的原因)。 */
+    private sealed interface ProbeOutcome {
+        data object Passed : ProbeOutcome
+        data class NoToolCall(val model: String) : ProbeOutcome
+        data class Failed(val message: String) : ProbeOutcome
+    }
+
     /**
-     * 列出模型后,让会被选作主模型的那个(没有就第一个)回一句最短的话,和真实任务走同一条建模型的路(请求头、会话号都一样):
-     * Key 不对、少了服务商要的请求头,这里就露出来,不等到第一句话。成功、或没有可试的模型(服务不提供列表)为 null,
-     * 失败是给人看的原因(服务端的报错原样带上),超过 [PROBE_TIMEOUT_MS] 没回也算失败。
+     * 列出模型后,让会被选作主模型的那个(没有就第一个)调用一次工具,和真实任务走同一条建模型的路(请求头、会话号都一样):
+     * Key 不对、少了服务商要的请求头、模型不会调用工具,这里就露出来,不等到第一个任务。
+     * 没有可试的模型(服务不提供列表)算通过;超过 [PROBE_TIMEOUT_MS] 没回算失败,服务端的报错原样带上。
      */
-    private suspend fun probeProblem(f: AddForm, baseUrl: String, key: String?, models: List<ListedModel>): String? {
+    private suspend fun probe(f: AddForm, baseUrl: String, key: String?, models: List<ListedModel>): ProbeOutcome {
         // 用 ChatGPT 登录不走这张表单(登录本身就核对过了);表单只给 Key 的接口类型,这里再挡一次
-        if (f.kind == ProviderConfig.Kind.ChatGpt) return null
+        if (f.kind == ProviderConfig.Kind.ChatGpt) return ProbeOutcome.Passed
         val base = (ProviderPresets.forBaseUrl(baseUrl) ?: ProviderPresets.custom).capabilities
         val options = ModelOptions.merge(models, base)
-        val model = ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id ?: return null
+        val model = ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id ?: return ProbeOutcome.Passed
         val caps = options.first { it.id == model }.capabilities
         val endpoint = models.firstOrNull { it.id == model }?.endpoint
-        val error = try {
+        val result = try {
             withContext(io) { withTimeout(PROBE_TIMEOUT_MS) { store.probe(f.kind, baseUrl, key, f.sessionHeader, model, endpoint, caps) } }
         } catch (e: TimeoutCancellationException) {
-            return tr(R.string.model_probe_timeout, model, (PROBE_TIMEOUT_MS / 1000).toInt())
+            return ProbeOutcome.Failed(tr(R.string.model_probe_timeout, model, (PROBE_TIMEOUT_MS / 1000).toInt()))
         }
-        return error?.let { tr(R.string.model_probe_failed, model, it.message.orEmpty()) }
+        return when (result) {
+            ProbeResult.ToolCalled -> ProbeOutcome.Passed
+            ProbeResult.NoToolCall -> ProbeOutcome.NoToolCall(model)
+            is ProbeResult.Failed -> ProbeOutcome.Failed(tr(R.string.model_probe_failed, model, result.error.message.orEmpty()))
+        }
     }
 
     // ---------- 用 ChatGPT 登录 ----------
@@ -342,7 +366,8 @@ class ModelSetupViewModel(
                 val p = store.provider(providerId) ?: return@withContext
                 use(role, p, m, ModelOptions.ofProvider(p, store.list()))
             }
-            sync()
+            // 选好了主模型,「那个模型没调用工具」的提醒就过去了
+            _state.update { snapshot(if (role == ModelRole.Main) it.copy(toolWarning = null) else it) }
         }
     }
 

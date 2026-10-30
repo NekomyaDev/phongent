@@ -55,9 +55,9 @@ class ModelSetupViewModelTest {
         modelLister = { kind, url, apiKey, _ -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
     )
 
-    /** 建过的模型(模型名、请求头等);「测试并保存」的试调用回什么由 [reply] 定,默认回一句。 */
+    /** 建过的模型(模型名、请求头等);「测试并保存」的试调用回什么由 [reply] 定,默认调用试用的工具。 */
     private val built = mutableListOf<Pair<String, ClientSetup>>()
-    private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.Text("pong")), StopReason.EndTurn, null) }
+    private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
     private val probes = mutableListOf<Triple<String, List<Message>, List<ToolSpec>>>()
 
     private inner class Fake(override val capabilities: Capabilities, private val answer: suspend () -> ModelReply) : ChatModel {
@@ -120,7 +120,7 @@ class ModelSetupViewModelTest {
         assertEquals("good", vm.state.value.form.apiKey)
     }
 
-    /** 列出模型后让会当主模型的那个回一句:不带工具、回复限短、带客户端标识;成功才存。 */
+    /** 列出模型后让会当主模型的那个调用一次工具:带一个无参数的工具、回复上限够一次调用、带客户端标识;成功才存。 */
     @Test fun testAndSaveSendsOneTinyRequestToTheMainCandidate() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -128,13 +128,35 @@ class ModelSetupViewModelTest {
         vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
         val (model, setup) = built.first()
         assertEquals("deepseek-chat", model)
-        assertEquals(16, setup.maxOutputTokens)
+        assertEquals(1024, setup.maxOutputTokens)
         assertEquals("Mika/1.2.3", setup.headers["User-Agent"])
         assertEquals("DeepSeek 没声明会话头", setOf("User-Agent"), setup.headers.keys)
         val (_, messages, tools) = probes.single()
         assertEquals(1, messages.size)
-        assertTrue(tools.isEmpty())
+        assertEquals(listOf("get_time"), tools.map { it.name })
         assertEquals(1, store.providers.value.size)
+        assertNull(vm.state.value.toolWarning)
+    }
+
+    /** 接口通、模型只回了话:存下服务商,但不拿这个模型当主模型,提醒一句;选好主模型后提醒收起。 */
+    @Test fun modelThatOnlyAnswersTextIsSavedButNotMadeMain() = runTest {
+        listing[deepseekUrl] = deepseek
+        reply = { ModelReply(listOf(Part.Text("It is noon.")), StopReason.EndTurn, null) }
+        val store = store()
+        val vm = vm(store)
+        vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
+        val p = store.providers.value.single()
+        assertEquals(3, p.models?.size)
+        assertNull("不自动选主模型", store.roles.value.main)
+        assertTrue(store.list().isEmpty())
+        val s = vm.state.value
+        assertFalse("存下了,表单收起", s.showForm)
+        assertEquals(ListState.Idle, s.form.test)
+        assertEquals("deepseek-chat 没有调用工具，Mika 干活需要会调用工具的模型。服务商已保存，但没有拿这个模型当主模型。", s.toolWarning)
+        assertFalse(s.canNext)
+        vm.pick(ModelRole.Main, p.id, "deepseek-reasoner"); runCurrent()
+        assertNull(vm.state.value.toolWarning)
+        assertEquals("deepseek-reasoner", store.configFor(ModelRole.Main)?.model)
     }
 
     /** 试调用失败(例如服务商要的请求头没带):服务端的报错原样给人看,什么都不存。 */

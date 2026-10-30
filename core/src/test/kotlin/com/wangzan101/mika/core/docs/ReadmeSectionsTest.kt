@@ -49,4 +49,16 @@ class ReadmeSectionsTest {
             ReadmeSections.presets(src),
         )
     }
+
+    /** 自定义能接的接口不写 Responses:它只给 OpenAI 预设和模型列表写明的模型用。 */
+    @Test fun customKindsLeaveOutResponses() {
+        val presets = listOf(
+            ReadmeSections.Preset("甲", "OpenAiCompat", "https://a.example/v1"),
+            ReadmeSections.Preset("乙", "OpenAiResponses", "https://b.example/v1"),
+            ReadmeSections.Preset("丙", "Gemini", "https://c.example"),
+            ReadmeSections.Preset("自定义", "OpenAiCompat", ""),
+        )
+        assertTrue(ReadmeSections.providers(presets).endsWith("内置 甲、乙、丙 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Gemini 接口都能接。"))
+        assertTrue(ReadmeSections.providersEn(presets).endsWith("which takes any OpenAI-compatible or Gemini endpoint."))
+    }
 }

@@ -577,38 +577,76 @@ class ProviderStoreTest {
         assertTrue("written back", f.readText().contains("sessionHeader"))
     }
 
-    /** 试调用走真的适配器:带客户端标识和声明的会话头、不带工具;服务端的报错原样带回。 */
+    /** 试调用走真的适配器:带客户端标识和声明的会话头、带一个试用的工具;回了工具调用才算通过,服务端的报错原样带回。 */
     @Test
     fun probeGoesThroughTheRealAdapterWithHeaders() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
         try {
             val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3")
             val url = server.url("/v1").toString()
-            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json")
-                .setBody("""{"choices":[{"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}"""))
-            assertNull(s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", "x-test-session", "m", null, none))
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json").setBody(
+                """{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","type":"function",""" +
+                    """"function":{"name":"get_time","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""",
+            ))
+            assertEquals(ProbeResult.ToolCalled, s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", "x-test-session", "m", null, none))
             val req = server.takeRequest()
             assertEquals("/v1/chat/completions", req.path)
             assertEquals("Mika/1.2.3", req.getHeader("User-Agent"))
             assertTrue(req.getHeader("x-test-session").orEmpty().isNotEmpty())
             assertEquals("Bearer sk", req.getHeader("Authorization"))
             val body = req.body.readUtf8()
-            assertFalse(body.contains("\"tools\""))
+            assertTrue(body, body.contains("\"tools\"") && body.contains("get_time"))
             assertFalse("Chat Completions 不给回复上限", body.contains("max_tokens"))
 
             server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(400).setBody("""{"error":{"type":"MissingSessionID"}}"""))
-            val e = s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", null, "m", null, none)
-            assertTrue(e?.message.orEmpty(), e?.message.orEmpty().contains("MissingSessionID"))
+            val e = s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", null, "m", null, none) as ProbeResult.Failed
+            assertTrue(e.error.message.orEmpty(), e.error.message.orEmpty().contains("MissingSessionID"))
             assertNull(server.takeRequest().getHeader("x-test-session"))
 
-            // Responses 不给回复上限
-            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream")
-                .setBody("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"))
-            assertNull(s.probe(ProviderConfig.Kind.OpenAiResponses, url, "sk", null, "m", null, none))
+            // Responses 不给回复上限;回了函数调用就算通过
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c1\",\"name\":\"get_time\",\"arguments\":\"{}\"}}\n\n" +
+                    "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n",
+            ))
+            assertEquals(ProbeResult.ToolCalled, s.probe(ProviderConfig.Kind.OpenAiResponses, url, "sk", null, "m", null, none))
             val responses = server.takeRequest()
             assertEquals("/v1/responses", responses.path)
             assertEquals("Mika/1.2.3", responses.getHeader("User-Agent"))
-            assertFalse(responses.body.readUtf8().contains("max_output_tokens"))
+            val responsesBody = responses.body.readUtf8()
+            assertFalse(responsesBody.contains("max_output_tokens"))
+            assertTrue(responsesBody.contains("get_time"))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    /** 接口通、模型只回了话不调用工具:不是失败,但要分得出来。 */
+    @Test
+    fun probeThatGetsOnlyTextReportsNoToolCall() = runTest {
+        val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
+        try {
+            val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3")
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("""{"choices":[{"message":{"role":"assistant","content":"It is noon."},"finish_reason":"stop"}]}"""))
+            assertEquals(ProbeResult.NoToolCall, s.probe(ProviderConfig.Kind.OpenAiCompat, server.url("/v1").toString(), "sk", null, "m", null, none))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    /** 试调用给 Messages 的回复上限留得够一次工具调用(16 个 token 装不下)。 */
+    @Test
+    fun probeLeavesRoomForAToolCall() = runTest {
+        val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
+        try {
+            val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3")
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json").setBody(
+                """{"content":[{"type":"tool_use","id":"t1","name":"get_time","input":{}}],"stop_reason":"tool_use","usage":{"input_tokens":1,"output_tokens":1}}""",
+            ))
+            assertEquals(ProbeResult.ToolCalled, s.probe(ProviderConfig.Kind.Anthropic, server.url("/").toString(), "sk", null, "m", null, none))
+            val body = server.takeRequest().body.readUtf8()
+            assertTrue(body, body.contains("\"max_tokens\":1024"))
+            assertTrue(body.contains("get_time"))
         } finally {
             server.shutdown()
         }

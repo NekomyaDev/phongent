@@ -26,6 +26,7 @@ import com.wangzan101.mika.core.model.Part
 import com.wangzan101.mika.core.model.PromptCaching
 import com.wangzan101.mika.core.model.ResponsesModel
 import com.wangzan101.mika.core.model.Role
+import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.usage.UsagePurpose
 import com.wangzan101.mika.core.usage.UsageSink
 import com.wangzan101.mika.core.usage.UsageSource
@@ -71,7 +72,7 @@ data class ProviderConfig(
     val providerId: String = "",
 ) {
     /**
-     * 接口类型。[OpenAiResponses] 只在模型列表给某个模型写明 Responses 协议时用(添加服务商时不选它);
+     * 接口类型。[OpenAiResponses] 用在模型列表给某个模型写明 Responses 协议时,和预设「OpenAI」(添加自定义服务商时不选它);
      * [ChatGpt] 是用 ChatGPT 账号登录、用套餐额度调用的那一家:凭据是登录(见 [ChatGptSession]),不是 API Key。
      */
     enum class Kind {
@@ -166,6 +167,16 @@ data class RoleChoices(
  * [maxOutputTokens] 限制回复长度(连接测试用),null 按适配器默认。
  */
 data class ClientSetup(val headers: Map<String, String> = emptyMap(), val maxOutputTokens: Int? = null)
+
+/** 「测试并保存」试调用(见 [ProviderStore.probe])的结果。 */
+sealed interface ProbeResult {
+    /** 模型调用了试用的工具:接口通,也会调用工具。 */
+    data object ToolCalled : ProbeResult
+    /** 接口通,模型只回了话、没调用工具:Mika 干活靠工具,这个模型当不了主模型。 */
+    data object NoToolCall : ProbeResult
+    /** 请求失败;[error] 带着服务端的报错。 */
+    data class Failed(val error: ModelError) : ProbeResult
+}
 
 /**
  * 服务商、模型配置的存取与用途选择。配置存成 JSON 文件,API Key 经 [KeyCipher] 加密后另存一个文件,每个服务商一份。
@@ -379,24 +390,25 @@ class ProviderStore(
 
     /**
      * 「测试并保存」的试调用:还没存下的服务商,按真实任务同一条路([modelFactory]、同样的请求头)建出 [model],
-     * 发一句最短的话、不带工具、回复限得很短(协议允许的话,见 [buildModel])。成功返回 null,失败返回原因(服务端的报错原样带上)。
+     * 带一个无参数的工具([PROBE_TOOL])、请它调用;回复限得很短(协议允许的话,见 [buildModel])。
+     * 回了工具调用为 [ProbeResult.ToolCalled],只回了话为 [ProbeResult.NoToolCall],请求失败带着服务端的报错原样返回。
      * 不计量:这几个 token 不属于任何用途。会话号用新的,不属于任何对话。超时由调用方管。
      */
     suspend fun probe(
         kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String?,
         model: String, endpoint: ModelEndpoint?, caps: Capabilities,
-    ): ModelError? {
-        val cfg = ProviderConfig(PROBE_ID, kind, baseUrl, model, caps.copy(toolCalls = false))
+    ): ProbeResult {
+        val cfg = ProviderConfig(PROBE_ID, kind, baseUrl, model, caps.copy(toolCalls = true))
         val m = modelFactory(cfg, apiKey, endpoint, ClientSetup(headers(sessionHeader, ModelSession.fresh()), PROBE_MAX_TOKENS))
         return try {
-            m.complete(PROBE_SYSTEM, listOf(Message(Role.User, listOf(Part.Text(PROBE_TEXT)), Author.Mika)), emptyList())
-            null
+            val reply = m.complete(PROBE_SYSTEM, listOf(Message(Role.User, listOf(Part.Text(PROBE_TEXT)), Author.Mika)), listOf(PROBE_TOOL))
+            if (reply.parts.any { it is Part.ToolCall }) ProbeResult.ToolCalled else ProbeResult.NoToolCall
         } catch (e: ModelError) {
-            e
+            ProbeResult.Failed(e)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ModelError.BadResponse(e.message.orEmpty(), e)
+            ProbeResult.Failed(ModelError.BadResponse(e.message.orEmpty(), e))
         }
     }
 
@@ -749,11 +761,15 @@ class ProviderStore(
         /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
         const val CHATGPT_NAME = "ChatGPT"
 
-        /** 试调用:临时配置的 id、系统提示、那句话、回复上限。 */
+        /**
+         * 试调用:临时配置的 id、系统提示、那句话、试用的工具、回复上限。
+         * 上限留得够一次工具调用,连同必须先想一想的模型的思考(Messages、generateContent 把思考也算在上限里)。
+         */
         private const val PROBE_ID = "probe"
-        private const val PROBE_SYSTEM = "Reply with one short word."
-        private const val PROBE_TEXT = "ping"
-        private const val PROBE_MAX_TOKENS = 16
+        private const val PROBE_SYSTEM = "This is a connection test. Call the get_time tool now. Do not answer with text."
+        private const val PROBE_TEXT = "What time is it? Use the get_time tool."
+        private val PROBE_TOOL = ToolSpec("get_time", "Returns the current time.", """{"type":"object","properties":{}}""")
+        private const val PROBE_MAX_TOKENS = 1024
         private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
         /**
