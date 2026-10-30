@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -83,6 +84,7 @@ fun AboutScreen(
     onCheck: () -> Unit,
     onOpenUrl: (String) -> Unit,
     onSaveQr: () -> Boolean,
+    onAskMikaToJoin: () -> Unit,
     onOpenLicense: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -171,7 +173,7 @@ fun AboutScreen(
             onX = { close(); onOpenUrl(MikaLinks.X) },
             onDismiss = close,
         )
-        AboutSheet.Group -> GroupSheet(onSave = saveQr, onDismiss = close)
+        AboutSheet.Group -> GroupSheet(onSave = saveQr, onAskMika = { close(); onAskMikaToJoin() }, onDismiss = close)
         null -> Unit
     }
 }
@@ -307,8 +309,10 @@ private fun FeedbackOption(icon: ImageVector, title: String, sub: String, first:
 }
 
 @Composable
-private fun GroupSheet(onSave: () -> Unit, onDismiss: () -> Unit) {
+private fun GroupSheet(onSave: () -> Unit, onAskMika: () -> Unit, onDismiss: () -> Unit) {
     val c = MikaTheme.colors
+    // 点一次就够:连点不会开出第二个一样的任务
+    var asked by remember { mutableStateOf(false) }
     AboutSheetFrame(AboutCopy.GROUP_SHEET_TITLE, AboutCopy.GROUP_SHEET_SUB, "group-sheet", onDismiss) {
         Image(
             painterResource(QrImage.RES), contentDescription = AboutCopy.GROUP_SHEET_TITLE,
@@ -319,5 +323,11 @@ private fun GroupSheet(onSave: () -> Unit, onDismiss: () -> Unit) {
         )
         Text(AboutCopy.GROUP_HINT, Modifier.fillMaxWidth(), style = MikaType.Hint, color = c.ink3, textAlign = TextAlign.Center)
         MikaButton(AboutCopy.SAVE_QR, onSave, Modifier.fillMaxWidth().padding(top = 14.dp), kind = ButtonKind.Tonal)
+        HorizontalDivider(Modifier.padding(top = 16.dp), color = c.hair)
+        Text(AboutCopy.GROUP_ALREADY_ADDED, Modifier.fillMaxWidth().padding(top = 12.dp), style = MikaType.Hint, color = c.ink3, textAlign = TextAlign.Center)
+        MikaButton(
+            AboutCopy.GROUP_ASK_MIKA, { if (!asked) { asked = true; onAskMika() } },
+            Modifier.fillMaxWidth().padding(top = 8.dp).testTag("group-ask-mika"), enabled = !asked,
+        )
     }
 }

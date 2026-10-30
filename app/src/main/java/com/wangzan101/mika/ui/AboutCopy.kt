@@ -3,6 +3,8 @@ package com.wangzan101.mika.ui
 import com.wangzan101.mika.about.CheckStatus
 import com.wangzan101.mika.about.MikaLinks
 import com.wangzan101.mika.about.UpdateState
+import com.wangzan101.mika.settings.Prerequisites
+import com.wangzan101.mika.settings.Problem
 
 /** 关于页的文字,以及「检查更新」一行、设置首页「关于 Mika」一行、侧栏入口上的提示怎么显示。 */
 object AboutCopy {
@@ -40,6 +42,8 @@ object AboutCopy {
     const val SAVE_QR = "保存二维码"
     const val QR_SAVED = "二维码已保存到相册"
     const val QR_SAVE_FAILED = "没能保存，可以截屏保存"
+    const val GROUP_ALREADY_ADDED = "已经加过作者微信？"
+    const val GROUP_ASK_MIKA = "让 Mika 帮我发消息入群"
 
     const val FOLLOW = "关注作者"
     const val FOLLOW_SUB = "X ${MikaLinks.X_HANDLE}，第一时间看新功能"
@@ -85,6 +89,21 @@ object AboutCopy {
     fun settingsValue(updateVersion: String?, versionName: String): CheckValue =
         if (updateVersion != null) CheckValue(available(updateVersion), dot = true, highlight = true)
         else CheckValue(versionName.takeIf { it.isNotEmpty() })
+
+    /** 「让 Mika 帮我发消息入群」还差的那一步:提示 [message],去 [fix] 那页补上(为空时去设置首页)。 */
+    enum class GroupTaskGap(val message: String, val fix: Fix?) {
+        Model("先完成设置：还没配好模型", Fix.AddModel),
+        Phone("先完成设置：手机操作还没配好", Fix.OpenPhoneSetup),
+        TooOld("这台手机的安卓版本太低，用不了手机操作", null),
+    }
+
+    /** 这件事要操作微信:模型配好、手机操作就绪才开始;差什么返回什么,都齐了为 null。 */
+    fun groupTaskGap(check: Prerequisites.Check): GroupTaskGap? = when {
+        Problem.NoModel in check.problems -> GroupTaskGap.Model
+        Problem.SystemTooOld in check.problems -> GroupTaskGap.TooOld
+        !check.phoneReady -> GroupTaskGap.Phone
+        else -> null
+    }
 
     /** 侧栏「关于 Mika」上的红点。 */
     fun drawerDot(s: UpdateState): Boolean = s.hasUpdate

@@ -41,6 +41,7 @@ class AboutScreenTest {
         var checks = 0
         var saves = 0
         var licenses = 0
+        var asks = 0
     }
 
     private fun about(update: UpdateState = UpdateState()): Calls {
@@ -50,7 +51,7 @@ class AboutScreenTest {
                 AboutScreen(
                     versionName = "0.1.0", build = "abc1234", beta = true, update = update, issueUrl = "issue://prefilled",
                     onCheck = { calls.checks++ }, onOpenUrl = { calls.urls += it },
-                    onSaveQr = { calls.saves++; true }, onOpenLicense = { calls.licenses++ }, onBack = {},
+                    onSaveQr = { calls.saves++; true }, onAskMikaToJoin = { calls.asks++ }, onOpenLicense = { calls.licenses++ }, onBack = {},
                 )
             }
         }
@@ -126,6 +127,20 @@ class AboutScreenTest {
         compose.awaitOne(AboutCopy.GROUP_SHEET_SUB).assertIsDisplayed()
         compose.onNodeWithTag("wechat-qr").assertExists()
         compose.onNodeWithText(AboutCopy.GROUP_HINT).assertExists()
+    }
+
+    /** 二维码下面:已经加过作者微信的,点一下让 Mika 去发消息;连点只算一次。 */
+    @Test
+    fun groupSheetAsksMikaOnce() {
+        val calls = about()
+        compose.onNodeWithText("加入内测群").performClick()
+        compose.awaitOne(AboutCopy.GROUP_SHEET_SUB)
+        compose.onNodeWithText(AboutCopy.SAVE_QR).assertExists()
+        compose.onNodeWithText(AboutCopy.GROUP_ALREADY_ADDED).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("group-ask-mika").performScrollTo().assertIsDisplayed().performClick()
+        compose.waitForIdle()
+        assertEquals(1, calls.asks)
+        compose.onAllNodesWithTag("group-ask-mika").assertCountEquals(0)
     }
 
     @Test

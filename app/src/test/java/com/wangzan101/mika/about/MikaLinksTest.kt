@@ -47,4 +47,16 @@ class MikaLinksTest {
         assertEquals("https://x.com/wangzan101", MikaLinks.X)
         assertTrue(MikaLinks.LATEST_RELEASE_API.endsWith("/repos/wangzan101/Mika/releases/latest"))
     }
+
+    /** 交给 Mika 的原话:按微信号找作者、发那句话;找不到时不加好友、不发给别人。 */
+    @Test
+    fun groupTaskText() {
+        val t = MikaLinks.GROUP_TASK
+        assertTrue(t.contains("微信号 ${MikaLinks.AUTHOR_WECHAT_ID}"))
+        assertEquals("wangzan101", MikaLinks.AUTHOR_WECHAT_ID)
+        assertTrue(t.contains("「你好，我是 Mika 的用户，想加入 Mika 内测体验群，麻烦拉我一下，谢谢！」"))
+        assertTrue(t.contains("不要添加好友，也不要发给别人"))
+        assertTrue(t.contains("先在「关于 Mika」里扫码加作者微信"))
+        assertEquals(2, t.lines().size)
+    }
 }
