@@ -54,4 +54,9 @@ internal fun userReason(e: ModelError): String = when (e) {
     is ModelError.Network -> "连接模型服务失败,重试后仍然不通。请检查网络和 Base URL。"
     is ModelError.Server -> "模型服务出错(HTTP ${e.status}),请稍后再试。"
     is ModelError.BadResponse -> "${e.message}。请检查 Base URL 和接口类型是否匹配。"
+    is ModelError.ChatGptLimitReached ->
+        "ChatGPT 额度用完了,稍后再试。用量可以在 ChatGPT 设置 › 用量(chatgpt.com/settings/usage)查看;Plus 每 5 小时的额度和其他用 ChatGPT 登录的 App 共用。也可以先换一个模型。"
+    is ModelError.ChatGptNotEligible ->
+        "这个账号不能在其他 App 里用 ChatGPT 额度(需要 Plus 或 Pro,并且所在地区和账号设置允许)。${if (e.detail.isEmpty()) "" else "服务端说明:${e.detail}。"}可以换一个模型。"
+    is ModelError.SignInExpired -> "ChatGPT 登录已失效,请在设置 › 模型里重新用 ChatGPT 登录。"
 }

@@ -102,7 +102,7 @@ class ModelCatalogTest {
                 ListedModel("glm-5.3", "GLM-5.3", toolCalls = true, vision = false, contextTokens = 1_000_000, reasoning = true,
                     endpoint = chat.copy(reasoningField = null)),
                 ListedModel("grok-4.7", "Grok 4.7", toolCalls = true, vision = true, contextTokens = 500_000,
-                    unsupportedApis = listOf("responses")),
+                    endpoint = ModelEndpoint(ModelProtocol.Responses, "https://gw.test/inference/openai/v1")),
                 ListedModel("claude-haiku-5-5", "Claude Haiku 5.5", toolCalls = true, vision = true, contextTokens = 1_000_000,
                     reasoning = true, endpoint = ModelEndpoint(ModelProtocol.Messages, "https://gw.test/inference/anthropic/v1")),
                 ListedModel("gemini-4-argon", "Gemini 4 Argon", toolCalls = true, vision = true, contextTokens = 1_048_576,
@@ -112,7 +112,28 @@ class ModelCatalogTest {
             ),
             list,
         )
-        assertEquals(listOf(true, true, false, true, true, true), list.map { it.usable })
+        assertEquals(listOf(true, true, true, true, true, true), list.map { it.usable })
+    }
+
+    @Test fun chatGptModelListKeepsListedSlugsInServerOrder() = runTest {
+        server.enqueue(ok("""{"models":[
+            {"slug":"gpt-b","display_name":"GPT B","visibility":"list","input_modalities":["text","image"],
+             "context_window":272000,"supported_reasoning_levels":[{"effort":"low"}]},
+            {"slug":"gpt-hidden","display_name":"Hidden","visibility":"hide"},
+            {"slug":"gpt-a","display_name":"GPT A","visibility":"list","input_modalities":["text"]},
+            {"slug":"odd","api":{"realtime":{"base_url":"https://x.test"}}}
+        ]}"""))
+        val list = models(catalog.openAiCompat("$base/v1", "token"))
+        assertEquals("Bearer token", server.takeRequest().getHeader("Authorization"))
+        assertEquals(
+            listOf(
+                ListedModel("gpt-b", "GPT B", vision = true, contextTokens = 272_000, reasoning = true),
+                ListedModel("gpt-a", "GPT A", vision = false),
+                ListedModel("odd", unsupportedApis = listOf("realtime")),
+            ),
+            list,
+        )
+        assertEquals(listOf(true, true, false), list.map { it.usable })
     }
 
     @Test fun adapterBaseUrlDropsTheVersionPathTheAdapterAddsItself() {
@@ -120,6 +141,7 @@ class ModelCatalogTest {
         assertEquals("https://gw.test/anthropic", ModelEndpoint(ModelProtocol.Messages, "https://gw.test/anthropic/v1").adapterBaseUrl)
         assertEquals("https://gw.test/anthropic", ModelEndpoint(ModelProtocol.Messages, "https://gw.test/anthropic").adapterBaseUrl)
         assertEquals("https://gw.test/google", ModelEndpoint(ModelProtocol.GenerateContent, "https://gw.test/google/v1beta/").adapterBaseUrl)
+        assertEquals("https://gw.test/openai/v1", ModelEndpoint(ModelProtocol.Responses, "https://gw.test/openai/v1/").adapterBaseUrl)
     }
 
     @Test fun eachAdapterCallsTheListedAddressWithoutDoublingTheVersion() = runTest {

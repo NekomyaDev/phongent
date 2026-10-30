@@ -40,7 +40,9 @@ enum class ModelProtocol(val wire: String) {
     /** Anthropic Messages,由 [AnthropicModel] 调用。 */
     Messages("messages"),
     /** Gemini generateContent,由 [GeminiModel] 调用。 */
-    GenerateContent("generate-content");
+    GenerateContent("generate-content"),
+    /** OpenAI Responses,由 [ResponsesModel] 调用。排在最后:同一个模型也写了前几种的,照旧用前几种。 */
+    Responses("responses");
 
     companion object {
         fun of(wire: String?): ModelProtocol? = entries.firstOrNull { it.wire == wire }
@@ -54,13 +56,14 @@ enum class ModelProtocol(val wire: String) {
 data class ModelEndpoint(val protocol: ModelProtocol, val baseUrl: String, val reasoningField: String? = null) {
     /**
      * 交给适配器的 Base URL。适配器自己接版本路径:[AnthropicModel] 接 `/v1/messages`、[GeminiModel] 接
-     * `/v1beta/models/…`,所以列表地址末尾已带的这一段去掉,免得重复;Chat Completions 只接 `/chat/completions`,原样用。
+     * `/v1beta/models/…`,所以列表地址末尾已带的这一段去掉,免得重复;Chat Completions 只接 `/chat/completions`、
+     * Responses 只接 `/responses`,原样用。
      */
     val adapterBaseUrl: String
         get() {
             val url = baseUrl.trim().trimEnd('/')
             return when (protocol) {
-                ModelProtocol.ChatCompletions -> url
+                ModelProtocol.ChatCompletions, ModelProtocol.Responses -> url
                 ModelProtocol.Messages -> url.removeSuffix("/v1")
                 ModelProtocol.GenerateContent -> url.removeSuffix("/v1beta")
             }
@@ -92,6 +95,8 @@ sealed interface ModelListResult {
  *   `architecture.input_modalities`、`supported_parameters` 等字段的(部分聚合服务会给)才填能力。
  *   也认另一种写法:`capabilities.tools.supported`、`capabilities.reasoning.supported`、`limit.context`、
  *   `modalities.input`(有 `image/…` 即能看图),以及按协议给地址的 `api` 表(见 [ListedModel.endpoint])。
+ *   用 ChatGPT 账号列出的是 `models` 表:名字在 `slug`、显示名在 `display_name`,只留 `visibility` 为 `list` 的、保持服务端的次序;
+ *   给了 `input_modalities`、`context_window`、`supported_reasoning_levels` 的照填。
  * - Anthropic:`GET {base}/v1/models`,按 `after_id` 翻页;`max_input_tokens` 是上下文,
  *   `capabilities.image_input` / `capabilities.thinking` 是看图和推理。不给工具调用信息。
  * - Gemini:`GET {base}/v1beta/models`,按 `pageToken` 翻页;只留能 `generateContent` 的,
@@ -145,15 +150,19 @@ class ModelCatalog(private val http: OkHttpClient) {
     }
 
     private fun openAiModel(o: JsonObject): ListedModel? {
-        val id = o.str("id")?.takeIf { it.isNotBlank() } ?: return null
+        // 用 ChatGPT 账号列模型时(`models` 表)名字在 `slug`、显示名在 `display_name`,只留 `visibility` 为 list 的
+        o.str("visibility")?.let { if (it != "list") return null }
+        val id = (o.str("id") ?: o.str("slug"))?.takeIf { it.isNotBlank() } ?: return null
         val arch = o["architecture"] as? JsonObject
         val inputs = (arch?.get("input_modalities") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
         val modality = arch?.str("modality")?.substringBefore("->")
         val params = (o["supported_parameters"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
         val caps = o["capabilities"] as? JsonObject
-        val modalIn = (o.obj("modalities")?.get("input") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        val modalIn = ((o.obj("modalities")?.get("input") ?: o["input_modalities"]) as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        val reasoningLevels = o["supported_reasoning_levels"] as? JsonArray
         val api = o.obj("api")
-        // 一个模型可能写了几种协议:按 Chat Completions、Messages、generateContent 的次序取第一种会说的
+        // 一个模型可能写了几种协议:按 Chat Completions、Messages、generateContent、Responses 的次序取第一种会说的
         val endpoint = api?.let { a ->
             ModelProtocol.entries.firstNotNullOfOrNull { p ->
                 val e = a.obj(p.wire) ?: return@firstNotNullOfOrNull null
@@ -163,7 +172,7 @@ class ModelCatalog(private val http: OkHttpClient) {
         }
         return ListedModel(
             id = id,
-            displayName = o.str("name").orEmpty(),
+            displayName = (o.str("name") ?: o.str("display_name")).orEmpty(),
             toolCalls = params?.let { "tools" in it } ?: caps?.obj("tools")?.bool("supported")
                 ?: caps?.bool("function_calling") ?: caps?.bool("tool_calls"),
             vision = inputs?.let { "image" in it } ?: modalIn?.let { m -> m.any { it == "image" || it.startsWith("image/") } }
@@ -171,7 +180,7 @@ class ModelCatalog(private val http: OkHttpClient) {
             contextTokens = o.int("context_length") ?: o.int("context_window") ?: o.int("max_context_length")
                 ?: o.obj("limit")?.int("context"),
             reasoning = params?.let { "reasoning" in it || "include_reasoning" in it } ?: caps?.obj("reasoning")?.bool("supported")
-                ?: o.bool("supports_reasoning"),
+                ?: o.bool("supports_reasoning") ?: reasoningLevels?.let { it.isNotEmpty() },
             endpoint = endpoint,
             unsupportedApis = if (endpoint == null) api?.keys?.toList().orEmpty() else emptyList(),
         )
