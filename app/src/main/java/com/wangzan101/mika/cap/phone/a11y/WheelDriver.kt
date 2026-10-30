@@ -8,6 +8,7 @@ import com.wangzan101.mika.core.cap.phone.WheelMath
 import com.wangzan101.mika.core.cap.phone.WheelSteps
 import com.wangzan101.mika.core.uistate.VisibleTextLine
 import com.wangzan101.mika.core.uistate.WheelOutcome
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -65,7 +66,7 @@ internal class WheelDriver(
         // 1. 直接输入
         editableOf(wheel ?: start)?.let { field ->
             if (typeInto(field, value)) {
-                now = read(col)
+                now = settled(col)
                 if (WheelMath.matches(now.current, value)) return outcome(true, now.current, from, "text")
             }
         }
@@ -74,9 +75,15 @@ internal class WheelDriver(
         if (wheel != null && canStep(wheel)) {
             val steps = WheelSteps(value, cap = MAX_STEPS)
             var stopped: String? = null
+            var rechecks = 0
             loop@ while (true) {
                 when (val s = steps.next(now.current, now.texts)) {
-                    WheelSteps.Step.Done -> return outcome(true, now.current, from, "actions")
+                    WheelSteps.Step.Done -> {
+                        // 读到目标时滚轮可能还在动:停稳了再核对一次,不对就接着滚
+                        now = settled(col)
+                        if (WheelMath.matches(now.current, value)) return outcome(true, now.current, from, "actions")
+                        if (++rechecks > MAX_RECHECKS) { stopped = "not_reached"; break@loop }
+                    }
                     is WheelSteps.Step.Stop -> { stopped = s.reason; break@loop }
                     is WheelSteps.Step.Act -> {
                         val action = if (s.forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
@@ -85,7 +92,7 @@ internal class WheelDriver(
                         attempts += s.count
                         quiet(STEP_QUIET_MS, STEP_CAP_MS)
                         wheel.refresh()
-                        now = read(col)
+                        now = settled(col)
                         // 一下都没滚动:这一边到头了(或这一边不让滚)
                         if (done == 0 && !WheelMath.matches(now.current, value)) { stopped = "at_end"; break@loop }
                     }
@@ -102,14 +109,20 @@ internal class WheelDriver(
         var now = first
         val plan = WheelDrags(value, rowHeight = col.rowHeight)
         var dragged = 0
+        var rechecks = 0
         while (true) {
             when (val s = plan.next(now.texts, now.selected, now.items.map { it.centerY }, dragged)) {
-                WheelDrags.Step.Done -> return outcome(true, now.current, from, "drag")
+                WheelDrags.Step.Done -> {
+                    // 停稳了再核对一次(松手后滚轮还会吸附到最近的一格)
+                    now = settled(col)
+                    if (WheelMath.matches(now.current, value)) return outcome(true, now.current, from, "drag")
+                    if (++rechecks > MAX_RECHECKS) return outcome(false, now.current, from, "drag", "not_reached")
+                }
                 is WheelDrags.Step.Stop -> return outcome(false, now.current, from, "drag", s.reason)
                 is WheelDrags.Step.Drag -> {
                     dragged = dragSteps(col, now, s.steps, plan.itemHeight, s.boost, s.slow)
                         ?: return outcome(false, now.current, from, "drag", "not_reached")
-                    now = read(col)
+                    now = settled(col)
                 }
             }
         }
@@ -158,6 +171,21 @@ internal class WheelDriver(
 
     // ---------- 读 ----------
 
+    /**
+     * 停稳后的读数:滚动、拖动之后滚轮还会转一会儿、吸附到最近的一格(原版数字滚轮一格的动画约 0.3 秒),
+     * 也不一定发无障碍事件。隔 [SETTLE_MS] 连读两次值相同才算停稳,至多读 [MAX_SETTLE_READS] 次。
+     */
+    private suspend fun settled(col: Column): Reading {
+        var last = read(col)
+        repeat(MAX_SETTLE_READS - 1) {
+            delay(SETTLE_MS)
+            val again = read(col)
+            if (again.current == last.current) return again
+            last = again
+        }
+        return last
+    }
+
     private suspend fun read(col: Column): Reading {
         col.root.refresh()
         col.root.getBoundsInScreen(col.box)
@@ -167,7 +195,18 @@ internal class WheelDriver(
             val anchor = WheelMath.selectedIndex(found, col.mid, h)
             val items = if (anchor >= 0) WheelMath.column(found, anchor) else found
             val i = WheelMath.selectedIndex(items, col.mid, WheelMath.itemHeight(items.map { it.centerY }) ?: h)
-            return Reading(items.getOrNull(i)?.text, items, i)
+            if (i >= 0) return Reading(items[i].text, items, i)
+            // 没有哪一项盖住中线:可能是中间那一格没报出来(只报了上下两格),按上下紧挨着的两项推出中间那一格;
+            // 推不出时退回离中线最近的那一项
+            val below = items.indexOfFirst { it.centerY > col.mid }
+            val mid = (if (below > 0) WheelMath.between(items[below - 1].text, items[below].text) else null) ?: run {
+                val j = WheelMath.selected(items.map { it.centerY }, col.mid, WheelMath.itemHeight(items.map { it.centerY }) ?: h)
+                return Reading(items.getOrNull(j)?.text, items, j)
+            }
+            val withMid = items.toMutableList().apply {
+                add(below, WheelMath.Item(mid, (items[below - 1].centerX + items[below].centerX) / 2, col.mid, selected = true))
+            }
+            return Reading(mid, withMid, below)
         }
         // 自己画的滚轮:认这一列里的字
         val lines = ocr().orEmpty().mapNotNull { l ->
@@ -188,7 +227,7 @@ internal class WheelDriver(
             val label = itemLabel(n) ?: return false
             n.getBoundsInScreen(r)
             if (r.isEmpty || !col.box.contains(r.centerX(), r.centerY()) || r.centerX() !in col.left..col.right) return false
-            if (out.none { it.text == label && abs(it.centerY - r.centerY()) < 4 }) out += WheelMath.Item(label, r.centerX(), r.centerY(), n.isSelected)
+            if (out.none { it.text == label && abs(it.centerY - r.centerY()) < 4 }) out += WheelMath.Item(label, r.centerX(), r.centerY(), n.isSelected, r.height())
             return true
         }
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
@@ -301,6 +340,10 @@ internal class WheelDriver(
         /** 一次拖至少能拖这么多格(列表只读到一两项时也拖得开)、至少这么多像素(拖得太短会被当成点按)。 */
         const val MIN_DRAG_ROWS = 3
         const val MIN_DRAG_PX = 48
+        /** 判停稳:隔这么久连读两次值相同;至多读几次;读到目标后停稳了却不对,至多再接着转几次。 */
+        const val SETTLE_MS = 350L
+        const val MAX_SETTLE_READS = 5
+        const val MAX_RECHECKS = 2
         const val STEP_QUIET_MS = 150L
         const val STEP_CAP_MS = 700L
         const val DRAG_QUIET_MS = 300L

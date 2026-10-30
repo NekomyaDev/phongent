@@ -395,7 +395,12 @@ class AndroidScreen(
         if (!opened) return@withContext NO_APP_OPEN
         val found = when (val f = findField(ref, snapshotId)) {
             is Field.Found -> f
-            is Field.Missing -> return@withContext if (f.reason == NO_FOCUS) typeUnseen(text) else ActionResult.Failed(f.reason)
+            is Field.Missing -> return@withContext when {
+                f.reason != NO_FOCUS -> ActionResult.Failed(f.reason)
+                // 屏上什么都没拿着输入焦点、也没弹输入法:没有框接得住粘贴,不去粘(粘了界面别处一动就会被当成「可能打进去了」)
+                !somethingHoldsInputFocus() -> ActionResult.Failed(NO_FOCUS)
+                else -> typeUnseen(text)
+            }
         }
         var field = found.node
         val original = FieldShape.of(field)
@@ -447,7 +452,11 @@ class AndroidScreen(
         if (!opened) return@withContext NO_APP_OPEN
         val found = when (val f = findField(ref, snapshotId, tapToFocus = false)) {
             is Field.Found -> f
-            is Field.Missing -> return@withContext if (f.reason == NO_FOCUS) clearUnseen() else ActionResult.Failed(f.reason)
+            is Field.Missing -> return@withContext when {
+                f.reason != NO_FOCUS -> ActionResult.Failed(f.reason)
+                !somethingHoldsInputFocus() -> ActionResult.Failed(NO_FOCUS)
+                else -> clearUnseen()
+            }
         }
         val field = found.node
         verified(relocatedTo = found.relocatedTo) { if (inWebView(field)) inputText(field, "") == true else setText(field, "") }
@@ -1283,6 +1292,13 @@ class AndroidScreen(
         val name = ScreenReader.ownLabel(n) ?: ScreenReader.ownLabel(target) ?: return false
         return SEARCH_WORDS.any { name.contains(it, ignoreCase = true) }
     }
+
+    /**
+     * 这块屏上有东西拿着输入焦点(哪怕不是树里的输入框,比如 App 自己画的界面整块拿着焦点),或弹着输入法。
+     * 都没有时按键没有框可去:树里看不到的输入框也只有拿着焦点才收得到粘贴。
+     */
+    private fun somethingHoldsInputFocus(): Boolean =
+        imeBox() != null || ScreenReader.contentWindows(windows()).any { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) != null }
 
     /** 这块屏上拿着输入焦点的可编辑框;焦点落在容器(如网页)上时找它里面聚焦的可编辑节点。 */
     private fun focusedEditable(): AccessibilityNodeInfo? {

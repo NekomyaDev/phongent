@@ -73,6 +73,26 @@ class WheelMathTest {
         assertEquals(2, WheelMath.selectedIndex(items.map { it.copy(selected = false) }, 260, 80))
     }
 
+    /**
+     * 原版数字滚轮有时只报上下两格(39、41),中间那一格没报出来:不能拿离中线最近的邻居(39)当选中的,
+     * 那样停在 40 也读成 39。各项带着高度时只认盖住中线的;没有就按上下两项推出中间的。
+     */
+    @Test fun missingCenterItemIsNotReplacedByANeighbour() {
+        val pair = listOf(WheelMath.Item("39", 100, 100, height = 120), WheelMath.Item("41", 100, 340, height = 120))
+        assertEquals(-1, WheelMath.selectedIndex(pair, 220, 240))
+        val three = listOf(pair[0], WheelMath.Item("40", 100, 220, height = 80), pair[1])
+        assertEquals(1, WheelMath.selectedIndex(three, 220, 120))
+        assertEquals("40", WheelMath.between("39", "41"))
+        assertEquals("00", WheelMath.between("59", "01"))
+        assertEquals("23", WheelMath.between("22", "0"))
+        assertEquals("1", WheelMath.between("12", "2"))
+        assertEquals("0", WheelMath.between("1", "59"))
+        assertEquals("09点", WheelMath.between("08点", "10点"))
+        assertEquals(null, WheelMath.between("39", "40"))
+        assertEquals(null, WheelMath.between("5", "30"))
+        assertEquals(null, WheelMath.between("上午", "下午"))
+    }
+
     @Test fun columnDropsTitlesAndButtonsAroundTheWheel() {
         val items = listOf(
             WheelMath.Item("小时", 100, 20),

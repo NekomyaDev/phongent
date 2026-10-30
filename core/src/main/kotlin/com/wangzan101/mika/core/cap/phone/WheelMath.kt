@@ -103,10 +103,40 @@ object WheelMath {
     }
 
     /**
-     * 选中的那一项:只有一项标着选中([Item.selected],无障碍的 isSelected)就是它;否则按 [selected] 找中线上的。
+     * 选中的那一项:只有一项标着选中([Item.selected],无障碍的 isSelected)就是它;各项都带着自己的高度时,
+     * 是自己的上下范围盖住中线 [centerY] 的那一项(都没盖住为 -1:中间那一格没报出来,不拿上下的邻居充数);
+     * 否则按 [selected] 找中线上的。
      */
-    fun selectedIndex(items: List<Item>, centerY: Int, itemHeight: Int?): Int =
-        items.indices.filter { items[it].selected }.singleOrNull() ?: selected(items.map { it.centerY }, centerY, itemHeight)
+    fun selectedIndex(items: List<Item>, centerY: Int, itemHeight: Int?): Int {
+        items.indices.filter { items[it].selected }.singleOrNull()?.let { return it }
+        if (items.isNotEmpty() && items.all { it.height > 0 }) {
+            return items.indices.filter { abs(items[it].centerY - centerY) * 2 <= items[it].height }
+                .minByOrNull { abs(items[it].centerY - centerY) } ?: -1
+        }
+        return selected(items.map { it.centerY }, centerY, itemHeight)
+    }
+
+    /**
+     * 中线上那一格没报出来(有的滚轮只报上下两格)、上下紧挨着的两项都是数时,中间那一格的文字:
+     * 上下差 2 就是夹在中间的数;差得多时只认转过一圈的接口(59 和 1 中间是 0,22 和 0 中间是 23,12 和 2 中间是 1,1 和 59 中间是 0)。
+     * 写法照上面那一项(单位;上下有补零的就补零);推不出为 null。
+     */
+    fun between(above: String, below: String): String? {
+        val a = number(above) ?: return null
+        val b = number(below) ?: return null
+        val mid = when {
+            abs(b - a) == 2 -> (a + b) / 2
+            b < a && b <= 2 -> if (b >= 1) b - 1 else a + 1
+            a < b && a <= 2 -> if (a >= 1) a - 1 else b + 1
+            else -> return null
+        }
+        if (mid < 0) return null
+        val token = DIGITS.find(above.trim())?.value ?: return null
+        val other = DIGITS.find(below.trim())?.value.orEmpty()
+        // 补零的滚轮(上下有一项以 0 开头,如 09、01)照样补零到同样宽
+        val padded = listOf(token, other).any { it.length > 1 && it.startsWith('0') }
+        return above.trim().replaceFirst(token, if (padded) mid.toString().padStart(token.length, '0') else mid.toString())
+    }
 
     /**
      * 从上到下的几项里,和第 [anchor] 项连成一列、间距差不多的那一段:同一块里滚轮上下的标题、按钮不算进来。
@@ -166,8 +196,8 @@ object WheelMath {
         return out
     }
 
-    /** 滚轮里看得到的一项:文字和中心(像素);[selected] 无障碍标着选中。 */
-    data class Item(val text: String, val centerX: Int, val centerY: Int, val selected: Boolean = false)
+    /** 滚轮里看得到的一项:文字和中心(像素);[selected] 无障碍标着选中;[height] 它自己有多高(不知道为 0)。 */
+    data class Item(val text: String, val centerX: Int, val centerY: Int, val selected: Boolean = false, val height: Int = 0)
 
     /**
      * 一个能竖着滚的容器看上去是不是滚轮,宁可漏认不错认:三到九项、每项都是短的值(不超过 [MAX_ITEM_CHARS] 个字)、互不相同,
