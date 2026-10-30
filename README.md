@@ -35,6 +35,8 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 ## 演示
 
+<p align="center"><img src="docs/media/wechat-send-side.gif" alt="后台操作微信，给文件传输助手发消息" width="520" /><br/>后台发微信：左边是 Mika 的对话页，右边是 Mika 在后台屏上的每一步<br/><sub>（加速 4 倍；聊天列表已打码）</sub></p>
+
 <table>
 <tr>
 <td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="260" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>

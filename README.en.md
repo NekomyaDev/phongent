@@ -33,6 +33,8 @@ It works on a hidden background screen, so you can keep using your phone.
 
 ## Demo
 
+<p align="center"><img src="docs/media/wechat-send-side.gif" alt="Operating WeChat in the background to send a message to File Transfer" width="520" /><br/>Sending a WeChat message in the background: Mika's chat page on the left, each step on Mika's background screen on the right<br/><sub>(4× speed; the chat list is blurred)</sub></p>
+
 <table>
 <tr>
 <td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="Reads through a WeChat group in the background and summarizes today's chat" width="260" /><br/>Reads through a WeChat group in the background and summarizes today's chat<br/><sub>(sped up; the summary quotes group members, so its text is blurred)</sub></td>
