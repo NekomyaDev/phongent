@@ -12,7 +12,7 @@
 - `:app`:安卓宿主。界面、前台服务、虚拟屏、无障碍、内置手机助手、WebView、沙箱、文件存储,以及 `:core` 里各个接口的安卓实现。
 
 ```
- 来源   对话界面 │ 定时/条件触发 │ 父任务(子任务)
+ 来源   对话界面 │ 定时/条件触发 │ 父任务(子任务)│ 电脑(MCP)
           └──────────┬──────────┘
           TaskService(前台服务,安卓宿主)
           TaskCenter(每个对话一个 Run、并行上限、排队)· RunStore · Outbox
@@ -23,7 +23,7 @@
             ModelCaller · ContextBuilder/ContextCompressor · TurnPolicy/StopRules
             ToolDispatcher → ActionExecutor(唯一执行入口)
                      │  CapabilityProvider(核心不认识具体能力)
-          phone      web       sandbox      (mcp:骨架)
+          phone      web       sandbox      (mcp 客户端:骨架)
 ```
 
 `:core` 里包之间的依赖方向(`PackageDependencyTest` 检查):
@@ -116,7 +116,7 @@
 - **工具声明**:每个工具一个类,实现 `AgentTool`(`core/tool/AgentTool.kt`),声明自己的动词、风险(Read / Write / External)、所属能力、能否进一次多步、能否进经验路线、并发方式等;代码按这些属性办事,不写死工具名。`ToolRegistry` 按任务筛出可用工具,一个任务内工具定义冻结不变。
 - **工具分两层,用到才展开**(`core/tool/ToolGroups.kt`、`ToolDispatcher.offeredNow`):一直都在的是通用工具(问用户、没办成就结束、等待、知识与技能、记忆、定时、子任务……)和不收的能力(MCP);手机、网页、沙箱各是一组(`Capability.folds`),开局只给入口工具(`AgentTool.entry`),用 `prompts/entries/<工具名>.md` 的短说明:`phone_launch_app`、`web_navigate`、`run_command` 调用后展开它那一组(`Entry.Opens`),`phone_list_apps`、`web_read_page`(读一个网址的正文)单用就够,不展开(`Entry.Alone`)。接管、报障碍、回看画面、一次多步只在有屏的组展开后才给(`AgentTool.withScreens`,算作 `screens` 一组)。展开后下一次请求起给整组全文,入口换回全文,能力那一段说明(`capabilities/<能力>.md`)也拼进系统提示词,本任务里一直留着;结果里的 `moreTools` 说一句。模型凭记忆调了收着的工具照常执行,同样展开它那一组(参数不对也展开,下一次看得到全文再改)。顺序固定:一直都在的 → `screens` → 手机 → 网页 → 沙箱,展开一组只改从它那一组起的部分,请求前缀因展开最多失效一次。开局预先展开:上一轮真的用过的组(`Turn.groups`,`AgentLoop.usedGroups` 记下、会话文件里存着;单用就够的入口不算用过),和能力按这次的话认定一定用得上的(带着工作区里的文件时的沙箱,`Capability.preload`)。只读的任务里跑命令不给,沙箱一组没有入口,就一开始展开。子任务、定时触发和别的来源都一样。运行记录里展开记 `tools_opened`、预先展开记 `tools_preloaded`;`PromptVersion` 按每组都展开的样子算,同一版提示词不因这次展开了哪几组而不同。
 - **审批**:`ApprovalPolicy`(`core/action/Approval.kt`)只问一种动作:花钱的那一步(`Risk.payment`:不可逆判定认出的付款、下单,或屏上有带币种的应付金额时命中判定的对外、不可逆动作,见 `ClassifiedRisk`)。别的一律直接做:发送、发帖、提交、删除、联系别人、改账号或安全设置、往密码框里打字、看图找到却看不出是什么的点、读不出目标的点击,都不问。花钱的一步只有手机上发起、用户在场时问(`Ask`);渠道、定时、MCP 发起的运行、子任务和无人在场的运行问不到人,一律拒绝(`approval_unavailable`)。同意只有一种:只放行紧接着的那一个匹配操作(`ConfirmationGate`:同一 App、同类动作、对象在屏上、申报的金额在屏上,3 步内、中间没做别的写操作)。付款本身(判定是 pay)不经同意,交给用户亲手付(`hand_to_user`,reason=payment)。审批结论都记进运行记录(`RunEvent.Approval`,对外的、花钱的和没放行的),核查据此知道任务做过对外的事。没有审批档位,也没有任务内、长期授权。
-- **询问 / 自主**:全局一个开关,在设置 › 开发者选项最前面的「做事方式」一组(「自主模式」,测试标签 `dev-autonomous`),默认关即询问;值存在 `ApprovalStore` 的 JSON 里(`autonomous`)。`ApprovalControl`(`settings/ApprovalControl.kt`)在每个任务开工时给一份 `RunApproval`(自主与否取全局的),`TaskRun` 据此装:询问时 `confirmations = ConfirmationGate()`、`autonomous = false`,花钱的一步被拦成 `confirmation_required`,下单一类由模型调 `request_confirmation`(必须写出屏上的金额,写不出金额的申请直接退回、不交给用户),用户在对话页的卡片、悬浮胶囊的卡片或通知上回答(只同意这一次 / 不同意),回答经 `TaskService` → `TaskRun.confirm` → `RunInbox` 交给循环;自主时 `confirmations = null`、`autonomous = true`、不提供 `request_confirmation`,判定照跑(对外动作的间隔照样认)但连付款也不拦。换开关(`ApprovalControl.setAutonomous`)存下来管之后的任务,正在跑的任务都跟着换:开工时是询问的任务中途换成自主,下一步起不再拦(已经弹出的确认照常等回答);开工时是自主的任务中途换成询问,留给下一个任务(工具和提示词一个任务内不变)。悬浮胶囊里发起、接着聊的任务、子任务、定时触发和 MCP 发起的运行都按这个开关;子任务本来就只读,询问时它过关卡、花钱的一步一律拒绝。定时任务这类无人在场的运行在询问模式下遇到花钱的一步不暂停等人:执行入口直接拒绝(`approval_unavailable`),模型照实说没做成哪一步,别的照常做完,结果照常通知。自主模式下 `ConfirmationGate` 不存在,`ConfirmDecision.judge` 里自主的提前返回排在「不对 Mika 自己动手」(`ownApp`)检查之前,所以这层保护在自主模式下不生效;询问时 Mika 不操作自己。
+- **询问 / 自主**:全局一个开关,在设置 › 开发者选项最前面的「做事方式」一组(「自主模式」,测试标签 `dev-autonomous`),默认关即询问;值存在 `ApprovalStore` 的 JSON 里(`autonomous`)。`ApprovalControl`(`settings/ApprovalControl.kt`)在每个任务开工时给一份 `RunApproval`(自主与否取全局的),`TaskRun` 据此装:询问时 `confirmations = ConfirmationGate()`、`autonomous = false`,花钱的一步被拦成 `confirmation_required`,下单一类由模型调 `request_confirmation`(必须写出屏上的金额,写不出金额的申请直接退回、不交给用户),用户在对话页的卡片、悬浮胶囊的卡片或通知上回答(只同意这一次 / 不同意),回答经 `TaskService` → `TaskRun.confirm` → `RunInbox` 交给循环;自主时 `confirmations = null`、`autonomous = true`、不提供 `request_confirmation`,判定照跑(对外动作的间隔照样认)但连付款也不拦。换开关(`ApprovalControl.setAutonomous`)存下来管之后的任务,正在跑的任务都跟着换:开工时是询问的任务中途换成自主,下一步起不再拦(已经弹出的确认照常等回答);开工时是自主的任务中途换成询问,留给下一个任务(工具和提示词一个任务内不变)。悬浮胶囊里发起、接着聊的任务、子任务、定时触发都按这个开关;电脑经 MCP 交来的任务例外:`ApprovalControl.start(remote = true)` 一律按询问开工、不跟开关变,付款这一步在这类任务里永远不做(见「MCP」一节);子任务本来就只读,询问时它过关卡、花钱的一步一律拒绝。定时任务这类无人在场的运行在询问模式下遇到花钱的一步不暂停等人:执行入口直接拒绝(`approval_unavailable`),模型照实说没做成哪一步,别的照常做完,结果照常通知。自主模式下 `ConfirmationGate` 不存在,`ConfirmDecision.judge` 里自主的提前返回排在「不对 Mika 自己动手」(`ownApp`)检查之前,所以这层保护在自主模式下不生效;询问时 Mika 不操作自己。
 - **改名后的旧工具名**:`LegacyNames`(`core/tool/LegacyNames.kt`)把旧名对应到现在的工具,只用来读旧的路线、运行记录和个人技能;模型调用旧名时只提示新名,不替它执行。
 
 ## 5. 观察、动作、地方
@@ -191,7 +191,23 @@
 
 ### MCP
 
-`core/mcp/McpServer.kt`(低层工具会话、整任务提交)和 `core/cap/mcp/McpClient.kt`(按注解定风险、工具列表开局冻结)只有骨架和测试,没有传输层,用户用不到。App 一侧已有 `McpTaskHub`(`app/task/McpTaskHub.kt`)和 `TaskService` 的 `ACTION_START_MCP` / `ACTION_CANCEL_MCP`,等传输层接上就能收任务、取消任务。
+两个方向。**Mika 作为 MCP 服务器**(电脑连接)已经接上,用户在设置里打开;**Mika 作为 MCP 客户端**去用别的服务器(`core/cap/mcp/McpClient.kt`,按注解定风险、工具列表开局冻结)和低层工具会话(`core/mcp/McpServer.kt`)还只有骨架和测试。用户文档见 [mcp.md](mcp.md)。
+
+**服务器**的分层都在 `:core`,可以在电脑上整套测:
+
+- `MiniHttpServer`(`core/mcp/HttpServer.kt`):自己写的极简 HTTP/1.1,只为这一个端点。每个连接一个线程,连接数、请求头、正文都有上限,认 Content-Length 和 chunked,连接可以复用。没有用现成的服务器库:要的只是「一个路径上收 POST、回 JSON」,框架带来的体积和依赖不值得。不做 TLS,靠只收私有地址和访问令牌把关。
+- `McpAccess`(`core/mcp/McpAccess.kt`):门口,顺序固定:带 `Origin` 头(浏览器)的 403;同一地址一分钟内认证失败 5 次封一分钟(429,带 `Retry-After`);`Authorization: Bearer` 令牌按常量时间比较(先各自摘要成等长再比),不对 401;路径不是 `/mcp` 的 404。`privateAddress` 判定私有地址:回环、10/8、172.16/12、192.168/16、私有组网常用的 100.64/10、链路本地、IPv6 唯一本地;`McpHost` 绑所有网卡,但连接两端有一端不是私有地址就当场断开(手机走移动数据时也就不对外)。
+- `McpRpc`(`core/mcp/McpRpc.kt`):Streamable HTTP 上的 JSON-RPC,只回单个 JSON、不开 SSE 流(规范允许),GET / DELETE 回 405,不发会话编号,服务端不发请求。两代协议都认:新一代(2026-07-28)每个请求在 `_meta` 里带版本和客户端能力,HTTP 头里的 `MCP-Protocol-Version`、`Mcp-Method`、`Mcp-Name` 要和正文一致(不一致 -32020),不认的版本回 -32022 并列出认的版本,支持 `server/discover`;老一代(2025-03-26 到 2025-11-25)先 `initialize` 握手,选双方都认的版本。工具参数不对、任务找不到是工具执行出错(`isError`),交回给对面的模型看;工具名不认得是协议错误。
+- `McpTaskTools`(`core/mcp/McpTaskTools.kt`):只给高层工具,电脑说要办成什么,手机上的 Mika 自己跑主循环。`mika_run_task` / `mika_task_status` / `mika_wait_task` / `mika_answer` / `mika_cancel_task` / `mika_list_tasks`。`RemoteStatus` 把 `TaskState` 翻成对电脑的状态:starting、running、paused(`Held` 且不要人动手)、waiting_for_answer(`WaitingInput`,只有它能用 `mika_answer` 回答)、waiting_on_phone(`WaitingConfirmation`、`WaitingTakeover`、要人动手的 `Held`)、done、failed、cancelled。等待按状态变化返回(进度说明变了不算),最多 50 秒。电脑开的对话编号是 `mcp-<uuid>`,`conversation` 参数只收这种,电脑接不上手机上的对话。
+- `McpHost`(`core/mcp/McpHost.kt`):把上面几层接起来,记最近连过的客户端(地址加自报的名字,十分钟内算最近)和最后一次请求的时间,给设置页显示。
+
+**App 一侧**:
+
+- 开关、端口存在 `files/settings/mcp.json`,访问令牌(32 字节随机数)和服务商的 Key 一样经 `KeyCipher` 加密存在 `mcp-token.bin`(`settings/McpSettings.kt`),默认关。
+- `McpRuntime`(`app/mcp/McpRuntime.kt`)整个进程一份:开关打开就起 `McpService`(`app/mcp/McpService.kt`,specialUse 前台服务,常驻一条低优先级通知,上面能直接关掉),服务在才监听;关掉开关就停服务、关端口。任务服务没任务时会自己退出,所以监听不放在 `TaskService` 里。服务被系统回收会重建(START_STICKY);开机时、打开 Mika 的界面时,开关开着却没在跑就补起来。
+- `McpTaskHub`(`app/task/McpTaskHub.kt`)实现 `RemoteTasks`:`TaskService.startMcp` 开始任务,和对话界面同一条路,来源记成 `RunOrigin.Mcp`、在场情况 `Reachable`(追问照常等,到时限当作没回答;交给用户的一步也有同样的时限,过时没人处理任务就停下)。同一对话里还有任务时排在后面,不丢。状态读任务自己的(`TaskRun.state`),这里只记电脑给的编号对应哪个对话、原话,和收尾时的终态(含排队时被取消、服务被停);交出去两分钟还没登记上的按没开始成算。回答直接交给 `TaskRun.answer`,只在任务正等着回答追问时;停止经 `TaskService` 的 `ACTION_CANCEL_MCP`(排队中的直接移出)。只认这里登记过的编号,手机上发起的任务电脑看不到也动不了。新对话照常请模型起标题。
+- 安全上的几道保证:付款和确认永远不能从电脑放行——`mika_answer` 只把回答交给等着追问的任务;`request_confirmation` 在非手机发起的运行里直接拒绝(`declined_remote`),`ApprovalPolicy` 对非手机发起的付款一律 Deny;MCP 发起的运行不管自主开关都按询问开工(`ApprovalControl.start(remote = true)`),所以自主模式也放不行付款。手机上照常弹出提问、接管的通知。运行记录的开始事件写明来源(`RunEvent.TaskStarted.origin` = `mcp`,手机上发起的不写),概要里也有。
+- 设置页(`ui/McpScreen.kt`):开关;打开时列状态(监听的端口或没开起来的原因、最近客户端数、最后一次请求)、连接地址(开着的网卡上的私有 IPv4,点了复制)、访问令牌(复制、换一个)、客户端配置片段(复制)。地址和动静两秒重读一次。
 
 ## 7. 上下文与压缩
 
