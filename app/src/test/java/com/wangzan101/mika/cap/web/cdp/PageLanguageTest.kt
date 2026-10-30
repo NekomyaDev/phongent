@@ -16,9 +16,9 @@ class PageLanguageTest {
     private val mobileMeta = DesktopProfile.metadata(engine, "152.0.7977.64", "Android", "14.0.0", "", "K", mobile = true, bitness = "", wow64 = false)
 
     @Test fun headerComesFromTheTag() {
-        assertEquals("en-US,en;q=0.9", PageLanguage.acceptLanguage("en-Latn-US"))
-        assertEquals("zh-CN,zh;q=0.9", PageLanguage.acceptLanguage("zh-Hans-CN"))
-        assertEquals("pt-BR,pt;q=0.9", PageLanguage.acceptLanguage("pt-BR"))
+        assertEquals("en-US,en", PageLanguage.acceptLanguage("en-Latn-US"))
+        assertEquals("zh-CN,zh", PageLanguage.acceptLanguage("zh-Hans-CN"))
+        assertEquals("pt-BR,pt", PageLanguage.acceptLanguage("pt-BR"))
         // 没有地区只写语言
         assertEquals("fr", PageLanguage.acceptLanguage("fr"))
     }
@@ -26,8 +26,8 @@ class PageLanguageTest {
     @Test fun desktopOverrideGetsTheLanguageOnlyWhenChosen() {
         val o = DesktopProfile.userAgentOverride("152", "152.0.7977.64", DesktopProfile.brands(engine, "152", "152.0.7977.64"))
         assertSame(o, PageLanguage.withLanguage(o, null))
-        val chosen = PageLanguage.withLanguage(o, "en-US,en;q=0.9")
-        assertEquals("en-US,en;q=0.9", chosen["acceptLanguage"]!!.jsonPrimitive.content)
+        val chosen = PageLanguage.withLanguage(o, "en-US,en")
+        assertEquals("en-US,en", chosen["acceptLanguage"]!!.jsonPrimitive.content)
         // 身份其余各项不变
         assertEquals(o, chosen - "acceptLanguage")
     }
@@ -37,13 +37,13 @@ class PageLanguageTest {
         assertEquals("", o["userAgent"]!!.jsonPrimitive.content)
         assertEquals(setOf("userAgent"), o.keys)
         // 拿不到默认 UA 时也不去造一个
-        assertEquals("", PageLanguage.mobileOverride("", mobileMeta, "en-US,en;q=0.9")["userAgent"]!!.jsonPrimitive.content)
+        assertEquals("", PageLanguage.mobileOverride("", mobileMeta, "en-US,en")["userAgent"]!!.jsonPrimitive.content)
     }
 
     @Test fun mobileWithAChosenLanguageKeepsTheDefaultIdentity() {
-        val o = PageLanguage.mobileOverride(mobileUa, mobileMeta, "en-US,en;q=0.9")
+        val o = PageLanguage.mobileOverride(mobileUa, mobileMeta, "en-US,en")
         assertEquals(mobileUa, o["userAgent"]!!.jsonPrimitive.content)
-        assertEquals("en-US,en;q=0.9", o["acceptLanguage"]!!.jsonPrimitive.content)
+        assertEquals("en-US,en", o["acceptLanguage"]!!.jsonPrimitive.content)
         assertFalse("platform" in o)
         val meta = o["userAgentMetadata"]!!.jsonObject
         assertTrue(meta["mobile"]!!.jsonPrimitive.boolean)
@@ -52,6 +52,6 @@ class PageLanguageTest {
         // 手机版的品牌照内核给的,Android WebView 留着
         assertEquals(listOf("Chromium", "Android WebView"), meta["brands"]!!.jsonArray.map { it.jsonObject["brand"]!!.jsonPrimitive.content })
         // 取不到默认 UA-CH 时只带 UA 和语言
-        assertEquals(setOf("userAgent", "acceptLanguage"), PageLanguage.mobileOverride(mobileUa, null, "zh-CN,zh;q=0.9").keys)
+        assertEquals(setOf("userAgent", "acceptLanguage"), PageLanguage.mobileOverride(mobileUa, null, "zh-CN,zh").keys)
     }
 }

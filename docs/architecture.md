@@ -154,7 +154,7 @@
 
 ### web:内置浏览器
 
-- WebView 渲染在 App 自建的私有虚拟显示上(`app/cap/web/WebHost.kt`),不占手机屏幕,也不需要内置助手;默认用桌面版页面(`app/cap/web/cdp/DesktopProfile.kt`),可按网站记住桌面版或手机版(`web_site_mode`)。用户在 Mika 里选定了界面语言(不是跟随系统)时,网页按这种语言请求(`app/cap/web/cdp/PageLanguage.kt`):经 `Emulation.setUserAgentOverride` 的 acceptLanguage 换 Accept-Language 和 navigator.language(s)(如 English → `en-US,en;q=0.9`),桌面版加在桌面身份上,手机版照搬 WebView 默认的 UA 与 UA-CH、只换语言;第一页在会话设好之前就发出去了的,设好后重新加载一次,中途换了语言的标签在下一次主文档加载前换过来;跟随系统时不覆盖,发系统给的那串。
+- WebView 渲染在 App 自建的私有虚拟显示上(`app/cap/web/WebHost.kt`),不占手机屏幕,也不需要内置助手;默认用桌面版页面(`app/cap/web/cdp/DesktopProfile.kt`),可按网站记住桌面版或手机版(`web_site_mode`)。用户在 Mika 里选定了界面语言(不是跟随系统)时,网页按这种语言请求(`app/cap/web/cdp/PageLanguage.kt`):经 `Emulation.setUserAgentOverride` 的 acceptLanguage 换 Accept-Language 和 navigator.language(s)(如 English → `en-US,en`),桌面版加在桌面身份上,手机版照搬 WebView 默认的 UA 与 UA-CH、只换语言;第一页在会话设好之前就发出去了的,设好后重新加载一次,中途换了语言的标签在下一次主文档加载前换过来;跟随系统时不覆盖,发系统给的那串。
 - 通过 WebView 的 DevTools 协议操作页面(`app/cap/web/cdp/WebDevtools.kt`),点击和输入是真实输入事件;连不上时退回注入的页面脚本。从不打开 Runtime 这一组(`Runtime.enable`):开着它时页面察觉得到挂着调试器,真机上有的网站因此一直重载;读脚本和页面脚本只用隔离世界和求值(页面脚本的 mika 调用经世界里的发件箱、由一直挂着的取件求值交回,不用要开 Runtime 的绑定),世界没了靠主框架换了文档(`Page.frameNavigated`)和求值报上下文不在来认。
 - 标签页池:每个任务最多 4 个,全局最多 8 个(`app/cap/web/WebTabPool.kt`、`TabBudget.kt`)。页面要跳到外部 App 的链接不跳。
 - 下载落到当前对话工作区的 `downloads/`,不打开不安装;上传只交工作区里的文件(`WebDownloads.kt`、`UploadStaging.kt`)。
