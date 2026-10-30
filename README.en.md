@@ -15,9 +15,29 @@ It works on a hidden background screen, so you can keep using your phone.
 <img src="https://img.shields.io/badge/sandbox-arm64-blue" alt="sandbox" />
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
 
-[Download APK](https://github.com/wangzan101/Mika/releases/latest) · [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [FAQ](#faq) · [Contributing](#contributing)
+[Download APK](https://github.com/wangzan101/Mika/releases/latest) · [Install](#install) · [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [FAQ](#faq) · [Contributing](#contributing)
 
 </div>
+
+## Install
+
+**Option 1: on the phone**
+
+1. Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it.
+2. Open the "Set up phone control" (设置手机操作) wizard in Mika's Settings and pair wireless debugging once ([setup guide](docs/setup-guide.en.md)).
+3. In "Models" (模型) in Settings, add a provider and enter your API key, or sign in with ChatGPT.
+
+Details for each step are in [Quick start](#quick-start) below.
+
+**Option 2: let an AI agent on your computer do it**
+
+Connect the phone to your computer with a USB cable, turn on USB debugging on the phone, and send this sentence to an AI agent on the computer that can run commands:
+
+```
+Follow https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.en.md to install Mika on the Android phone connected over USB.
+```
+
+It checks the phone, downloads and installs Mika, turns on the permissions it needs, and stops to tell you whenever something needs a tap on the phone. You enter your API key in Mika yourself; it never goes through the agent.
 
 > **Language**
 >
@@ -162,6 +182,8 @@ Open "Set up phone control" (设置手机操作) in Settings and follow the chec
 First time, stuck on a step, or not sure where the pairing code goes? See the [phone control setup guide](docs/setup-guide.en.md): it covers where to tap for each step, how to tell it worked, and fixes for common snags.
 
 Why this step: Mika has a built-in phone helper that launches and operates apps on the background screen, and it uses Android's own wireless debugging to start that helper. Everything happens on the phone; no computer or cable needed. After pairing, if the system turns wireless debugging off (Android does this when you change Wi-Fi or reboot), Mika turns it back on by itself, with your permission.
+
+If you have a computer and a USB cable at hand, you can skip pairing: open Mika once, then with the cable plugged in run `adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/usb-start.sh` on the computer to start the phone helper; this has to be run again after every phone restart. An AI agent on your computer can do this for you; see [Installing Mika with an AI agent](docs/install-with-agent.en.md).
 
 If you only want web browsing, files and chat, you can skip this step for now.
 
