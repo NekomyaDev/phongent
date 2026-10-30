@@ -12,13 +12,15 @@ enum class SetupPhase {
     /** 正在配对、连接、启动:显示进度。 */
     Working,
     Success,
-    /** 出错:[SetupView.failure] 给原因和修复。 */
+    /** 出错:[SetupView.failure] 给原因和修复,[SetupView.suspect] 指出最可能要回去重做的一步。 */
     Failed,
 }
 
 /**
- * 引导页的输入:系统设置里读到的开关和助手的状态。
+ * 引导页的输入:系统设置里读到的开关、用户自己的确认和助手的状态。
+ * 读到的开关只用来自动打勾和给提示,不拦死:有的手机读不到或读不准,用户点了「我已经打开了,下一步」([confirmed])就往下走。
  * [wirelessDebugging] 为 null 表示这台手机读不到这个开关(不按原版写设置项):不拦着,当作开着往下走。
+ * [confirmed] 是用户说已经做好的几步;[revisit] 是用户在清单里点了前面的某一步,要回去重做。
  * [repair] 是用户在设置页点了「重新配对」:即便已在运行,也回到配对那一步,直到新的配对开始。
  * [usbDebugging] 开着时,Wi-Fi 断开、无线调试被系统关掉后助手也不会停。
  * [accessibility] 是 Mika 的无障碍服务在运行:配对时由它读出配对码;用户可以跳过([accessibilitySkipped]),退回在通知里填。
@@ -35,7 +37,12 @@ data class SetupInputs(
     val accessibility: Boolean = true,
     val accessibilitySkipped: Boolean = false,
     val restrictedSettings: Boolean = false,
+    val confirmed: Set<SetupStep> = emptySet(),
+    val revisit: SetupStep? = null,
 )
+
+/** 配对或连接没成功时最可能的原因:[step] 这一步读到是关着的;[unreadable] 为真是这台手机根本读不到。 */
+data class SetupSuspect(val step: SetupStep, val unreadable: Boolean)
 
 data class SetupView(
     val phase: SetupPhase,
@@ -51,22 +58,58 @@ data class SetupView(
     val autoRead: Boolean = false,
     /** 无障碍一步时给出「去应用信息允许受限制的设置」的入口。 */
     val showAppInfo: Boolean = false,
+    /** 失败时最可能要回去重做的前一步,界面给一个回去的按钮。 */
+    val suspect: SetupSuspect? = null,
+    /** 当前这一步是用户点回来重做的:界面给「回到原来的步骤」。 */
+    val revisiting: Boolean = false,
 )
 
 /**
- * 引导页的状态机:每次输入变化(系统设置开关、助手状态、找端口的进度)都重新算一遍,不存中间状态。
- * 先看系统开关,再看助手:开发者选项、USB 调试或无线调试被关掉时,不管助手之前怎样,都退回那一步。
+ * 引导页的状态机:每次输入变化(系统设置开关、用户确认、助手状态、找配对窗口的进度)都重新算一遍,不存中间状态。
+ * 成功只看助手:连上了就算设置好,不管前面读到什么。前面几步读到做好了就自动打勾;读到没做好、用户也没确认,就停在那一步,
+ * 但用户随时可以点「我已经打开了,下一步」往下走,所以哪一步都不会卡死。
+ * 读到开关被关掉、又没确认过时,不管助手之前怎样,都退回那一步。
  */
 object PhoneSetupFlow {
+    /** 配对、连接时可能因为前面的开关没开而失败的几类(配对码不对说明配对窗口开着,不算)。 */
+    private val SWITCH_RELATED = setOf(BuiltinShellFailure.PairingWindowClosed, BuiltinShellFailure.ConnectFailed, BuiltinShellFailure.Unknown)
+
+    /** 用户能点回去重做的几步:自动连接那一步没有要用户做的事。 */
+    val REVISITABLE: Set<SetupStep> = SetupStep.entries.toSet() - SetupStep.Connect
+
+    /** 有「我已经打开了,下一步」的几步:读的是系统开关(无障碍另有跳过)。 */
+    val CONFIRMABLE: Set<SetupStep> = setOf(SetupStep.DeveloperOptions, SetupStep.UsbDebugging, SetupStep.WirelessDebugging)
+
     fun view(i: SetupInputs): SetupView {
         val status = effectiveStatus(i.status, i.repair)
         if (status == BuiltinShellStatus.Running) return SetupView(SetupPhase.Success, marks(SetupStep.entries.size, i), null)
-        if (!i.developerOptions) return guide(SetupStep.DeveloperOptions, i)
-        if (!i.usbDebugging) return guide(SetupStep.UsbDebugging, i)
-        if (!i.accessibility && !i.accessibilitySkipped) return guide(SetupStep.Accessibility, i)
-        // 读不到开关时以助手的说法为准
-        val wirelessOff = i.wirelessDebugging == false || (i.wirelessDebugging == null && status == BuiltinShellStatus.WirelessDebuggingOff)
+        val natural = natural(i, status)
+        // 正在连接时以进度为准;读到更前面的一步被关掉时先回那一步
+        val back = i.revisit?.takeIf { it in REVISITABLE && status != BuiltinShellStatus.Connecting } ?: return natural
+        val earlier = natural.phase == SetupPhase.Guide && natural.current != null && natural.current < back
+        if (earlier) return natural
+        // 别的步骤照旧打勾或标失败,原来停着的那一步先变回待做
+        val marks = natural.marks.mapValues { (_, m) -> if (m == StepMark.Current) StepMark.Todo else m } + (back to StepMark.Current)
+        return guide(back, i).copy(marks = marks, revisiting = true)
+    }
+
+    /** 没有回头重做时的样子。 */
+    private fun natural(i: SetupInputs, status: BuiltinShellStatus): SetupView {
+        if (blocks(SetupStep.DeveloperOptions, i)) return guide(SetupStep.DeveloperOptions, i)
+        if (blocks(SetupStep.UsbDebugging, i)) return guide(SetupStep.UsbDebugging, i)
+        if (blocks(SetupStep.Accessibility, i)) return guide(SetupStep.Accessibility, i)
+        // 读不到开关时以助手的说法为准;用户确认过就不拦
+        val wirelessConfirmed = SetupStep.WirelessDebugging in i.confirmed
+        val wirelessOff = !wirelessConfirmed &&
+            (i.wirelessDebugging == false || (i.wirelessDebugging == null && status == BuiltinShellStatus.WirelessDebuggingOff))
         if (wirelessOff) return guide(SetupStep.WirelessDebugging, i)
+        // 用户说开了,助手却读到关着、不去连:不一直转圈,指出是哪一步并给回去的按钮
+        if (status == BuiltinShellStatus.WirelessDebuggingOff && wirelessConfirmed && i.wirelessDebugging != true) {
+            return SetupView(
+                SetupPhase.Failed, marks(SetupStep.Connect.ordinal, i, current = SetupStep.Connect, mark = StepMark.Failed), SetupStep.Connect,
+                suspect = SetupSuspect(SetupStep.WirelessDebugging, unreadable = i.wirelessDebugging == null),
+            )
+        }
         return when (status) {
             BuiltinShellStatus.Running -> error("handled above")
             // 配对过、无线调试开着而状态还没跟上:实现马上会自动连,先显示「正在连接」
@@ -80,9 +123,30 @@ object PhoneSetupFlow {
                     portFound = step == SetupStep.PairingCode && i.discovery is PairingDiscovery.Found,
                     needsNotifications = step == SetupStep.PairingCode && !i.notificationsAllowed,
                     autoRead = step == SetupStep.PairingCode && i.accessibility,
+                    suspect = if (status.reason in SWITCH_RELATED) suspect(i) else null,
                 )
             }
         }
+    }
+
+    /** 读到这一步没做好,用户也没确认(无障碍还可以跳过):停在这一步。 */
+    private fun blocks(step: SetupStep, i: SetupInputs): Boolean =
+        detected(step, i) == false && step !in i.confirmed && !(step == SetupStep.Accessibility && i.accessibilitySkipped)
+
+    /** 从系统设置读到的这一步做没做好;读不到、或这一步不是开关时为 null。 */
+    fun detected(step: SetupStep, i: SetupInputs): Boolean? = when (step) {
+        SetupStep.DeveloperOptions -> i.developerOptions
+        SetupStep.UsbDebugging -> i.usbDebugging
+        SetupStep.Accessibility -> i.accessibility
+        SetupStep.WirelessDebugging -> i.wirelessDebugging
+        SetupStep.PairingCode, SetupStep.Connect -> null
+    }
+
+    /** 配对、连接要靠开发者选项和无线调试:按顺序找第一个读到关着(用户确认过才走到这里)或读不到的。 */
+    private fun suspect(i: SetupInputs): SetupSuspect? = when {
+        !i.developerOptions -> SetupSuspect(SetupStep.DeveloperOptions, unreadable = false)
+        i.wirelessDebugging != true -> SetupSuspect(SetupStep.WirelessDebugging, unreadable = i.wirelessDebugging == null)
+        else -> null
     }
 
     private fun guide(step: SetupStep, i: SetupInputs) = SetupView(
@@ -97,7 +161,7 @@ object PhoneSetupFlow {
     private fun marks(done: Int, i: SetupInputs, current: SetupStep? = null, mark: StepMark = StepMark.Current): Map<SetupStep, StepMark> =
         SetupStep.entries.associateWith { s ->
             when {
-                s.ordinal < done && s == SetupStep.Accessibility && !i.accessibility -> StepMark.Skipped
+                s.ordinal < done && s == SetupStep.Accessibility && !i.accessibility && s !in i.confirmed -> StepMark.Skipped
                 s.ordinal < done -> StepMark.Done
                 s == current -> mark
                 else -> StepMark.Todo

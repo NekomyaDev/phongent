@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,9 +78,15 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaShapes
 import androidx.compose.runtime.setValue
 
+/** 用户确认做好的几步,转屏、进后台后还在。 */
+private val StepSetSaver = Saver<Set<SetupStep>, String>(
+    save = { set -> set.joinToString(",") { it.name } },
+    restore = { s -> s.split(',').mapNotNull { n -> SetupStep.entries.firstOrNull { it.name == n } }.toSet() },
+)
+
 /**
- * 「设置手机操作」引导页:接上实时状态。每一步都按系统开关和助手状态自动判断;
- * 停在配对一步时开始找配对窗口:无障碍开着就由 Mika 自己读配对码,否则发带输入框的通知。
+ * 「设置手机操作」引导页:接上实时状态。每一步按系统开关自动打勾,读不到或读不准时用户点「我已经打开了,下一步」;
+ * 点清单里前面的某一步可以回去重做。停在配对一步时开始找配对窗口:无障碍开着就由 Mika 自己读配对码,否则发带输入框的通知。
  * [repair] 是从设置页「重新配对」进来的。
  */
 @Composable
@@ -92,19 +99,28 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
     var repairStarted by rememberSaveable { mutableStateOf(false) }
     if (repair && !repairStarted) { repairStarted = true; pairing.startRepair() }
     val repairing by pairing.repairing.collectAsState()
-    var wirelessAssumed by rememberSaveable { mutableStateOf(false) }
+    var confirmed by rememberSaveable(stateSaver = StepSetSaver) { mutableStateOf(emptySet<SetupStep>()) }
+    var revisit by rememberSaveable { mutableStateOf<SetupStep?>(null) }
     var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var accessibilitySkipped by rememberSaveable { mutableStateOf(false) }
 
-    val view = PhoneSetupFlow.view(
-        SetupInputs(
-            developerOptions = status.developerOptions,
-            wirelessDebugging = if (wirelessAssumed && !status.wirelessDebugging) null else status.wirelessDebugging,
-            status = shell, discovery = discovery, notificationsAllowed = status.notificationsAllowed, repair = repairing,
-            usbDebugging = status.usbDebugging, accessibility = status.accessibility == AccessibilityState.On,
-            accessibilitySkipped = accessibilitySkipped, restrictedSettings = status.restrictedSettings,
-        ),
+    val inputs = SetupInputs(
+        developerOptions = status.developerOptions, wirelessDebugging = status.wirelessDebugging,
+        status = shell, discovery = discovery, notificationsAllowed = status.notificationsAllowed, repair = repairing,
+        usbDebugging = status.usbDebugging, accessibility = status.accessibility == AccessibilityState.On,
+        accessibilitySkipped = accessibilitySkipped, restrictedSettings = status.restrictedSettings,
+        confirmed = confirmed, revisit = revisit,
     )
+    val view = PhoneSetupFlow.view(inputs)
+    // 回去重做的那一步:读到它从关着变成开着,就自动回到原来的步骤,不用再点
+    val revisitDetected = revisit?.let { PhoneSetupFlow.detected(it, inputs) }
+    var revisitSawOff by rememberSaveable(revisit) { mutableStateOf(false) }
+    LaunchedEffect(revisit, revisitDetected) {
+        if (revisitDetected == false) revisitSawOff = true
+        else if (revisitDetected == true && revisitSawOff) revisit = null
+    }
+    // 开始连接或已经成功:以助手为准,不再停在回头的那一步
+    LaunchedEffect(view.phase) { if (view.phase == SetupPhase.Working || view.phase == SetupPhase.Success) revisit = null }
     // 到了配对一步:开始找配对窗口;通知没允许就在这时请求(配对码要填在通知里)
     LaunchedEffect(view.current) {
         if (view.current == SetupStep.PairingCode) pairing.begin()
@@ -142,17 +158,19 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
         onAllowNotifications = { onFix(Fix.AllowNotifications) },
         headsUpLowered = status.notificationsAllowed && (status.attentionLowered || status.resultLowered),
         onOpenHeadsUp = { onFix(if (status.attentionLowered) Fix.OpenAttentionChannel else Fix.OpenResultChannel) },
-        onWirelessAlreadyOn = { wirelessAssumed = true },
+        onConfirmStep = { step -> confirmed = confirmed + step; revisit = null },
         onSubmit = { code, port -> pairing.submit(code, port) },
         onClose = close,
         onAppInfo = { onFix(Fix.OpenAppInfo) },
-        onSkipAccessibility = { accessibilitySkipped = true },
+        onSkipAccessibility = { accessibilitySkipped = true; revisit = null },
+        onRevisit = { step -> revisit = step },
         onboarding = onboarding,
     )
 }
 
 /**
  * 不带状态的引导页,便于测试。步骤是一张编号清单:做完的打勾,当前一步亮起并带按钮,后面的变灰。
+ * 读开关的几步都有 [onConfirmStep](「我已经打开了,下一步」);做完的步骤可以点,[onRevisit] 回去重做,传 null 是回到原来的步骤。
  * [onboarding] 为真时是首次上手的最后一步,底部多一排分页点。[onSubmit] 收到的码已经校验过是 6 位数字。
  */
 @Composable
@@ -161,15 +179,19 @@ fun PhoneSetupContent(
     onStepAction: (SetupStep) -> Unit,
     onFailureFix: (BuiltinShellFix) -> Unit,
     onAllowNotifications: () -> Unit,
-    onWirelessAlreadyOn: () -> Unit,
+    onConfirmStep: (SetupStep) -> Unit,
     onSubmit: (code: String, port: Int?) -> Unit,
     onClose: () -> Unit,
     headsUpLowered: Boolean = false,
     onOpenHeadsUp: () -> Unit = {},
     onAppInfo: () -> Unit = {},
     onSkipAccessibility: () -> Unit = {},
+    onRevisit: (SetupStep?) -> Unit = {},
     onboarding: Boolean = false,
 ) {
+    val canRevisit = view.phase == SetupPhase.Guide || view.phase == SetupPhase.Failed
+    fun revisitable(step: SetupStep) = canRevisit && step != view.current && step in PhoneSetupFlow.REVISITABLE &&
+        view.marks.getValue(step) in setOf(StepMark.Done, StepMark.Skipped, StepMark.Failed)
     val c = MikaTheme.colors
     PageBackground {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
@@ -188,14 +210,19 @@ fun PhoneSetupContent(
                 }
                 GroupCard {
                     SetupStep.entries.forEach { step ->
-                        StepRow(step, view.marks.getValue(step), current = step == view.current, first = step.ordinal == 0) {
+                        StepRow(
+                            step, view.marks.getValue(step), current = step == view.current, first = step.ordinal == 0,
+                            onClick = if (revisitable(step)) ({ onRevisit(step) }) else null,
+                        ) {
                             if (step == view.current) CurrentStepBody(
-                                step, view, onStepAction, onFailureFix, onAllowNotifications, headsUpLowered, onOpenHeadsUp, onWirelessAlreadyOn, onSubmit, onAppInfo, onSkipAccessibility,
+                                step, view, onStepAction, onFailureFix, onAllowNotifications, headsUpLowered, onOpenHeadsUp, onConfirmStep, onSubmit,
+                                onAppInfo, onSkipAccessibility, onRevisit,
                             )
                             if (step == SetupStep.Connect && view.phase == SetupPhase.Working) WorkingLine()
                         }
                     }
                 }
+                if (SetupStep.entries.any(::revisitable)) FooterNote(PhoneSetupCopy.REVISIT_NOTE)
                 if (view.phase == SetupPhase.Guide) FooterNote(PhoneSetupCopy.SKIP_NOTE)
             }
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
@@ -223,10 +250,10 @@ fun PhoneSetupContent(
 }
 
 @Composable
-private fun StepRow(step: SetupStep, mark: StepMark, current: Boolean, first: Boolean, body: @Composable () -> Unit) {
+private fun StepRow(step: SetupStep, mark: StepMark, current: Boolean, first: Boolean, onClick: (() -> Unit)?, body: @Composable () -> Unit) {
     val copy = PhoneSetupCopy.step(step)
     val c = MikaTheme.colors
-    Box(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).testTag("setup-step-${step.name}")) {
         if (!first) Box(Modifier.padding(start = 58.dp).fillMaxWidth().height(0.5.dp).background(c.hair))
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             StepBadge(step.ordinal + 1, mark)
@@ -274,10 +301,11 @@ private fun CurrentStepBody(
     onAllowNotifications: () -> Unit,
     headsUpLowered: Boolean,
     onOpenHeadsUp: () -> Unit,
-    onWirelessAlreadyOn: () -> Unit,
+    onConfirmStep: (SetupStep) -> Unit,
     onSubmit: (String, Int?) -> Unit,
     onAppInfo: () -> Unit,
     onSkipAccessibility: () -> Unit,
+    onRevisit: (SetupStep?) -> Unit,
 ) {
     val copy = PhoneSetupCopy.step(step)
     Text(copy.body, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = MikaTheme.colors.ink2)
@@ -290,6 +318,16 @@ private fun CurrentStepBody(
             Text(fc.body, Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.ink2)
         }
         PillButton(PhoneSetupCopy.fixLabel(f.fix), primary = true, tag = "setup-fix") { onFailureFix(f.fix) }
+    }
+    // 没成功时最可能的原因在前面哪一步:说清楚,给回去的按钮
+    view.suspect?.let { s ->
+        Text(
+            PhoneSetupCopy.suspect(s),
+            Modifier.padding(top = 10.dp).fillMaxWidth().background(MikaTheme.colors.warnSoft, RoundedCornerShape(12.dp)).padding(12.dp)
+                .testTag("setup-suspect"),
+            fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.ink,
+        )
+        PillButton(PhoneSetupCopy.goBackTo(s.step), primary = view.failure == null, tag = "setup-suspect-back") { onRevisit(s.step) }
     }
     if (step == SetupStep.PairingCode) {
         if (view.needsNotifications) {
@@ -308,13 +346,15 @@ private fun CurrentStepBody(
         PairingHint(view.autoRead)
         if (view.portFound && !view.autoRead) Text(PhoneSetupCopy.PORT_FOUND, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = MikaTheme.colors.ok)
     }
-    if (view.failure == null && copy.action != null) PillButton(copy.action, primary = true, tag = "setup-action") { onStepAction(step) }
-    if (step == SetupStep.Accessibility) {
-        if (view.showAppInfo) PillButton(PhoneSetupCopy.APP_INFO, primary = false, tag = "setup-app-info", onClick = onAppInfo)
-        LinkText(PhoneSetupCopy.ACCESSIBILITY_SKIP, "setup-skip-a11y", onSkipAccessibility)
-    }
-    if (step == SetupStep.WirelessDebugging) LinkText(PhoneSetupCopy.WIRELESS_ALREADY_ON, null, onWirelessAlreadyOn)
+    // 无障碍一步推荐跳过:配对后 Mika 自己打开,也不会被「受限制的设置」拦住
+    val a11y = step == SetupStep.Accessibility
+    if (a11y) PillButton(PhoneSetupCopy.ACCESSIBILITY_SKIP, primary = true, tag = "setup-skip-a11y", onClick = onSkipAccessibility)
+    if (view.failure == null && copy.action != null) PillButton(copy.action, primary = !a11y, tag = "setup-action") { onStepAction(step) }
+    if (a11y && view.showAppInfo) PillButton(PhoneSetupCopy.APP_INFO, primary = false, tag = "setup-app-info", onClick = onAppInfo)
+    // 读到的开关只是参考:用户说打开了就往下走,哪一步都不会卡死
+    if (step in PhoneSetupFlow.CONFIRMABLE) PillButton(PhoneSetupCopy.TURNED_ON_NEXT, primary = false, tag = "setup-confirm") { onConfirmStep(step) }
     if (step == SetupStep.PairingCode) ManualCode(askPort = !view.portFound, onSubmit = onSubmit)
+    if (view.revisiting) LinkText(PhoneSetupCopy.REVISIT_BACK, "setup-revisit-back") { onRevisit(null) }
 }
 
 @Composable

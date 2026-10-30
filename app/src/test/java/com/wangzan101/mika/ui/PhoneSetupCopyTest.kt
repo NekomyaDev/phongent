@@ -6,6 +6,7 @@ import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.SetupStep
+import com.wangzan101.mika.core.shell.SetupSuspect
 import com.wangzan101.mika.settings.Problem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,10 +33,18 @@ class PhoneSetupCopyTest {
                 PhoneSetupCopy.NEED_NOTIFICATIONS, PhoneSetupCopy.MANUAL_HINT, PhoneSetupCopy.NOTIFY_ENTER_TEXT,
                 PhoneSetupCopy.NOTIFY_ENTER_TITLE, PhoneSetupCopy.NOTIFY_ACTION, PhoneSetupCopy.NOTIFY_INPUT_LABEL,
                 PhoneSetupCopy.AUTO_READ_HINT, PhoneSetupCopy.PULL_DOWN_HINT, PhoneSetupCopy.ACCESSIBILITY_SKIP,
-                PhoneSetupCopy.ACCESSIBILITY_SKIPPED, PhoneSetupCopy.APP_INFO,
+                PhoneSetupCopy.ACCESSIBILITY_SKIPPED, PhoneSetupCopy.APP_INFO, PhoneSetupCopy.TURNED_ON_NEXT,
+                PhoneSetupCopy.REVISIT_BACK, PhoneSetupCopy.REVISIT_NOTE,
             ),
         )
+        suspects.forEach { add(PhoneSetupCopy.suspect(it)); add(PhoneSetupCopy.goBackTo(it.step)) }
     }
+
+    private val suspects = listOf(
+        SetupSuspect(SetupStep.DeveloperOptions, unreadable = false),
+        SetupSuspect(SetupStep.WirelessDebugging, unreadable = false),
+        SetupSuspect(SetupStep.WirelessDebugging, unreadable = true),
+    )
 
     private val statuses = listOf(
         BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff, BuiltinShellStatus.Connecting, BuiltinShellStatus.Running,
@@ -75,6 +84,30 @@ class PhoneSetupCopyTest {
         assertTrue(a11y.body.contains("不用手动填"))
         assertTrue(a11y.body.contains("「无障碍」"))
         assertTrue(PhoneSetupCopy.APP_INFO.contains("受限制的设置"))
+    }
+
+    @Test
+    fun skippingAccessibilityReadsAsTheRecommendedPath() {
+        assertEquals("跳过(配对后 Mika 会自己打开)", PhoneSetupCopy.ACCESSIBILITY_SKIP)
+        assertTrue(PhoneSetupCopy.step(SetupStep.Accessibility).body.contains("推荐"))
+        assertEquals("我已经打开了,下一步", PhoneSetupCopy.TURNED_ON_NEXT)
+    }
+
+    @Test
+    fun suspectsNameTheStepAndHowItWasRead() {
+        assertTrue(PhoneSetupCopy.suspect(suspects[0]).contains("开发者选项"))
+        assertTrue(PhoneSetupCopy.suspect(suspects[1]).contains("好像没开"))
+        assertTrue(PhoneSetupCopy.suspect(suspects[2]).contains("读不到"))
+        assertEquals("回到「打开无线调试」", PhoneSetupCopy.goBackTo(SetupStep.WirelessDebugging))
+    }
+
+    @Test
+    fun alwaysAllowCheckboxIsNamedTheSameEverywhere() {
+        val box = "「始终允许使用此网络」"
+        listOf(
+            PhoneSetupCopy.step(SetupStep.WirelessDebugging).body, PhoneSetupCopy.failure(BuiltinShellFailure.WifiNotAllowed).body,
+            PhoneSetupCopy.WIFI_NOT_ALLOWED_LINE,
+        ).forEach { assertTrue(it, it.contains(box)) }
     }
 
     @Test

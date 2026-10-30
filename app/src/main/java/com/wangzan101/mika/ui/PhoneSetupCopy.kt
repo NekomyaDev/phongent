@@ -6,6 +6,7 @@ import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.SetupStep
+import com.wangzan101.mika.core.shell.SetupSuspect
 import com.wangzan101.mika.ui.components.ValueTone
 
 /**
@@ -65,8 +66,20 @@ object PhoneSetupCopy {
     val AUTO_READ_HINT: String get() = tr(R.string.phone_auto_read)
     val PULL_DOWN_HINT: String get() = tr(R.string.phone_pull_down)
 
-    /** 无线调试一步的兜底:有的手机读不到无线调试开关,用户确认打开了就往下走。 */
-    val WIRELESS_ALREADY_ON: String get() = tr(R.string.phone_wireless_on)
+    /** 读开关的几步的兜底:有的手机读不到或读不准,用户确认打开了就往下走。 */
+    val TURNED_ON_NEXT: String get() = tr(R.string.phone_turned_on_next)
+    /** 点回前面某一步重做时,不改了就回去。 */
+    val REVISIT_BACK: String get() = tr(R.string.phone_revisit_back)
+    val REVISIT_NOTE: String get() = tr(R.string.phone_revisit_note)
+
+    /** 配对、连接没成功时,最可能要回去重做的那一步怎么说。 */
+    fun suspect(s: SetupSuspect): String = when {
+        s.step == SetupStep.DeveloperOptions -> tr(R.string.phone_suspect_dev)
+        s.unreadable -> tr(R.string.phone_suspect_wireless_unreadable)
+        else -> tr(R.string.phone_suspect_wireless_off)
+    }
+
+    fun goBackTo(s: SetupStep): String = tr(R.string.phone_suspect_go_back, step(s).title)
     val PORT_FOUND: String get() = tr(R.string.phone_port_found)
     val NEED_NOTIFICATIONS: String get() = tr(R.string.phone_need_notif)
     val ALLOW_NOTIFICATIONS: String get() = tr(R.string.explain_notif)

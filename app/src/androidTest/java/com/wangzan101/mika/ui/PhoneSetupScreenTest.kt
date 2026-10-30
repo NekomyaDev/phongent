@@ -15,6 +15,7 @@ import com.wangzan101.mika.core.shell.PairingDiscovery
 import com.wangzan101.mika.core.shell.PhoneSetupFlow
 import com.wangzan101.mika.core.shell.SetupInputs
 import com.wangzan101.mika.core.shell.SetupStep
+import com.wangzan101.mika.core.shell.SetupSuspect
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -32,13 +33,14 @@ class PhoneSetupScreenTest {
             onStepAction = { calls += "step $it" },
             onFailureFix = { calls += "fix $it" },
             onAllowNotifications = { calls += "notify" },
-            onWirelessAlreadyOn = { calls += "assume" },
+            onConfirmStep = { calls += "confirm $it" },
             onSubmit = { c, p -> calls += "submit $c $p" },
             onClose = { calls += "close" },
             headsUpLowered = headsUpLowered,
             onOpenHeadsUp = { calls += "headsUp" },
             onAppInfo = { calls += "appInfo" },
             onSkipAccessibility = { calls += "skipA11y" },
+            onRevisit = { calls += "revisit $it" },
         )
     }
 
@@ -55,10 +57,56 @@ class PhoneSetupScreenTest {
     fun accessibilityStepOpensSettingsOffersAppInfoAndCanBeSkipped() {
         show(SetupInputs(true, true, BuiltinShellStatus.NotPaired, accessibility = false, restrictedSettings = true))
         compose.onNodeWithText(PhoneSetupCopy.step(SetupStep.Accessibility).title).assertIsDisplayed()
+        compose.onNodeWithText(PhoneSetupCopy.ACCESSIBILITY_SKIP).assertIsDisplayed()
         compose.onNodeWithTag("setup-action").performClick()
         compose.onNodeWithTag("setup-app-info").performClick()
         compose.onNodeWithTag("setup-skip-a11y").performClick()
         assertEquals(listOf("step Accessibility", "appInfo", "skipA11y"), calls)
+        // 无障碍靠跳过往下走,不另给「已打开」
+        compose.onNodeWithTag("setup-confirm").assertDoesNotExist()
+    }
+
+    @Test
+    fun everySwitchStepHasAManualNext() {
+        // 什么都读成关着:第一步就能点「我已经打开了,下一步」
+        show(SetupInputs(false, false, BuiltinShellStatus.NotPaired, usbDebugging = false, accessibility = false))
+        compose.onNodeWithText(PhoneSetupCopy.TURNED_ON_NEXT).assertIsDisplayed()
+        compose.onNodeWithTag("setup-confirm").performClick()
+        assertEquals(listOf("confirm DeveloperOptions"), calls)
+    }
+
+    @Test
+    fun wirelessStepHasAManualNext() {
+        show(SetupInputs(true, false, BuiltinShellStatus.NotPaired))
+        compose.onNodeWithTag("setup-confirm").performScrollTo().performClick()
+        assertEquals(listOf("confirm WirelessDebugging"), calls)
+    }
+
+    @Test
+    fun doneStepsCanBeTappedToRedo() {
+        show(SetupInputs(true, true, BuiltinShellStatus.NotPaired))
+        compose.onNodeWithTag("setup-step-UsbDebugging").performClick()
+        // 后面没做的不能点
+        compose.onNodeWithTag("setup-step-Connect").performClick()
+        compose.onNodeWithText(PhoneSetupCopy.REVISIT_NOTE).performScrollTo().assertIsDisplayed()
+        assertEquals(listOf("revisit UsbDebugging"), calls)
+    }
+
+    @Test
+    fun revisitedStepOffersNextAndBack() {
+        show(SetupInputs(true, true, BuiltinShellStatus.NotPaired, revisit = SetupStep.UsbDebugging))
+        compose.onNodeWithText(PhoneSetupCopy.step(SetupStep.UsbDebugging).body).assertIsDisplayed()
+        compose.onNodeWithTag("setup-confirm").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-revisit-back").performScrollTo().performClick()
+        assertEquals(listOf("confirm UsbDebugging", "revisit null"), calls)
+    }
+
+    @Test
+    fun connectionFailureSaysWhichStepToCheckAndGoesBack() {
+        show(SetupInputs(true, null, BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed)))
+        compose.onNodeWithText(PhoneSetupCopy.suspect(SetupSuspect(SetupStep.WirelessDebugging, unreadable = true))).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-suspect-back").performScrollTo().performClick()
+        assertEquals(listOf("revisit WirelessDebugging"), calls)
     }
 
     @Test
