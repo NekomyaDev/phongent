@@ -12,6 +12,9 @@ import kotlin.math.roundToInt
 object WheelMath {
     private val ONLY_NUMBER = Regex("""^-?\d{1,6}$""")
     private val LEADING_NUMBER = Regex("""^\D{0,3}?(\d{1,6})(?!\d)""")
+    private val DIGITS = Regex("""(?<!\d)\d{1,6}(?!\d)""")
+    /** 一项的文字里把值和状态词(「已选中」「selected」……)、单位隔开的标点。 */
+    private val SEPARATORS = Regex("""[,，、:：;；|/()（）\[\]【】<>《》·•]+""")
 
     /** 比较文字用:去空白、全角数字换半角、忽略大小写。 */
     fun normalize(s: String): String = buildString {
@@ -23,27 +26,44 @@ object WheelMath {
     }
 
     /**
-     * 显示的文字里的整数:"09" → 9,"9时"/"9 点" → 9,"2026年" → 2026,"第3周" → 3;前面的字超过三个、没有数字为 null。
-     * 只取开头附近的第一个数,滚轮上一格通常只有一个数。
+     * 显示的文字里的整数:"09" → 9,"9时"/"9 点" → 9,"2026年" → 2026,"第3周" → 3;
+     * 无障碍名字常在值前后带状态词("已选中，21"、"Selected, 21"、"21 (selected)"),整段只有一个数时就是它。
+     * 有几个数时取开头附近的第一个(前面的字超过三个为 null);没有数字为 null。
      */
     fun number(s: String?): Int? {
         val t = s?.let(::normalize)?.ifEmpty { null } ?: return null
         if (ONLY_NUMBER.matches(t)) return t.toIntOrNull()
+        DIGITS.findAll(t).toList().singleOrNull()?.let { return it.value.toIntOrNull() }
         return LEADING_NUMBER.find(t)?.groupValues?.get(1)?.toIntOrNull()
+    }
+
+    /** 按标点切开的几段(已按 [normalize] 处理):"已选中，21" → [已选中, 21]。 */
+    fun segments(s: String): List<String> = normalize(s).split(SEPARATORS).filter { it.isNotEmpty() }
+
+    /**
+     * 报给模型的值:名字里带着状态词时只留值那一段("已选中，21" → "21"、"Selected, 21" → "21");
+     * 切不出唯一一段带数字的就原样(文字值不猜哪段是状态词)。
+     */
+    fun clean(label: String?): String? {
+        val t = label?.trim()?.ifEmpty { null } ?: return null
+        val parts = t.split(SEPARATORS).map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.size < 2) return t
+        return parts.filter { p -> p.any { it.isDigit() || it in '０'..'９' } }.singleOrNull() ?: t
     }
 
     /** 目标本身就是一个数(「9」「09」「２０２６」),不是带数字的文字。 */
     fun numericTarget(target: String): Int? = normalize(target).takeIf(ONLY_NUMBER::matches)?.toIntOrNull()
 
     /**
-     * 滚轮此刻显示的 [shown] 是不是要的 [target]:目标是纯数字时按数比("09" 就是 "9","40分" 就是 "40");
-     * 否则文字相同,或显示的以目标开头/结尾(「北京市」对「北京」)。
+     * 滚轮此刻显示的 [shown] 是不是要的 [target]:目标是纯数字时按数比("09" 就是 "9","40分" 就是 "40",
+     * "已选中，21" 就是 "21");否则文字相同,或显示的(或按标点切开的某一段)以目标开头/结尾(「北京市」对「北京」)。
      */
     fun matches(shown: String?, target: String): Boolean {
         val s = shown?.let(::normalize)?.ifEmpty { null } ?: return false
         val t = normalize(target).ifEmpty { return false }
         numericTarget(target)?.let { return number(s) == it }
-        return s == t || s.startsWith(t) || s.endsWith(t)
+        fun affix(x: String) = x == t || x.startsWith(t) || x.endsWith(t)
+        return affix(s) || segments(s).any(::affix)
     }
 
     /**
@@ -82,6 +102,31 @@ object WheelMath {
         return gaps.sorted()[gaps.size / 2]
     }
 
+    /**
+     * 选中的那一项:只有一项标着选中([Item.selected],无障碍的 isSelected)就是它;否则按 [selected] 找中线上的。
+     */
+    fun selectedIndex(items: List<Item>, centerY: Int, itemHeight: Int?): Int =
+        items.indices.filter { items[it].selected }.singleOrNull() ?: selected(items.map { it.centerY }, centerY, itemHeight)
+
+    /**
+     * 从上到下的几项里,和第 [anchor] 项连成一列、间距差不多的那一段:同一块里滚轮上下的标题、按钮不算进来。
+     * 一格多高按它和上下相邻项的间距(取小的)算。不到三项、估不出一格多高时原样返回。
+     */
+    fun column(items: List<Item>, anchor: Int): List<Item> {
+        if (items.size < 3 || anchor !in items.indices) return items
+        val near = listOfNotNull(
+            items.getOrNull(anchor - 1)?.let { items[anchor].centerY - it.centerY },
+            items.getOrNull(anchor + 1)?.let { it.centerY - items[anchor].centerY },
+        ).filter { it > 2 }
+        val h = near.minOrNull() ?: return items
+        fun even(gap: Int) = gap > h * 0.4 && gap < h * 1.8
+        var lo = anchor
+        var hi = anchor
+        while (lo > 0 && even(items[lo].centerY - items[lo - 1].centerY)) lo--
+        while (hi < items.lastIndex && even(items[hi + 1].centerY - items[hi].centerY)) hi++
+        return items.subList(lo, hi + 1)
+    }
+
     /** 中线 [centerY] 上的那一项的下标:中心离中线最近的;离得超过大半格(没有正对中线的)为 -1。 */
     fun selected(centers: List<Int>, centerY: Int, itemHeight: Int?): Int {
         val best = centers.indices.minByOrNull { abs(centers[it] - centerY) } ?: return -1
@@ -91,14 +136,15 @@ object WheelMath {
 
     /**
      * 要往前转几格才到(负数往后):目标就在看得到的几项里时按位置差算(下面的是前进);目标和选中的都是数字时按数差算
-     * (看得出循环就走近的那边,[increasingForward] 为 false 时前进是变小);都不行(文字列表、目标不在眼前)为 null。
+     * (看得出循环就走近的一边,眼前看不出时用之前看出的 [knownModulus];[increasingForward] 为 false 时前进是变小);
+     * 都不行(文字列表、目标不在眼前)为 null。
      */
-    fun stepsTo(visible: List<String>, selectedIndex: Int, target: String, increasingForward: Boolean = true): Int? {
+    fun stepsTo(visible: List<String>, selectedIndex: Int, target: String, increasingForward: Boolean = true, knownModulus: Int? = null): Int? {
         if (selectedIndex !in visible.indices) return null
         visible.indexOfFirst { matches(it, target) }.takeIf { it >= 0 }?.let { return it - selectedIndex }
         val t = numericTarget(target) ?: return null
         val cur = number(visible[selectedIndex]) ?: return null
-        val d = distance(cur, t, modulus(visible))
+        val d = distance(cur, t, modulus(visible) ?: knownModulus)
         return if (increasingForward) d else -d
     }
 
@@ -120,8 +166,8 @@ object WheelMath {
         return out
     }
 
-    /** 滚轮里看得到的一项:文字和中心(像素)。 */
-    data class Item(val text: String, val centerX: Int, val centerY: Int)
+    /** 滚轮里看得到的一项:文字和中心(像素);[selected] 无障碍标着选中。 */
+    data class Item(val text: String, val centerX: Int, val centerY: Int, val selected: Boolean = false)
 
     /**
      * 一个能竖着滚的容器看上去是不是滚轮,宁可漏认不错认:三到九项、每项都是短的值(不超过 [MAX_ITEM_CHARS] 个字)、互不相同,
@@ -159,7 +205,10 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
         data object Done : Step
         /** 往 [forward] 那边滚 [count] 下。 */
         data class Act(val forward: Boolean, val count: Int) : Step
-        /** 停下:[reason] 为 at_end(到头了,目标不在这一边)、cap(滚了太多下)、overshoot(停不准)、unknown_value(读不出值)。 */
+        /**
+         * 停下:[reason] 为 at_end(到头了,目标不在这一边)、not_moving(循环的滚轮滚了不动)、cap(滚了太多下)、
+         * overshoot(停不准)、unknown_value(读不出值)。
+         */
         data class Stop(val reason: String) : Step
     }
 
@@ -186,7 +235,8 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
         if (actions >= cap) return Step.Stop("cap")
         if (numeric != null && WheelMath.number(current) != null) {
             if (prev != null) {
-                if (unchanged) return Step.Stop("at_end")
+                // 值不动:看得出循环的滚轮没有头,是这一下没起作用,不是到头了
+                if (unchanged) return Step.Stop(if (modulus != null) "not_moving" else "at_end")
                 val moved = WheelMath.moved(last, current, modulus)
                 if (!calibrated && moved != null && moved != 0) {
                     calibrated = true
@@ -218,5 +268,96 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
         lastAct = a
         actions += a.count
         return a
+    }
+}
+
+/**
+ * 拖动转滚轮(App 自己画的、不能无障碍滚的)时的下一步:每次拖完把读回的这一列交进来,它说再拖几格、怎么拖,或停。
+ * - 按 [WheelMath.stepsTo] 定格数(数字按数差,看得出循环走近的一边,之前看出过的循环长度记着);第一次转动时看「往上拖」
+ *   是变大还是变小,按实际转过的格数校准一格多高。
+ * - 拖了值不动不等于到头:只有看不出循环、往要去的那边已经没有项时才算到头(at_end);否则是这一下没起作用,
+ *   下次换个快慢(只差一格的还拖远一点),连着 [maxStill] 次不动报 not_moving。
+ * - 文字列表、目标不在眼前:一次翻过看得到的几项往一边扫,到头了反过来,两头都到了停。
+ */
+class WheelDrags(private val target: String, rowHeight: Int, private val maxMoves: Int = 5, private val maxStill: Int = 3) {
+    sealed interface Step {
+        data object Done : Step
+        /** 拖过 [steps] 格(正数手指往上 = 前进),距离再乘 [boost];[slow] 慢拖不甩,否则快划一下。 */
+        data class Drag(val steps: Int, val boost: Double, val slow: Boolean) : Step
+        /** 停下:[reason] 为 at_end、not_moving、not_reached(转了几轮没到,或按数算到了却没有这个值)、unknown_value。 */
+        data class Stop(val reason: String) : Step
+    }
+
+    /** 一格多高(像素):先按看得到的几项估,转动后按实际转过的格数校准。 */
+    var itemHeight: Int = rowHeight.coerceAtLeast(1)
+        private set
+    private val numeric = WheelMath.numericTarget(target)
+    private var started = false
+    private var increasingForward = true
+    private var directionKnown = false
+    private var modulus: Int? = null
+    private var last: String? = null
+    private var lastDrag: Step.Drag? = null
+    private var lastScanning = false
+    private var scanForward = true
+    private var scanReversed = false
+    private var moves = 0
+    private var still = 0
+
+    /**
+     * 刚才那次拖动之后:这一列从上到下的几项 [items]、各自中心的纵坐标 [centers]、选中项下标 [selected](找不到为 -1),
+     * 和手指实际走过的像素 [dragged](往上为正;第一次调时还没拖过,给 0)。
+     */
+    fun next(items: List<String>, selected: Int, centers: List<Int> = emptyList(), dragged: Int = 0): Step {
+        val current = items.getOrNull(selected)
+        if (WheelMath.matches(current, target)) return Step.Done
+        if (items.isEmpty()) return Step.Stop("unknown_value")
+        if (!started) {
+            started = true
+            WheelMath.itemHeight(centers)?.let { itemHeight = it }
+        }
+        WheelMath.modulus(items)?.let { modulus = it }
+        val prev = lastDrag
+        if (prev != null) {
+            if (current != last) {
+                still = 0
+                moves++
+                val moved = WheelMath.moved(last, current, modulus)
+                if (moved != null && moved != 0) {
+                    if (!directionKnown && numeric != null) {
+                        directionKnown = true
+                        if ((moved > 0) != (dragged > 0)) increasingForward = false
+                    }
+                    WheelMath.calibrated(dragged, moved)?.let { itemHeight = it }
+                }
+            } else if (atEnd(items, selected, forward = prev.steps > 0)) {
+                if (!lastScanning || scanReversed) return Step.Stop("at_end")
+                scanReversed = true
+                scanForward = !scanForward
+            } else {
+                still++
+            }
+        }
+        if (still >= maxStill) return Step.Stop("not_moving")
+        if (moves >= maxMoves) return Step.Stop("not_reached")
+        val planned = WheelMath.stepsTo(items, selected, target, increasingForward, modulus)
+        // 按数算已经到了却没对上:这个值不在滚轮上(比如 0–59 里找 75)
+        if (planned == 0) return Step.Stop("not_reached")
+        lastScanning = planned == null
+        val steps = planned ?: ((items.size - 1).coerceAtLeast(1) * if (scanForward) 1 else -1)
+        last = current
+        // 上一下没起作用:换个快慢再来;只差一格的拖得短,再拖远一点(拖得多的不加,免得一起作用就转过头、把校准带偏)
+        val boost = if (abs(steps) <= 1) 1.0 + BOOST * still else 1.0
+        return Step.Drag(steps, boost, slow = still % 2 == 0).also { lastDrag = it }
+    }
+
+    /** 看不出循环,往要去的那边(前进是下面)已经没有项了。 */
+    private fun atEnd(items: List<String>, selected: Int, forward: Boolean): Boolean {
+        if (modulus != null || items.size < 2 || selected !in items.indices) return false
+        return if (forward) selected == items.lastIndex else selected == 0
+    }
+
+    private companion object {
+        const val BOOST = 0.6
     }
 }

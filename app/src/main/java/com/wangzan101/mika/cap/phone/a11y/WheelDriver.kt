@@ -3,6 +3,7 @@ package com.wangzan101.mika.cap.phone.a11y
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import com.wangzan101.mika.core.cap.phone.WheelDrags
 import com.wangzan101.mika.core.cap.phone.WheelMath
 import com.wangzan101.mika.core.cap.phone.WheelSteps
 import com.wangzan101.mika.core.uistate.VisibleTextLine
@@ -14,8 +15,11 @@ import kotlin.math.roundToInt
  * 把一个滚轮转到一个值,在一次调用里做完。按控件能做什么依次试(能做就做,做不到退到下一种):
  * 1. 滚轮里有输入框(原版的数字滚轮有):直接把值写进去,让它失去焦点确认,读回来;
  * 2. 滚轮能无障碍「往前/往后滚」(原版的数字滚轮一下一格):读出当前值,按 [WheelSteps] 定方向和下数,一批一批滚,每批读回;
- * 3. 都不行(App 自己画的滚轮):读看得到的几项(无障碍读不到就认屏上的字)估一格多高和当前值,慢慢拖一次(不甩,免得转过头),
- *    读回来再小拖一两次校正。
+ * 3. 都不行(App 自己画的滚轮):读这一列看得到的几项(无障碍读不到就认屏上的字)估一格多高和当前值,在这一列上慢慢拖
+ *    (不甩,免得转过头),读回来再校正;拖了值不动就拖远一点、换快一点再试,还不动报 not_moving 交回模型。
+ *
+ * 给的编号可以是滚轮,也可以是它显示的某一项(常是选中的那一项):这时滚轮是和这一项横向对齐的那一列,
+ * 同一块里并排的别的滚轮(时旁边的分)不读、不拖。
  * 读值、拖动、等界面安静都由 [AndroidScreen] 注入,这里只管步骤。
  */
 internal class WheelDriver(
@@ -23,8 +27,8 @@ internal class WheelDriver(
     private val height: Int,
     /** 等到界面连续安静 quietMs,最多等 capMs。 */
     private val quiet: suspend (quietMs: Long, capMs: Long) -> Unit,
-    /** 一根手指沿这几点慢慢拖(像素),松手前停住、不甩。 */
-    private val drag: suspend (List<Pair<Int, Int>>) -> Boolean,
+    /** 一根手指沿这几点拖(像素):[slow] 为 true 时慢拖、松手前停住不甩;false 时像人快快划一下。 */
+    private val drag: suspend (points: List<Pair<Int, Int>>, slow: Boolean) -> Boolean,
     /** 认屏上的字(0–999 的坐标);没有为 null。 */
     private val ocr: suspend () -> List<VisibleTextLine>?,
     /** 这块屏上弹着输入法。 */
@@ -34,32 +38,42 @@ internal class WheelDriver(
 ) {
     private var attempts = 0
 
-    /** 一次读值:选中的那一项 [current](读不出为 null)和看得到的几项(从上到下);[fromOcr] 是认字认出来的。 */
-    private class Reading(val current: String?, val items: List<WheelMath.Item>, val fromOcr: Boolean) {
+    /** 一次读值:选中的那一项 [current](读不出为 null)和这一列看得到的几项(从上到下),[selected] 是选中项的下标。 */
+    private class Reading(val current: String?, val items: List<WheelMath.Item>, val selected: Int) {
         val texts get() = items.map { it.text }
     }
 
+    /**
+     * 要转的那一列:从 [root] 往下读,只认横向落在 [left]..[right] 里的项;[mid] 是选中那一格的中线;
+     * [rowHeight] 是一格多高估不出来时的退路(给的是一项时就是它自己的高度)。
+     */
+    private class Column(val root: AccessibilityNodeInfo, val box: Rect, val left: Int, val right: Int, val mid: Int, val rowHeight: Int)
+
     suspend fun set(start: AccessibilityNodeInfo, value: String): WheelOutcome {
-        val wheel = wheelOf(start) ?: start
-        val box = Rect().also(wheel::getBoundsInScreen)
-        if (box.isEmpty) return outcome(false, null, null, "none", "not_a_wheel")
-        var now = read(wheel, box)
+        val startBox = Rect().also(start::getBoundsInScreen)
+        if (startBox.isEmpty) return outcome(false, null, null, "none", "not_a_wheel")
+        val wheel = scrollableWheel(start, startBox)
+        val col = columnOf(start, startBox, wheel)
+        var now = read(col)
         val from = now.current
-        if (from == null && now.items.size < 2) return outcome(false, null, null, "none", if (scrollable(wheel)) "unknown_value" else "not_a_wheel")
+        if (from == null && now.items.size < 2) {
+            val scrollable = wheel != null || start.isScrollable
+            return outcome(false, null, null, "none", if (scrollable) "unknown_value" else "not_a_wheel")
+        }
         if (WheelMath.matches(from, value)) return outcome(true, from, from, "none")
 
         // 1. 直接输入
-        editableOf(wheel)?.let { field ->
+        editableOf(wheel ?: start)?.let { field ->
             if (typeInto(field, value)) {
-                now = read(wheel, box)
+                now = read(col)
                 if (WheelMath.matches(now.current, value)) return outcome(true, now.current, from, "text")
             }
         }
 
         // 2. 无障碍滚动
-        var stopped: String? = null
-        if (canStep(wheel)) {
+        if (wheel != null && canStep(wheel)) {
             val steps = WheelSteps(value, cap = MAX_STEPS)
+            var stopped: String? = null
             loop@ while (true) {
                 when (val s = steps.next(now.current, now.texts)) {
                     WheelSteps.Step.Done -> return outcome(true, now.current, from, "actions")
@@ -71,7 +85,7 @@ internal class WheelDriver(
                         attempts += s.count
                         quiet(STEP_QUIET_MS, STEP_CAP_MS)
                         wheel.refresh()
-                        now = read(wheel, box)
+                        now = read(col)
                         // 一下都没滚动:这一边到头了(或这一边不让滚)
                         if (done == 0 && !WheelMath.matches(now.current, value)) { stopped = "at_end"; break@loop }
                     }
@@ -81,54 +95,49 @@ internal class WheelDriver(
         }
 
         // 3. 拖动
-        return dragTo(wheel, box, value, from, now)
+        return dragTo(col, value, from, now)
     }
 
-    private suspend fun dragTo(wheel: AccessibilityNodeInfo, box: Rect, value: String, from: String?, first: Reading): WheelOutcome {
+    private suspend fun dragTo(col: Column, value: String, from: String?, first: Reading): WheelOutcome {
         var now = first
-        var itemHeight = WheelMath.itemHeight(now.items.map { it.centerY }) ?: (box.height() / ASSUMED_ROWS)
-        var increasingForward = true
-        var scanForward = true
-        var scanReversed = false
-        repeat(MAX_DRAGS) {
-            if (WheelMath.matches(now.current, value)) return outcome(true, now.current, from, "drag")
-            val sel = WheelMath.selected(now.items.map { it.centerY }, box.centerY(), itemHeight)
-            val planned = WheelMath.stepsTo(now.texts, sel, value, increasingForward)
-            // 文字列表、目标不在眼前:一次翻过看得到的那几项,往一个方向扫
-            val scanning = planned == null
-            val steps = planned ?: ((now.items.size - 1).coerceAtLeast(1) * if (scanForward) 1 else -1)
-            val before = now.current
-            var dragged = 0
-            for (d in WheelMath.drags(steps, itemHeight, (box.height() - itemHeight).coerceAtLeast(itemHeight))) {
-                // 手指往上拖 = 下面的项转上来 = 前进
-                val x = box.centerX()
-                val y0 = (box.centerY() + d / 2).coerceIn(box.top + 1, box.bottom - 1)
-                val y1 = (y0 - d).coerceIn(box.top + 1, box.bottom - 1)
-                if (!drag(listOf(x to y0, x to y1))) return outcome(false, now.current, from, "drag", "not_reached")
-                attempts++
-                dragged += y0 - y1
-                quiet(DRAG_QUIET_MS, DRAG_CAP_MS)
-            }
-            wheel.refresh()
-            now = read(wheel, box)
-            val moved = WheelMath.moved(before, now.current, WheelMath.modulus(now.texts))
-            when {
-                before == now.current && scanning -> {
-                    // 扫到头了:反过来扫,两头都到了就停
-                    if (scanReversed) return outcome(false, now.current, from, "drag", "at_end")
-                    scanReversed = true
-                    scanForward = !scanForward
-                }
-                // 拖了没转:这里拖不动它,再拖也一样
-                before == now.current -> return outcome(false, now.current, from, "drag", "not_reached")
-                moved != null && moved != 0 -> {
-                    if (WheelMath.numericTarget(value) != null && (moved > 0) != (dragged > 0) && it == 0) increasingForward = false
-                    WheelMath.calibrated(dragged, moved)?.let { h -> itemHeight = h }
+        val plan = WheelDrags(value, rowHeight = col.rowHeight)
+        var dragged = 0
+        while (true) {
+            when (val s = plan.next(now.texts, now.selected, now.items.map { it.centerY }, dragged)) {
+                WheelDrags.Step.Done -> return outcome(true, now.current, from, "drag")
+                is WheelDrags.Step.Stop -> return outcome(false, now.current, from, "drag", s.reason)
+                is WheelDrags.Step.Drag -> {
+                    dragged = dragSteps(col, now, s.steps, plan.itemHeight, s.boost, s.slow)
+                        ?: return outcome(false, now.current, from, "drag", "not_reached")
+                    now = read(col)
                 }
             }
         }
-        val reached = WheelMath.matches(now.current, value)
-        return outcome(reached, now.current, from, "drag", if (reached) null else "not_reached")
+    }
+
+    /**
+     * 在这一列上拖过 [steps] 格(正数手指往上 = 前进),每格 [itemHeight]、再乘 [boost];返回手指实际走过的像素(往上为正),
+     * 拖不出去为 null。手指落在这一列的横向正中,往上拖从这一列靠下的地方起、往下拖从靠上的地方起,可以拖出这一列(手指没抬起,
+     * 滚轮照样跟着走),只夹在屏内。
+     */
+    private suspend fun dragSteps(col: Column, r: Reading, steps: Int, itemHeight: Int, boost: Double, slow: Boolean): Int? {
+        val h = itemHeight.coerceAtLeast(1)
+        val x = r.items.map { it.centerX }.sorted().getOrNull(r.items.size / 2) ?: (col.left + col.right) / 2
+        val top = r.items.minOfOrNull { it.centerY - h / 2 } ?: (col.mid - h / 2)
+        val bottom = r.items.maxOfOrNull { it.centerY + h / 2 } ?: (col.mid + h / 2)
+        val maxDrag = maxOf(bottom - top - h, h * MIN_DRAG_ROWS)
+        var dragged = 0
+        for (piece in WheelMath.drags(steps, h, maxDrag)) {
+            val len = maxOf((abs(piece) * boost).roundToInt(), MIN_DRAG_PX)
+            val up = piece > 0
+            val y0 = (if (up) bottom - h / 2 else top + h / 2).coerceIn(maxOf(top + 1, 1), minOf(bottom - 1, height - 2).coerceAtLeast(maxOf(top + 1, 1)))
+            val y1 = (if (up) y0 - len else y0 + len).coerceIn(1, height - 2)
+            if (!drag(listOf(x.coerceIn(0, width - 1) to y0, x.coerceIn(0, width - 1) to y1), slow)) return null
+            attempts++
+            dragged += y0 - y1
+            quiet(DRAG_QUIET_MS, DRAG_CAP_MS)
+        }
+        return dragged
     }
 
     /** 往滚轮里的输入框写值并确认(失去焦点时原版滚轮按写进去的值定下来);因此弹出的输入法收起来。 */
@@ -149,56 +158,79 @@ internal class WheelDriver(
 
     // ---------- 读 ----------
 
-    private suspend fun read(wheel: AccessibilityNodeInfo, box: Rect): Reading {
-        val items = treeItems(wheel, box)
-        val h = WheelMath.itemHeight(items.map { it.centerY })
-        if (items.isNotEmpty()) {
-            val i = WheelMath.selected(items.map { it.centerY }, box.centerY(), h)
-            return Reading(items.getOrNull(i)?.text ?: ScreenReader.ownLabel(wheel), items, fromOcr = false)
+    private suspend fun read(col: Column): Reading {
+        col.root.refresh()
+        col.root.getBoundsInScreen(col.box)
+        val found = treeItems(col)
+        if (found.isNotEmpty()) {
+            val h = WheelMath.itemHeight(found.map { it.centerY })
+            val anchor = WheelMath.selectedIndex(found, col.mid, h)
+            val items = if (anchor >= 0) WheelMath.column(found, anchor) else found
+            val i = WheelMath.selectedIndex(items, col.mid, WheelMath.itemHeight(items.map { it.centerY }) ?: h)
+            return Reading(items.getOrNull(i)?.text, items, i)
         }
-        ScreenReader.ownLabel(wheel)?.takeIf { it.length <= MAX_ITEM_CHARS }?.let { return Reading(it, emptyList(), fromOcr = false) }
-        // 自己画的滚轮:认这一块里的字
+        // 自己画的滚轮:认这一列里的字
         val lines = ocr().orEmpty().mapNotNull { l ->
             val cx = px((l.bounds[0] + l.bounds[2]) / 2, width)
             val cy = px((l.bounds[1] + l.bounds[3]) / 2, height)
-            if (!box.contains(cx, cy) || l.text.isBlank() || l.text.trim().length > MAX_ITEM_CHARS) null
+            if (!col.box.contains(cx, cy) || cx !in col.left..col.right || l.text.isBlank() || l.text.trim().length > MAX_ITEM_CHARS) null
             else WheelMath.Item(l.text.trim(), cx, cy)
         }.sortedBy { it.centerY }
-        val oh = WheelMath.itemHeight(lines.map { it.centerY })
-        val i = WheelMath.selected(lines.map { it.centerY }, box.centerY(), oh)
-        return Reading(lines.getOrNull(i)?.text, lines, fromOcr = true)
+        val i = WheelMath.selected(lines.map { it.centerY }, col.mid, WheelMath.itemHeight(lines.map { it.centerY }))
+        return Reading(lines.getOrNull(i)?.text, lines, i)
     }
 
-    /** 滚轮里看得到、带字、在滚轮范围里的几项(往下找三层),从上到下;同一项不重复。 */
-    private fun treeItems(wheel: AccessibilityNodeInfo, box: Rect): List<WheelMath.Item> {
+    /** 这一列里看得到、带字的几项(往下找几层),从上到下;同一项不重复。 */
+    private fun treeItems(col: Column): List<WheelMath.Item> {
         val out = mutableListOf<WheelMath.Item>()
         val r = Rect()
+        fun add(n: AccessibilityNodeInfo): Boolean {
+            val label = itemLabel(n) ?: return false
+            n.getBoundsInScreen(r)
+            if (r.isEmpty || !col.box.contains(r.centerX(), r.centerY()) || r.centerX() !in col.left..col.right) return false
+            if (out.none { it.text == label && abs(it.centerY - r.centerY()) < 4 }) out += WheelMath.Item(label, r.centerX(), r.centerY(), n.isSelected)
+            return true
+        }
         fun walk(n: AccessibilityNodeInfo, depth: Int) {
             for (i in 0 until n.childCount) {
                 val c = n.getChild(i) ?: continue
                 if (!c.isVisibleToUser) continue
-                c.getBoundsInScreen(r)
-                val label = ScreenReader.ownLabel(c)?.takeIf { it.length <= MAX_ITEM_CHARS }
-                if (label != null && box.contains(r.centerX(), r.centerY())) {
-                    if (out.none { it.text == label && abs(it.centerY - r.centerY()) < 4 }) out += WheelMath.Item(label, r.centerX(), r.centerY())
-                } else if (depth < 3) walk(c, depth + 1)
+                if (!add(c) && depth < MAX_DOWN) walk(c, depth + 1)
             }
         }
-        walk(wheel, 0)
+        if (col.root.childCount == 0) add(col.root) else walk(col.root, 0)
         return out.sortedBy { it.centerY }
+    }
+
+    /** 一项的名字;系统单独报的状态(stateDescription,如「已选中」)若被拼进了名字,先拿掉。太长的不算一项。 */
+    private fun itemLabel(n: AccessibilityNodeInfo): String? {
+        var label = ScreenReader.ownLabel(n) ?: return null
+        val state = n.stateDescription?.toString()?.trim()
+        if (!state.isNullOrEmpty() && label != state && label.contains(state)) {
+            label = label.replace(state, "").trim { it.isWhitespace() || !it.isLetterOrDigit() }.ifEmpty { label }
+        }
+        return label.takeIf { it.length <= MAX_ITEM_CHARS }
     }
 
     // ---------- 认滚轮 ----------
 
-    /** 给的节点自己、往上几层里能滚的那个(给的是滚轮里的一项时);都不能滚时往下找一个能滚的。 */
-    private fun wheelOf(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        var p: AccessibilityNodeInfo? = n
+    /**
+     * 能无障碍滚的滚轮:给的节点自己、往上几层里能滚的那个(给的是滚轮里的一项时),或往下找到的;
+     * 往上找到的要横向罩着给的那一项的正中(整页的滚动区罩着几个并排的滚轮,不能拿来滚)。没有为 null。
+     */
+    private fun scrollableWheel(start: AccessibilityNodeInfo, startBox: Rect): AccessibilityNodeInfo? {
+        if (scrollable(start)) return start
+        val r = Rect()
+        var p = start.parent
         var depth = 0
-        while (p != null && depth++ <= MAX_UP) {
-            if (scrollable(p)) return p
+        while (p != null && depth++ < MAX_UP) {
+            if (scrollable(p)) {
+                p.getBoundsInScreen(r)
+                return p.takeIf { r.centerX() in startBox.left..startBox.right }
+            }
             p = p.parent
         }
-        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(n) }
+        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(start) }
         var visited = 0
         while (queue.isNotEmpty() && visited++ < 60) {
             val c = queue.removeFirst()
@@ -206,6 +238,35 @@ internal class WheelDriver(
             for (i in 0 until c.childCount) c.getChild(i)?.let(queue::add)
         }
         return null
+    }
+
+    /**
+     * 要读的那一列。给的是滚轮(能滚的)或里面装着几项:就是它。给的是一项(自己画的滚轮常这样):
+     * 往上找最近的、里面和它横向对齐的项不少于三项的那一层,只认横向和它对齐的项,所以旁边的滚轮不算进来。
+     */
+    private fun columnOf(start: AccessibilityNodeInfo, startBox: Rect, wheel: AccessibilityNodeInfo?): Column {
+        val ownHeight = startBox.height().coerceAtLeast(1)
+        if (wheel != null && wheel != start && Rect().also(wheel::getBoundsInScreen).let { it.width() <= startBox.width() * 2 }) {
+            // 给的是滚轮里的一项、滚轮就这一列宽:读整个滚轮
+            val box = Rect().also(wheel::getBoundsInScreen)
+            return Column(wheel, box, box.left, box.right, startBox.centerY(), ownHeight)
+        }
+        if (start.childCount > 0) {
+            val own = Column(start, Rect(startBox), startBox.left, startBox.right, startBox.centerY(), startBox.height() / ASSUMED_ROWS)
+            if (treeItems(own).size >= 2) return own
+        }
+        var best: Column? = null
+        var p = start.parent
+        var depth = 0
+        while (p != null && depth++ < MAX_UP) {
+            val box = Rect().also(p::getBoundsInScreen)
+            val c = Column(p, box, startBox.left, startBox.right, startBox.centerY(), ownHeight)
+            val n = treeItems(c).size
+            if (n >= 3) return c
+            if (n >= 2 && best == null) best = c
+            p = p.parent
+        }
+        return best ?: Column(start, Rect(startBox), startBox.left, startBox.right, startBox.centerY(), ownHeight)
     }
 
     private fun scrollable(n: AccessibilityNodeInfo): Boolean = n.isScrollable || canStep(n)
@@ -227,15 +288,19 @@ internal class WheelDriver(
     private fun px(n: Int, size: Int) = (n * (size - 1) / 999.0).roundToInt()
 
     private fun outcome(reached: Boolean, value: String?, from: String?, method: String, error: String? = null) =
-        WheelOutcome(reached, value, from, attempts, method, if (reached) null else error ?: "not_reached")
+        WheelOutcome(reached, WheelMath.clean(value), WheelMath.clean(from), attempts, method, if (reached) null else error ?: "not_reached")
 
     private companion object {
         const val MAX_STEPS = 80
-        const val MAX_DRAGS = 4
-        const val MAX_UP = 4
-        const val MAX_ITEM_CHARS = 12
+        const val MAX_UP = 5
+        const val MAX_DOWN = 4
+        /** 一项的名字常带着状态词(「已选中，21」「Selected, 21」),放宽一些。 */
+        const val MAX_ITEM_CHARS = 24
         /** 一格多高估不出来时按一屏五行算。 */
         const val ASSUMED_ROWS = 5
+        /** 一次拖至少能拖这么多格(列表只读到一两项时也拖得开)、至少这么多像素(拖得太短会被当成点按)。 */
+        const val MIN_DRAG_ROWS = 3
+        const val MIN_DRAG_PX = 48
         const val STEP_QUIET_MS = 150L
         const val STEP_CAP_MS = 700L
         const val DRAG_QUIET_MS = 300L

@@ -58,6 +58,7 @@ internal object SetWheel : PhoneTool {
                     "not_a_wheel" -> "not_a_wheel"
                     "at_end" -> "wheel_at_end"
                     "unknown_value" -> "wheel_unreadable"
+                    "not_moving" -> "wheel_not_moving"
                     else -> "wheel_not_reached"
                 }
                 put("error", code)

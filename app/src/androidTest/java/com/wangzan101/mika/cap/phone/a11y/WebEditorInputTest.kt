@@ -8,6 +8,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.wangzan101.mika.ui.MainActivity
+import com.wangzan101.mika.a11y.WebEditorTestActivity
 import java.io.File
 import com.wangzan101.mika.core.uistate.ActionResult
 import com.wangzan101.mika.core.uistate.ScreenSnapshot
@@ -46,7 +47,7 @@ class WebEditorInputTest {
 
     @Test
     fun typingReachesTheWebEditor() = runBlocking<Unit> {
-        DeviceSupport.startTestActivity(agent.display.displayId, "WebEditorTestActivity")
+        DeviceSupport.startTestActivity(agent.display.displayId, WebEditorTestActivity::class.java)
         val s = snapUntil { snap -> snap.elements.any { it.editable } }
         val field = s.elements.first { it.editable }
 
@@ -78,7 +79,7 @@ class WebEditorInputTest {
             val cm = ctx.getSystemService(ClipboardManager::class.java)
             instr.runOnMainSync { cm.setPrimaryClip(ClipData.newPlainText("user-label", "用户原来复制的 123")) }
 
-            DeviceSupport.startTestActivity(agent.display.displayId, "WebEditorTestActivity")
+            DeviceSupport.startTestActivity(agent.display.displayId, WebEditorTestActivity::class.java)
             val s = snapUntil { snap -> snap.elements.any { it.editable } }
             val r = screen.typeText(s.elements.first { it.editable }.ref, s.snapshotId, "粘贴测试")
             // 还原刚发生:「已复制」浮层若会弹,此刻就在主屏上

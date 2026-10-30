@@ -774,8 +774,8 @@ class AndroidScreen(
         val driver = WheelDriver(
             display.width, display.height,
             quiet = { q, cap -> withEventClock { it.awaitQuiet(q, cap) } },
-            // 慢拖:按节奏走时末尾减速到停、松手不甩,免得转过头
-            drag = { points -> drag(points, WHEEL_DRAG_MS, bow = false) },
+            // 慢拖:按节奏走时末尾减速到停、松手不甩,免得转过头;慢拖拖不动时换成快快划一下
+            drag = { points, slow -> drag(points, if (slow) WHEEL_DRAG_MS else WHEEL_SWIPE_MS, bow = false) },
             ocr = { readVisibleText() },
             imeShown = { imeBox() != null },
             back = { runCatching { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }.getOrDefault(false) },
@@ -1499,6 +1499,8 @@ class AndroidScreen(
         const val SYSTEM_ACTION_REQUEST = 0x5A
         /** 拖滚轮的时长:不短于节奏里的慢拖时长,松手时已经停住。 */
         const val WHEEL_DRAG_MS = 1_000L
+        /** 慢拖拖不动时快划一下的时长(像人手划滚轮)。 */
+        const val WHEEL_SWIPE_MS = 400L
         const val TYPE_ATTEMPTS = 2
         const val WEB_VIEW = "android.webkit.WebView"
         const val PASTE_WAIT_MS = 1_500L

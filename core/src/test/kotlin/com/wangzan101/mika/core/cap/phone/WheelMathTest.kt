@@ -29,6 +29,60 @@ class WheelMathTest {
         assertFalse(WheelMath.matches(null, "9"))
     }
 
+    /** 选中那一项的无障碍名字常带状态词或单位:「已选中，21」「Selected, 21」「21 (selected)」「21点」。 */
+    @Test fun valueIsFoundInsideLabelsWithStateWords() {
+        assertEquals(21, WheelMath.number("已选中，21"))
+        assertEquals(21, WheelMath.number("Selected, 21"))
+        assertEquals(21, WheelMath.number("21 (selected)"))
+        assertEquals(21, WheelMath.number("21点"))
+        assertEquals(9, WheelMath.number("已选中，09"))
+        assertTrue(WheelMath.matches("已选中，21", "21"))
+        assertTrue(WheelMath.matches("Selected, 21", "21"))
+        assertTrue(WheelMath.matches("已选中，07", "7"))
+        assertFalse(WheelMath.matches("已选中，21", "1"))
+        assertTrue(WheelMath.matches("已选中，下午", "下午"))
+        assertTrue(WheelMath.matches("下午 (selected)", "下午"))
+        assertFalse(WheelMath.matches("已选中，上午", "下午"))
+        // 报给模型的值只留值那一段
+        assertEquals("21", WheelMath.clean("已选中，21"))
+        assertEquals("21", WheelMath.clean("Selected, 21"))
+        assertEquals("21", WheelMath.clean("21 (selected)"))
+        assertEquals("21点", WheelMath.clean("21点"))
+        assertEquals("已选中，下午", WheelMath.clean("已选中，下午"))
+        assertEquals(null, WheelMath.clean(null))
+    }
+
+    /** 真机上的时钟:24 小时的时、分两个滚轮都循环,选中项叫「已选中，21」,上下是 20、22。 */
+    @Test fun stepsFromASelectedLabelWithStatePrefix() {
+        val near = listOf("20", "已选中，21", "22")
+        // 看不出循环时按数差走(往回 14 格,循环的滚轮也到得了)
+        assertEquals(-14, WheelMath.stepsTo(near, 1, "7"))
+        // 之前看出过 0–23 循环,或眼前就看得到 23 → 0:走近的一边,往前 10 格
+        assertEquals(10, WheelMath.stepsTo(near, 1, "7", knownModulus = 24))
+        assertEquals(10, WheelMath.stepsTo(listOf("18", "19", "20", "已选中，21", "22", "23", "0"), 3, "7"))
+        // 分:21 → 25 往前 4 格
+        assertEquals(4, WheelMath.stepsTo(near, 1, "25"))
+        assertEquals(1, WheelMath.stepsTo(listOf("Selected, 21", "22"), 0, "22"))
+        assertEquals(-1, WheelMath.stepsTo(listOf("20点", "21点", "22点"), 1, "20"))
+    }
+
+    @Test fun selectedItemPrefersTheSelectedFlag() {
+        val items = listOf(WheelMath.Item("20", 100, 100), WheelMath.Item("已选中，21", 100, 180, selected = true), WheelMath.Item("22", 100, 260))
+        assertEquals(1, WheelMath.selectedIndex(items, 260, 80))
+        // 没有标着选中的:中线上的
+        assertEquals(2, WheelMath.selectedIndex(items.map { it.copy(selected = false) }, 260, 80))
+    }
+
+    @Test fun columnDropsTitlesAndButtonsAroundTheWheel() {
+        val items = listOf(
+            WheelMath.Item("小时", 100, 20),
+            WheelMath.Item("20", 100, 300), WheelMath.Item("21", 100, 380), WheelMath.Item("22", 100, 460),
+            WheelMath.Item("确定", 100, 900),
+        )
+        assertEquals(listOf("20", "21", "22"), WheelMath.column(items, 2).map { it.text })
+        assertEquals(items.take(2), WheelMath.column(items.take(2), 1))
+    }
+
     @Test fun matchingTextIsWholeOrAffix() {
         assertTrue(WheelMath.matches("北京市", "北京"))
         assertTrue(WheelMath.matches("PM", "pm"))

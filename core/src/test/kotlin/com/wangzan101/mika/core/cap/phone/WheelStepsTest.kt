@@ -62,6 +62,14 @@ class WheelStepsTest {
         assertTrue("$actions", actions <= 15)
     }
 
+    /** 循环的滚轮没有头:滚了值不动是这一下没起作用,报 not_moving(交给拖动),不报到头。 */
+    @Test fun stuckWrappingWheelIsNotAtItsEnd() {
+        val s = WheelSteps("40")
+        val visible = listOf("58", "59", "00", "01", "02")
+        assertTrue(s.next("00", visible) is WheelSteps.Step.Act)
+        assertEquals(WheelSteps.Step.Stop("not_moving"), s.next("00", visible))
+    }
+
     @Test fun valueBeyondTheEndStops() {
         val hours = (0..23).map { "$it" }
         val w = Wheel(hours, 20, wrap = false)

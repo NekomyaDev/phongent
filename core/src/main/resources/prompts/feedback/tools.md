@@ -138,6 +138,9 @@ The wheel stopped at its end before showing that value: the value is not on this
 ## failure.wheel_unreadable
 The value the wheel shows could not be read, so it was not turned. Observe once (or take a screenshot) and set it with phone_swipe if needed.
 
+## failure.wheel_not_moving
+Dragging the wheel did not change it, even with longer and faster drags; value is what it shows now. Turn it yourself with phone_swipe on that wheel's column, a few items per swipe, observing after each.
+
 ## failure.wheel_not_reached
 The wheel did not reach that value within the attempts allowed; value is what it shows now. Observe once and either call again or finish it with a short phone_swipe.
 

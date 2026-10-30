@@ -44,7 +44,7 @@ class SetWheelToolTest {
         assertEquals("23", end.s("value"))
         assertEquals(FAILURE_MESSAGES.getValue("wheel_at_end"), end.s("message"))
 
-        for ((port, code) in listOf("not_a_wheel" to "not_a_wheel", "unknown_value" to "wheel_unreadable", "overshoot" to "wheel_not_reached")) {
+        for ((port, code) in listOf("not_a_wheel" to "not_a_wheel", "unknown_value" to "wheel_unreadable", "not_moving" to "wheel_not_moving", "overshoot" to "wheel_not_reached")) {
             screen.wheel = WheelOutcome(false, "1", "1", 3, "drag", error = port)
             assertEquals(code, d.execute(call("""{"ref":"@e1","snapshotId":"$id","value":"30"}""")).content.s("error"))
         }

@@ -44,7 +44,7 @@ class ScreenAccuracyTest {
     }
 
     private suspend fun openFields(): ScreenSnapshot {
-        DeviceSupport.startTestActivity(agent.display.displayId, "FieldsTestActivity")
+        DeviceSupport.startTestActivity(agent.display.displayId, FieldsTestActivity::class.java)
         return snapUntil { s -> s.packageName == TEST_PACKAGE && s.elements.any { it.name == "7" } }
     }
 

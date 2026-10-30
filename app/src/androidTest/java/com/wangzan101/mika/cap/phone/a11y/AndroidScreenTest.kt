@@ -168,7 +168,7 @@ class AndroidScreenTest {
     @Test
     fun appSwitchDetected() = runBlocking<Unit> {
         openSettings()
-        DeviceSupport.startTestActivity(agent.display.displayId, "PlainTestActivity")
+        DeviceSupport.startTestActivity(agent.display.displayId, PlainTestActivity::class.java)
         snapUntil { it.packageName == TEST_PACKAGE }
         val r = ok(screen.tapXY(360, 1400))
         assertEquals(TEST_PACKAGE, r.appSwitched)
@@ -180,7 +180,7 @@ class AndroidScreenTest {
         assertEquals(ScreenState.BLANK, blank.state)
         assertFalse(blank.needsHuman)
 
-        DeviceSupport.startTestActivity(agent.display.displayId, "SecureTestActivity")
+        DeviceSupport.startTestActivity(agent.display.displayId, SecureTestActivity::class.java)
         snapUntil { s -> s.packageName == TEST_PACKAGE && s.elements.any { it.name == "secure page" } }
         val protectedCheck = pollUntil(5_000) {
             runBlocking { screen.checkScreen() }.takeIf { it.state == ScreenState.PROTECTED }

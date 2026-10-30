@@ -65,6 +65,25 @@ class ManifestProvidersTest {
         }
     }
 
+    /**
+     * 测试 APK 清单里的页面、服务运行在测试包自己的进程里,那里没有 Kotlin 标准库(和 App 重复的依赖不打进测试 APK):
+     * 每个都要有同名的 Java 源文件。类名对不上、或写成 Kotlin,真机上一打开就崩,读屏只读到一块空屏。
+     */
+    @Test
+    fun testApkComponentsAreJavaClassesWithMatchingNames() {
+        val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+            .newDocumentBuilder().parse(File("src/androidTest/AndroidManifest.xml"))
+        val names = listOf("activity", "service", "receiver", "provider").flatMap { tag ->
+            val nodes = doc.getElementsByTagName(tag)
+            (0 until nodes.length).map { (nodes.item(it) as Element).getAttributeNS(androidNs, "name") }
+        }
+        assertTrue(names.isNotEmpty())
+        for (n in names) {
+            val path = "src/androidTest/java/${n.replace('.', '/')}"
+            assertTrue("$n has no Java source at $path.java", File("$path.java").isFile)
+        }
+    }
+
     /** 内置助手进程按这个全名启动。 */
     @Test
     fun helperEntryClassExists() {
