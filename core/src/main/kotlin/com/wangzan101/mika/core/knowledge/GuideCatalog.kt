@@ -27,9 +27,9 @@ sealed interface GuideView {
 
 private const val SKILL_FILE = "SKILL.md"
 /** 文档可能提到本机没有的工具;在注入和 knowledge_read / skill_read 的边界处提醒。 */
-const val UNAVAILABLE_TOOLS_NOTE = "(注:文中提到的脚本或本机没有的工具不可用,只使用你工具列表中的工具。)"
+const val UNAVAILABLE_TOOLS_NOTE = "(Note: scripts mentioned in the text and tools this phone does not have are not available; use only the tools in your tool list.)"
 /** 设备支持沙箱时的附注:技能脚本按清单可以跑。 */
-const val SANDBOX_TOOLS_NOTE = "(注:标为可运行的脚本可用 run_bundled_script 运行,其余脚本与本机没有的工具不可用。)"
+const val SANDBOX_TOOLS_NOTE = "(Note: scripts marked runnable can be run with run_bundled_script; other scripts and tools this phone does not have are not available.)"
 
 /** 注入参考资料、knowledge_read / skill_read 时的附注,按沙箱工具是否提供。 */
 fun toolsNote(sandboxAvailable: Boolean): String = if (sandboxAvailable) SANDBOX_TOOLS_NOTE else UNAVAILABLE_TOOLS_NOTE
@@ -134,7 +134,7 @@ class GuideCatalog private constructor(
         val text = (if (path == main) fullText(info) else read(info, path))
             ?: return GuideView.Failed("file_not_found", "File '$path' could not be read.")
         val cut = text.length > VIEW_LIMIT
-        return GuideView.Found(info, path, note + "\n" + (if (cut) text.take(VIEW_LIMIT) + "\n…(已截断,可用 file_path 查看其它文件)" else text), cut, text.length)
+        return GuideView.Found(info, path, note + "\n" + (if (cut) text.take(VIEW_LIMIT) + "\n…(truncated; use file_path to view the other files)" else text), cut, text.length)
     }
 
     // 坏掉的个人技能明确报错,不回退到同名内置技能
@@ -142,9 +142,9 @@ class GuideCatalog private constructor(
         if (path != SKILL_FILE) return GuideView.Failed("file_not_found", "Personal skill ${info.name} has only $SKILL_FILE.")
         val body = personalEntries().find { it.info.name == info.name }?.body
             ?: return GuideView.Failed("personal_skill_invalid",
-                "The user's personal skill '${info.name}' is damaged and cannot be read; do not rely on it. The user can fix or delete it in 记忆与技能.")
+                "The user's personal skill '${info.name}' is damaged and cannot be read; do not rely on it. The user can fix or delete it in Memory & skills.")
         val cut = body.length > VIEW_LIMIT
-        return GuideView.Found(info, SKILL_FILE, if (cut) body.take(VIEW_LIMIT) + "\n…(已截断)" else body, cut, body.length)
+        return GuideView.Found(info, SKILL_FILE, if (cut) body.take(VIEW_LIMIT) + "\n…(truncated)" else body, cut, body.length)
     }
 
     /** 主文件(APP.md / SITE.md / SKILL.md)的正文,去掉头部。坏掉的个人技能为 null。 */
@@ -222,11 +222,11 @@ class GuideCatalog private constructor(
             PersonalEntry(
                 GuideInfo(
                     kind = PERSONAL_KIND, name = s.name, display = one("display")?.takeIf { it.isNotEmpty() } ?: s.name,
-                    description = (if (s.status == SkillStatus.trial) "[未核实，试用时须核查] " else "") + (one("description") ?: ""), aliases = many("aliases"),
+                    description = (if (s.status == SkillStatus.trial) "[unverified: check the result when trying it] " else "") + (one("description") ?: ""), aliases = many("aliases"),
                     terms = many("apps") + many("domains"), files = listOf(SKILL_FILE),
                     apps = many("apps"), sites = many("sites") + many("domains"),
                 ),
-                body.takeIf { valid }?.let { if (s.status == SkillStatus.trial) "[未核实的个人技能草稿：只可试用，结果必须核查。]\n$it" else it },
+                body.takeIf { valid }?.let { if (s.status == SkillStatus.trial) "[Unverified personal skill draft: use it only as a trial; the result must be checked.]\n$it" else it },
             )
         }
 

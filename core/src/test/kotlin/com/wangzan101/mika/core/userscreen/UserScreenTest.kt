@@ -34,17 +34,17 @@ class UserScreenTest {
 
     @Test fun saidSentences() {
         val s = UserScreen("s1", at, "com.example.pay", "支付")
-        assertEquals("用户刚截下他正在看的屏幕(支付,10月28日 04:02),没有附言。", UserScreenPrompt.said("s1", s, "", zone))
-        assertEquals("用户刚截下他正在看的屏幕(支付,10月28日 04:02),附言:记一下", UserScreenPrompt.said("s1", s, "记一下", zone))
-        assertTrue(UserScreenPrompt.said("s1", s.copy(blocked = true), "", zone).contains("不让截图"))
-        assertTrue(UserScreenPrompt.said("s9", null, "", zone).contains("已经不在了"))
+        assertEquals("The user just captured the screen they are looking at (支付, Oct 28 04:02), with no words.", UserScreenPrompt.said("s1", s, "", zone))
+        assertEquals("The user just captured the screen they are looking at (支付, Oct 28 04:02), with these words: 记一下", UserScreenPrompt.said("s1", s, "记一下", zone))
+        assertTrue(UserScreenPrompt.said("s1", s.copy(blocked = true), "", zone).contains("does not allow screenshots"))
+        assertTrue(UserScreenPrompt.said("s9", null, "", zone).contains("no longer available"))
     }
 
     @Test fun earlierLine() {
         val s = UserScreen("s1", at, "com.example.pay", "支付", lines = listOf(ScreenLine("支付成功", 500, 200), ScreenLine("¥38.50", 500, 260)))
-        assertEquals("(用户之前发来的屏幕 s1:支付,10月28日 04:02;屏上开头是「支付成功 ¥38.50」)", UserScreenPrompt.earlier("s1", s, zone))
-        assertTrue(UserScreenPrompt.earlier("s1", s.copy(lines = emptyList()), zone).contains("没有读到字"))
-        assertTrue(UserScreenPrompt.earlier("s1", s.copy(blocked = true), zone).contains("不让截图"))
+        assertEquals("(Screen s1 the user sent earlier: 支付, Oct 28 04:02; the screen begins with 「支付成功 ¥38.50」)", UserScreenPrompt.earlier("s1", s, zone))
+        assertTrue(UserScreenPrompt.earlier("s1", s.copy(lines = emptyList()), zone).contains("no text was read"))
+        assertTrue(UserScreenPrompt.earlier("s1", s.copy(blocked = true), zone).contains("does not allow screenshots"))
         val long = s.copy(lines = listOf(ScreenLine("字".repeat(100), 0, 0)))
         assertEquals(UserScreenPrompt.GIST_CHARS + 1, UserScreenPrompt.gist(long)!!.length)
     }

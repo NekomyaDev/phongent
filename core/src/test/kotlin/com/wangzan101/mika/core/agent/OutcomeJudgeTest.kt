@@ -76,6 +76,6 @@ class OutcomeJudgeTest {
             Turn("视频标题", "视频不存在", "succeeded", result = "not_possible"),
             Turn("有没有小王", "没有", "succeeded", result = "done"),
         ))!!.parts.single() as Part.Text).text
-        assertTrue(text, text.contains("只办成了一部分:只看了两条") && text.contains("没有办成:视频不存在") && text.contains("结果:没有"))
+        assertTrue(text, text.contains("only partly done: 只看了两条") && text.contains("not done: 视频不存在") && text.contains("result: 没有"))
     }
 }

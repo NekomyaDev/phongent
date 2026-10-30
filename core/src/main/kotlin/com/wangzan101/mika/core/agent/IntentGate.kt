@@ -17,7 +17,7 @@ internal class IntentGate(private val judge: ChatModel, private val fallback: Ch
             ?.parts?.filterIsInstance<Part.Text>()?.joinToString("\n") { it.text }.orEmpty()
         val input = buildString {
             if (prior.isNotEmpty()) appendLine(prior).appendLine()
-            append("用户这次原话:\n").append(task)
+            append("The user's current message:\n").append(task)
         }
         val messages = listOf(Message(Role.User, listOf(Part.Text(input)), Author.User))
         for (candidate in listOfNotNull(judge, fallback)) {

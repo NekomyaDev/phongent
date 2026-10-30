@@ -185,7 +185,7 @@ class ReplayerTest {
 
         val p = Notes.screen().apply { protectedPage = "home" }
         val hidden = replayer(p).run(RouteChoice(Notes.route(), listOf("x"))) as ReplayOutcome.Diverged
-        assertEquals("受保护页面", hidden.seen)
+        assertEquals("a protected page", hidden.seen)
     }
 
     @Test fun stableRefsTranslatedToPortRefs() = runTest {

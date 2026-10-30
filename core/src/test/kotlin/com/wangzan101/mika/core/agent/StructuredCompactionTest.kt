@@ -42,16 +42,16 @@ class StructuredCompactionTest {
             listOf(
                 ContextCompressor.HEADER,
                 ContextCompressor.SUMMARY_REMINDER,
-                "目标:帮我查上海的天气",
-                "已确认的事实:",
-                "- 到过的 App:com.weather",
-                "- 打开过的页面:https://wttr.in/Shanghai",
-                "进展:",
-                "- 第 1 步 phone_launch_app(com.weather)→ 生效",
-                "- 第 2 步 web_navigate→ 生效",
-                "- 第 3 步 phone_tap(刷新)→ ref_expired",
-            ) + (4..14).map { "- 第 $it 步 phone_tap(按钮${it - 3})→ 生效" } +
-                "下一步:从下面保留的最近几步接着做(折叠前最后的打算:刷新一下再读)",
+                "Goal: 帮我查上海的天气",
+                "Confirmed facts:",
+                "- apps visited: com.weather",
+                "- pages opened: https://wttr.in/Shanghai",
+                "Progress:",
+                "- Step 1 phone_launch_app(com.weather) → applied",
+                "- Step 2 web_navigate → applied",
+                "- Step 3 phone_tap(刷新) → ref_expired",
+            ) + (4..14).map { "- Step $it phone_tap(按钮${it - 3}) → applied" } +
+                "Next: continue from the most recent steps kept below (last stated plan before folding: 刷新一下再读)",
             s.lines(),
         )
     }
@@ -75,15 +75,15 @@ class StructuredCompactionTest {
         } + taps(12)
         val s = summaries(ContextCompressor(TOOLS,structured = true).compress(h, contextTokens = 100).messages).single().lines()
         // 上下文很小,只留最近一次往返:折了 31 步,最近 15 步逐条,更早 16 步并成计数
-        assertTrue(s.toString(), "- 更早的 16 步:生效 13、ref_expired 3" in s)
-        assertEquals(15, s.count { it.startsWith("- 第 ") })
-        assertTrue("- 第 17 步 phone_tap(好17)→ 生效" in s && s.none { it.startsWith("- 第 16 步") })
+        assertTrue(s.toString(), "- 16 earlier steps: applied 13, ref_expired 3" in s)
+        assertEquals(15, s.count { it.startsWith("- Step ") })
+        assertTrue("- Step 17 phone_tap(好17) → applied" in s && s.none { it.startsWith("- Step 16") })
     }
 
     @Test fun plainSummaryWhenOff() {
         val h = head + taps(15)
         val s = summaries(ContextCompressor(TOOLS).compress(h, contextTokens = 100).messages).single()
-        assertTrue("目标:" !in s && s.lines()[1] == ContextCompressor.SUMMARY_REMINDER && s.lines()[2].startsWith("第 1 步"))
+        assertTrue("Goal: " !in s && s.lines()[1] == ContextCompressor.SUMMARY_REMINDER && s.lines()[2].startsWith("Step 1"))
     }
 
     @Test fun calibratedEstimateDecidesWhenToCompact() {
@@ -126,7 +126,7 @@ class StructuredCompactionTest {
         assertTrue("${s.length}", s.length < 4000)
         assertTrue(long !in s)
         val plain = summaries(ContextCompressor(TOOLS).compress(h, contextTokens = 100).messages).single()
-        assertTrue(plain.lines().drop(1).all { it.length < 120 })
+        assertTrue(plain.lines().drop(2).all { it.length < 120 })
     }
 
     @Test fun loopUsesStructuredSummaryWhenFlagOn() = runTest {
@@ -136,7 +136,7 @@ class StructuredCompactionTest {
         }
         AgentLoop(m, toolDispatcher(FakeScreen()), "BASE", flags = SpeedFlags(structuredCompaction = true)).run("等一会儿")
         val s = summaries(m.requests.last().messages).single()
-        assertTrue(s, "目标:等一会儿" in s && "进展:" in s && "下一步:" in s)
+        assertTrue(s, "Goal: 等一会儿" in s && "Progress:" in s && "Next: " in s)
     }
 
     @Test fun calibratedRatioIsSmoothedAndBounded() {

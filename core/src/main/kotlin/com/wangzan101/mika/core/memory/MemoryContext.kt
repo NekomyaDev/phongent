@@ -14,8 +14,8 @@ object MemoryContext {
     const val MAX_PROCEDURES = 3
     const val MIN_SCORE = 0.5
 
-    private const val FACTS_HEADER = "关于用户的记忆(用户告诉过你的;可能过时,和用户这次说的冲突时以这次为准):"
-    private const val PROCEDURES_HEADER = "用户批准的做法(和用户这次说的冲突时以这次为准):"
+    private const val FACTS_HEADER = "Memories about the user (things the user told you; may be out of date; when they conflict with what the user says now, follow what they say now):"
+    private const val PROCEDURES_HEADER = "Ways of doing things the user approved (when they conflict with what the user says now, follow what they say now):"
 
     /** [rewrite]:做法里提到的旧工具名换成现在的(见 LegacyNames.rewrite);默认原样。 */
     fun build(items: List<MemoryItem>, goal: String, lastUserTurn: String?, rewrite: (String) -> String = { it }): MemoryBlock {

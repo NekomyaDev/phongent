@@ -243,6 +243,6 @@ class PrefixStabilityTest {
 
     private companion object {
         const val STEPS = 30
-        val STEP = Regex("第 (\\d+) 步,上限")
+        val STEP = Regex("Step: (\\d+) of at most")
     }
 }

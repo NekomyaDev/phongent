@@ -785,7 +785,7 @@ class TaskService : Service() {
 
         fun startTrigger(context: Context, goal: String, threadId: String, windowKey: String, conditionGoal: String?) {
             val checking = conditionGoal != null
-            val runGoal = if (checking) "$conditionGoal\n只读检查。最后只输出 JSON：{\"met\":true或false,\"evidence\":\"简短依据\"}。无法检查时报告失败，不要猜测。" else goal
+            val runGoal = if (checking) "$conditionGoal\nRead-only check. At the end, output only JSON: {\"met\":true or false,\"evidence\":\"short supporting evidence\"}. If you cannot check, report failure; do not guess." else goal
             context.startForegroundService(Intent(context, TaskService::class.java).setAction(ACTION_START_TRIGGER)
                 .putExtra(EXTRA_GOAL, runGoal).putExtra(EXTRA_CONVERSATION, threadId)
                 .putExtra(EXTRA_TRIGGER_KEY, windowKey).putExtra(EXTRA_TRIGGER_THREAD, threadId)

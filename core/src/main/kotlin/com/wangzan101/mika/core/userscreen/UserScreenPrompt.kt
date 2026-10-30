@@ -5,6 +5,7 @@ import com.wangzan101.mika.core.prompt.Feedback
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * 带着用户屏幕的一句话给模型时的写法,只在这里。和相册里的图片(附件,照旧是文件)分开:
@@ -16,7 +17,7 @@ object UserScreenPrompt {
     /** 之前几轮里那一屏留几个字的开头。 */
     const val GIST_CHARS = 40
 
-    private val TIME = DateTimeFormatter.ofPattern("M月d日 HH:mm")
+    private val TIME = DateTimeFormatter.ofPattern("MMM d HH:mm", Locale.ENGLISH)
 
     fun time(at: Long, zone: ZoneId): String = TIME.format(Instant.ofEpochMilli(at).atZone(zone))
 

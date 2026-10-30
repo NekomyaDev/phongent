@@ -170,7 +170,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     suspend fun describe(task: String): String {
         val shot = capture().let { it as? Shot.Ok ?: throw (it as Shot.Missing).let { m -> ScreenUnavailable(m.reason, m.message) } }
         clearForVision()?.let { throw ScreenUnavailable(it.reason, it.message) }
-        return vision.ask(DESCRIBE_PROMPT, "我现在想做的事:$task", listOf(shot.png))
+        return vision.ask(DESCRIBE_PROMPT, "What I want to do now: $task", listOf(shot.png))
     }
 
     /**

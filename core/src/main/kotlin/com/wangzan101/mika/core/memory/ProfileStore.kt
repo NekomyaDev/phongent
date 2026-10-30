@@ -66,5 +66,5 @@ class ProfileStore(private val backend: ProfileBackend, private val clock: () ->
 
 object ProfileContext {
     fun render(snapshot: List<ProfileEntry>): String? = snapshot.takeIf { it.isNotEmpty() }
-        ?.joinToString("\n", "用户画像(仅作参考，以本轮用户原话为准):\n") { "- ${it.text}" }
+        ?.joinToString("\n", "User profile (for reference only; what the user says in this turn takes precedence):\n") { "- ${it.text}" }
 }

@@ -74,7 +74,7 @@ class OpenAiCompatModelTest {
         model(vision = false).complete("s", withImage, emptyList())
         val off = server.takeRequest().body.readUtf8()
         assertFalse(off.contains("image_url"))
-        assertTrue(off.contains("[截图已省略:当前模型不支持看图]"))
+        assertTrue(off.contains("[screenshot omitted: the current model cannot see images]"))
 
         server.enqueue(ok("""{"choices":[{"finish_reason":"stop","message":{"content":"ok"}}]}"""))
         model(vision = true).complete("s", withImage, emptyList())

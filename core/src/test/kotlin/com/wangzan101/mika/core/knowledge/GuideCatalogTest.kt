@@ -57,7 +57,7 @@ class GuideCatalogTest {
         assertTrue(v.truncated)
         assertEquals(VIEW_LIMIT + 500, v.totalChars)
         assertTrue(v.content.startsWith(UNAVAILABLE_TOOLS_NOTE + "\n" + "字".repeat(VIEW_LIMIT)))
-        assertTrue(v.content.endsWith("…(已截断,可用 file_path 查看其它文件)"))
+        assertTrue(v.content.endsWith("…(truncated; use file_path to view the other files)"))
         val short = big.view("site:big.com") as GuideView.Found
         assertTrue(!short.truncated && short.totalChars == short.content.length - UNAVAILABLE_TOOLS_NOTE.length - 1)
     }

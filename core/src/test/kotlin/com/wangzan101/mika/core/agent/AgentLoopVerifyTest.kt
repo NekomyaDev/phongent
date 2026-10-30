@@ -110,7 +110,7 @@ class AgentLoopVerifyTest {
         assertFalse(result.reviewed)
         assertTrue(checker.requests.isEmpty())
         assertEquals(4, main.requests.size)
-        assertTrue(main.lastNotice(2).contains("查看当前界面"))
+        assertTrue(main.lastNotice(2).contains("Look at the current screen"))
         assertTrue(sink.events.any { it is RunEvent.Sources })
         assertFalse(sink.events.any { it is RunEvent.AnswerCheck || it is RunEvent.Verifier })
     }

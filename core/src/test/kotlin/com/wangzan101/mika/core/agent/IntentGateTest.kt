@@ -14,7 +14,7 @@ class IntentGateTest {
         assertEquals(IntentGate.Intent.Discuss, decision)
         assertTrue(judge.offeredTools.single().isEmpty())
         val input = judge.requests.single().single().parts.single() as com.wangzan101.mika.core.model.Part.Text
-        assertTrue(input.text.contains("用户这次原话:\n以后可以帮我同步发布，对吧？"))
+        assertTrue(input.text.contains("The user's current message:\n以后可以帮我同步发布，对吧？"))
     }
 
     @Test fun onlyKnownIntentLabelsAreAccepted() {

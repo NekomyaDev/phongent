@@ -35,12 +35,12 @@ class ConversationTest {
     @Test fun failedTurnShowsReason() {
         // 停止的那一轮没有交代时只说取消了(停止后补上交代的见 StopSummaryTest)
         val t = text(listOf(Turn("订票", "验证码一直过不去", "failed"), Turn("查天气", Conversation.CANCELLED_OUTCOME, "cancelled")))
-        assertTrue("没有完成,原因:验证码一直过不去" in t)
-        assertTrue("你取消了这次任务" in t && "停止前" !in t)
+        assertTrue("not finished, reason: 验证码一直过不去" in t)
+        assertTrue("the user cancelled this task" in t && "before the stop" !in t)
     }
 
     @Test fun unverifiedTurnIsLabelled() {
         val t = text(listOf(Turn("查余额", "余额 10 元", "unverified", note = "防截屏")))
-        assertTrue(t, "结果(没能核实):余额 10 元" in t)
+        assertTrue(t, "result (could not be verified): 余额 10 元" in t)
     }
 }

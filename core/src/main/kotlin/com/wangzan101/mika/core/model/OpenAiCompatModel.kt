@@ -183,7 +183,7 @@ class OpenAiCompatModel(
 
     private fun textOf(p: Part): String = when (p) {
         is Part.Text -> p.text
-        is Part.Image -> "[截图已省略:当前模型不支持看图]"
+        is Part.Image -> "[screenshot omitted: the current model cannot see images]"
         else -> ""
     }
 

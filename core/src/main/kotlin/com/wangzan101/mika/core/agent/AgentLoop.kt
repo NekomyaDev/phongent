@@ -450,7 +450,7 @@ class AgentLoop(
                 if (intent == IntentGate.Intent.Discuss) {
                     // 提议的调用尚未写进历史、也没有执行；重问一次，只给直接回答的机会。
                     val discussion = history + ctx.notice("conversation_intent",
-                        "用户这次是在讨论或复盘。直接回答这次的问题，不读取或操作 App、网站或其他外部内容。")
+                        "The user is discussing or reviewing this time. Answer this question directly, without reading or operating apps, websites or other outside content.")
                     reply = try { caller.ask(discussion, emptyList(), using = model, onText = previewFor(step)) }
                     catch (e: CancellationException) { throw e }
                     catch (e: Exception) { return StopRules.modelFailed(e) }
@@ -506,7 +506,7 @@ class AgentLoop(
                 val currentFacts = facts()
                 if (!reviewFinalAnswer && currentFacts.unreadChange && !resultReadNudged) {
                     resultReadNudged = true
-                    history += ctx.notice("operation_result", "最后一次操作之后还没有读取结果。先查看当前界面，确认实际状态，再回答；如果无法读取，如实说明。")
+                    history += ctx.notice("operation_result", "The result of the last action has not been read yet. Look at the current screen first to confirm the actual state, then answer; if it cannot be read, say so plainly.")
                     continue
                 }
                 // 不带调用的回复就是最终回答；产品路径只整理来源。
@@ -677,7 +677,7 @@ class AgentLoop(
         val catalog = skills?.takeIf { recommendSkills } ?: return
         e ?: return
         val linked = catalog.linkedSkills(e.name).map { GuideRecommender.id(it) to GuideRecommender.line(it) }
-        ctx.linkedSkills("关联 ${e.display} 的技能", SKILL_INDEX_HEADER, linked)?.let { history += it }
+        ctx.linkedSkills("skills linked to ${e.display}", SKILL_INDEX_HEADER, linked)?.let { history += it }
     }
 
     /**

@@ -236,7 +236,7 @@ class LocatorTest {
         val m = says("[屏幕] 设置首页")
         assertEquals("[屏幕] 设置首页", locator(LocScreen(), m).describe("打开 WLAN"))
         val msg = m.requests.single().single()
-        assertEquals("我现在想做的事:打开 WLAN", (msg.parts[0] as Part.Text).text)
+        assertEquals("What I want to do now: 打开 WLAN", (msg.parts[0] as Part.Text).text)
         assertTrue(msg.parts[1] is Part.Image)
         assertTrue(m.system!!, "[可交互元素]" in m.system!!)
     }

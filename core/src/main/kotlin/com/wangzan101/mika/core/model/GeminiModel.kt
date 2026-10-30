@@ -166,7 +166,7 @@ class GeminiModel(
                 p is Part.Image && capabilities.vision -> buildJsonObject {
                     putJsonObject("inlineData") { put("mimeType", p.mime); put("data", p.pngBase64) }
                 }
-                p is Part.Image -> buildJsonObject { put("text", "[截图已省略:当前模型不支持看图]") }
+                p is Part.Image -> buildJsonObject { put("text", "[screenshot omitted: the current model cannot see images]") }
                 else -> null
             }
         }

@@ -37,10 +37,10 @@ class MemoryContextTest {
         assertFalse(msg.contains("先领券"))
         assertEquals(MemoryContext.MAX_PROCEDURES, block.usedIds.count { id -> approved.any { it.id == id } })
         assertTrue(fact.id in block.usedIds)
-        val procSection = msg.substringAfter("用户批准的做法(和用户这次说的冲突时以这次为准):")
+        val procSection = msg.substringAfter("Ways of doing things the user approved (when they conflict with what the user says now, follow what they say now):")
         assertEquals(3, numberedLines(procSection).size)
         assertTrue(numberedLines(procSection).all { it.contains("先比较") })
-        assertFalse(msg.substringBefore("用户批准的做法").contains("先比较"))
+        assertFalse(msg.substringBefore("Ways of doing things the user approved").contains("先比较"))
     }
 
     @Test fun pinnedProceduresCountTowardCap() {
@@ -95,14 +95,14 @@ class MemoryContextTest {
 
     @Test fun headerSaysCurrentRequestWins() {
         val block = MemoryContext.build(distractors(10) + mem("外卖不要香菜"), goal = "点外卖,这次多放香菜", lastUserTurn = null)
-        assertTrue(block.message!!.startsWith("关于用户的记忆(用户告诉过你的;可能过时,和用户这次说的冲突时以这次为准):"))
+        assertTrue(block.message!!.startsWith("Memories about the user (things the user told you; may be out of date; when they conflict with what the user says now, follow what they say now):"))
     }
 
     @Test fun proceduresOnlyBlockAlsoSaysCurrentRequestWins() {
         val block = MemoryContext.build(
             distractors(10) + mem("点外卖时先比价", kind = MemoryKind.procedure), goal = "点外卖", lastUserTurn = null,
         )
-        assertTrue(block.message!!.startsWith("用户批准的做法(和用户这次说的冲突时以这次为准):"))
+        assertTrue(block.message!!.startsWith("Ways of doing things the user approved (when they conflict with what the user says now, follow what they say now):"))
     }
 
     @Test fun emptyGivesNull() {

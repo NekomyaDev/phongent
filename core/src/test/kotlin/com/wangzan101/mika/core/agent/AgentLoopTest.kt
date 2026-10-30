@@ -485,7 +485,7 @@ class AgentLoopTest {
         com.wangzan101.mika.core.testing.assertAnswered(DONE, run.await())
         val text = m.requests[1].withoutRuntime().last().results().single().json().s("instruction")
         assertEquals(
-            "用户说已自己完成,请只 observe 读一下 App 现在的状态来核实:确认完成就直接回答用户读到的结果,无法确认就 end_not_done,不要再做其他操作。",
+            "The user says they finished it themselves. Only observe to read the app's current state and check: if it is confirmed done, answer the user directly with what you read; if you cannot confirm it, call end_not_done. Do nothing else.",
             text,
         )
     }
@@ -742,7 +742,7 @@ class AgentLoopTest {
         val retried = m.requests[11].withoutRuntime()
         assertEquals(1 + 1 + 6 * 2, retried.size)
         val summary = retried[1].plainText()
-        assertTrue(summary, summary.startsWith(ContextCompressor.HEADER) && "第 4 步 wait(0.4)→ 生效" in summary && "第 5 步" !in summary)
+        assertTrue(summary, summary.startsWith(ContextCompressor.HEADER) && "Step 4 wait(0.4) → applied" in summary && "Step 5 " !in summary)
         // 之后只追加:压缩的结果原样在前,多一次往返接在后面
         assertEquals(1 + 1 + 7 * 2, m.requests[12].withoutRuntime().size)
         assertEquals(retried, m.requests[12].withoutRuntime().take(retried.size))
@@ -766,7 +766,7 @@ class AgentLoopTest {
         val retried = m.requests[16].withoutRuntime()
         assertTrue("${retried.size} < ${overflowed.size}", retried.size < overflowed.size)
         val summary = retried[1].plainText()
-        assertTrue(summary, summary.startsWith(ContextCompressor.HEADER) && "第 8 步" in summary && "第 9 步" !in summary)
+        assertTrue(summary, summary.startsWith(ContextCompressor.HEADER) && "Step 8 " in summary && "Step 9 " !in summary)
     }
 
     @Test fun contextTooLongWithNothingToFoldFailsWithoutResending() = runTest {

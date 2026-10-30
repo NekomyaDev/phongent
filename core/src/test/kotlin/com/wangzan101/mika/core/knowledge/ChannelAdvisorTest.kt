@@ -15,12 +15,12 @@ class ChannelAdvisorTest {
 
     @Test fun bothRoutesListed() {
         assertEquals(
-            "可用渠道:小红书 — App:已安装(com.xingin.xhs),有 App 做法;网页:xiaohongshu.com,有网页做法",
+            "Available channels: 小红书 — app: installed (com.xingin.xhs), known way to do it in the app; web: xiaohongshu.com, known way to do it on the web",
             ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(setOf("com.xingin.xhs"), emptySet(), true)),
         )
         // 没有网页做法时只给域名
         assertEquals(
-            "可用渠道:小红书 — App:已安装(com.xingin.xhs);网页:xiaohongshu.com",
+            "Available channels: 小红书 — app: installed (com.xingin.xhs); web: xiaohongshu.com",
             ChannelAdvisor.line(listOf(xhs), testCatalog(), ChannelFacts(setOf("com.xingin.xhs"), emptySet(), true)),
         )
     }
@@ -30,21 +30,21 @@ class ChannelAdvisorTest {
         val app = entry("xhs", "小红书", listOf("com.xingin.xhs")).copy(related = listOf("xiaohongshu.com"))
         val site = entry("xiaohongshu.com", "小红书", domains = listOf("xiaohongshu.com")).copy(surface = Surface.Web, related = listOf("xhs"))
         assertEquals(
-            "可用渠道:小红书 — App:已安装(com.xingin.xhs),有 App 做法;网页:xiaohongshu.com,有网页做法",
+            "Available channels: 小红书 — app: installed (com.xingin.xhs), known way to do it in the app; web: xiaohongshu.com, known way to do it on the web",
             ChannelAdvisor.line(listOf(app, site), skills, ChannelFacts(setOf("com.xingin.xhs"), emptySet(), true)),
         )
-        assertEquals("可用渠道:小红书 — 网页:xiaohongshu.com,有网页做法",
+        assertEquals("Available channels: 小红书 — web: xiaohongshu.com, known way to do it on the web",
             ChannelAdvisor.line(listOf(site.copy(related = emptyList())), skills, ChannelFacts(emptySet(), emptySet(), true)))
     }
 
     @Test fun notInstalledSaysSo() {
         val l = ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(emptySet(), emptySet(), true))!!
-        assertTrue(l, "App:未安装" in l)
-        assertFalse(l, "已安装" in l)
+        assertTrue(l, "app: not installed" in l)
+        assertFalse(l, "app: installed" in l)
     }
 
     @Test fun webUnavailableOmitsWeb() {
-        assertEquals("可用渠道:小红书 — App:已安装(com.xingin.xhs),有 App 做法",
+        assertEquals("Available channels: 小红书 — app: installed (com.xingin.xhs), known way to do it in the app",
             ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(setOf("com.xingin.xhs"), emptySet(), false)))
         // 只有网页的条目,浏览器不可用时没有可说的
         assertNull(ChannelAdvisor.line(listOf(entry("web", domains = listOf("example.com"))), skills, ChannelFacts(emptySet(), emptySet(), false)))
@@ -52,23 +52,23 @@ class ChannelAdvisorTest {
 
     @Test fun loggedInMarked() {
         val l = ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(emptySet(), setOf("m.xiaohongshu.com"), true))!!
-        assertTrue(l, l.endsWith("网页:xiaohongshu.com,有网页做法,在 Mika 里登录过(m.xiaohongshu.com)"))
+        assertTrue(l, l.endsWith("web: xiaohongshu.com, known way to do it on the web, signed in within Mika (m.xiaohongshu.com)"))
         val other = ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(emptySet(), setOf("example.com"), true))!!
-        assertFalse(other, "登录过" in other)
+        assertFalse(other, "signed in" in other)
     }
 
     @Test fun challengedMarked() {
         val l = ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(emptySet(), emptySet(), true, challengedSites = setOf("www.xiaohongshu.com")))!!
-        assertTrue(l, l.endsWith("网页:xiaohongshu.com,有网页做法,最近在这里碰到过验证或拦截(www.xiaohongshu.com),用户可在设置里清除该站数据"))
+        assertTrue(l, l.endsWith("web: xiaohongshu.com, known way to do it on the web, recently hit a verification or block here (www.xiaohongshu.com); the user can clear this site's data in settings"))
         val other = ChannelAdvisor.line(listOf(xhs), skills, ChannelFacts(emptySet(), emptySet(), true, challengedSites = setOf("example.com")))!!
-        assertFalse(other, "拦截" in other)
+        assertFalse(other, "block" in other)
     }
 
     @Test fun cappedToFirstChannels() {
         val many = (1..6).map { entry("s$it", "站$it", domains = listOf("s$it.example.com")) }
         val l = ChannelAdvisor.line(many, skills, ChannelFacts(emptySet(), emptySet(), true))!!
         assertEquals(3, l.split(" | ").size)
-        assertTrue(l, l.startsWith("可用渠道:站1 — ")); assertFalse(l, "站4" in l)
+        assertTrue(l, l.startsWith("Available channels: 站1 — ")); assertFalse(l, "站4" in l)
     }
 
     @Test fun noEntriesNoLine() {

@@ -8,6 +8,6 @@ object OutputClip {
         val h = if (head > 0 && s[head - 1].isHighSurrogate()) head - 1 else head
         var start = s.length - tail
         if (start < s.length && s[start].isLowSurrogate()) start++
-        return "${s.substring(0, h)}\n…(省略 ${start - h} 字)…\n${s.substring(start)}" to true
+        return "${s.substring(0, h)}\n…(${start - h} characters omitted)…\n${s.substring(start)}" to true
     }
 }

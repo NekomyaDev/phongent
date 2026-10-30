@@ -140,7 +140,7 @@ class AnthropicModel(
                     }
                 }
                 p is Part.Image -> buildJsonObject {
-                    put("type", "text"); put("text", "[截图已省略:当前模型不支持看图]")
+                    put("type", "text"); put("text", "[screenshot omitted: the current model cannot see images]")
                 }
                 else -> null
             }

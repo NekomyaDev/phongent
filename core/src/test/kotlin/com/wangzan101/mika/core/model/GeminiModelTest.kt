@@ -126,7 +126,7 @@ class GeminiModelTest {
         server.enqueue(ok(cand("""[]""")))
         model(vision = false).complete("s", msgs, emptyList())
         val p = sentBody().arr("contents")[0].jsonObject.arr("parts")[0].jsonObject
-        assertEquals("[截图已省略:当前模型不支持看图]", p.str("text"))
+        assertEquals("[screenshot omitted: the current model cannot see images]", p.str("text"))
     }
 
     @Test fun sendsJpegMime() = runTest {

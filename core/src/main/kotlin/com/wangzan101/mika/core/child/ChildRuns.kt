@@ -53,13 +53,13 @@ class ChildAgentRunner(
             val raw = when (end) {
                 is TaskState.Succeeded -> end.answer
                 is TaskState.Failed -> end.reason
-                TaskState.Cancelled -> "已中断"
-                else -> "未取得结果"
+                TaskState.Cancelled -> INTERRUPTED
+                else -> "no result"
             }
             val phase = if (end == TaskState.Cancelled) ChildPhase.Interrupted else ChildPhase.Completed
             val answer = raw.take(MAX_RESULT_CHARS)
             val checked = if (format == "json" && runCatching { Json.parseToJsonElement(answer) }.isFailure)
-                "$answer\n(子 Run 的 JSON 格式未通过校验，保留原文)" else answer
+                "$answer\n(the child run's JSON did not pass validation; the original text is kept)" else answer
             store.save(ChildRecord(spec.id.value, parent.value, phase, checked, clock()))
             if (!ownerAlive(parent)) {
                 store.save(ChildRecord(spec.id.value, parent.value, ChildPhase.Unknown, checked, clock()))
@@ -67,7 +67,7 @@ class ChildAgentRunner(
             }
             return ChildResult(spec.id, phase, checked)
         } catch (e: CancellationException) {
-            withContext(NonCancellable) { store.save(ChildRecord(spec.id.value, parent.value, ChildPhase.Interrupted, "已中断", clock())) }
+            withContext(NonCancellable) { store.save(ChildRecord(spec.id.value, parent.value, ChildPhase.Interrupted, INTERRUPTED, clock())) }
             throw e
         } finally {
             synchronized(active) { active[parent]?.remove(agent); if (active[parent]?.isEmpty() == true) active.remove(parent) }
@@ -76,5 +76,8 @@ class ChildAgentRunner(
 
     fun cancelAll(parent: RunId) { synchronized(active) { active[parent]?.toList() }.orEmpty().forEach(AgentLoop::cancel) }
 
-    companion object { const val MAX_RESULT_CHARS = 4000 }
+    companion object {
+        const val MAX_RESULT_CHARS = 4000
+        private const val INTERRUPTED = "interrupted"
+    }
 }

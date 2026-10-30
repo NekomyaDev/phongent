@@ -140,12 +140,12 @@ class ContextBuilderTest {
         val t0 = 1_793_000_000_000L // 2026-10-26 07:33 UTC,周一
         fun body(place: Place?, label: String? = null, mode: String? = null, step: Int = 3) =
             ContextBuilder.bodyOf(Message(Role.User, listOf(b.runtimeState(place, label, mode, step, 60, t0)), Author.Mika))
-        assertEquals("当前界面:还没读取当前界面或页面\n步数:第 3 步,上限 60 步\n本地时间:2026-10-26 07:33 周一", body(null))
-        assertEquals("当前界面:App 铁路12306(com.MobileTicket)", body(Place.app("com.MobileTicket"), "铁路12306")!!.lines()[0])
-        assertEquals("当前界面:App com.x", body(Place.app("com.x"))!!.lines()[0])
-        assertEquals("当前界面:网页 www.12306.cn(手机版)", body(Place.site("www.12306.cn"), mode = "mobile")!!.lines()[0])
-        assertEquals("当前界面:网页 a.com", body(Place.site("a.com"))!!.lines()[0])
-        assertEquals("步数:已用完(上限 60 步)", body(null, step = 61)!!.lines()[1])
+        assertEquals("Current place: no screen or page read yet\nStep: 3 of at most 60\nLocal time: 2026-10-26 07:33 Monday", body(null))
+        assertEquals("Current place: app 铁路12306 (com.MobileTicket)", body(Place.app("com.MobileTicket"), "铁路12306")!!.lines()[0])
+        assertEquals("Current place: app com.x", body(Place.app("com.x"))!!.lines()[0])
+        assertEquals("Current place: website www.12306.cn (mobile version)", body(Place.site("www.12306.cn"), mode = "mobile")!!.lines()[0])
+        assertEquals("Current place: website a.com", body(Place.site("a.com"))!!.lines()[0])
+        assertEquals("Step: used up (limit 60 steps)", body(null, step = 61)!!.lines()[1])
         assertEquals(ContextKind.RuntimeState, ContextBuilder.kindOf(b.runtimeState(null, null, null, 1, 60, t0).text))
     }
 }
@@ -176,7 +176,7 @@ class RuntimeStateHistoryTest {
         m.requests.forEachIndexed { i, req ->
             // 每步一段,都还在;最新一段在最后一条消息的末尾
             assertEquals(i + 1, req.runtimeStates().size)
-            assertTrue(req.runtimeStates().last().contains("步数:第 ${i + 1} 步,上限 20 步"))
+            assertTrue(req.runtimeStates().last().contains("Step: ${i + 1} of at most 20"))
             val tail = req.last().parts.last() as Part.Text
             assertEquals(ContextKind.RuntimeState, ContextBuilder.kindOf(tail.text))
         }
@@ -200,18 +200,18 @@ class RuntimeStateHistoryTest {
         assertEquals(3, second.size)
         assertEquals(Role.Tool, second.last().role)
         assertTrue(second.last().parts.first() is Part.ToolResult)
-        assertTrue(second.runtimeStates().last().startsWith("当前界面:App "))
+        assertTrue(second.runtimeStates().last().startsWith("Current place: app "))
     }
 
     @Test fun webSurfaceAlwaysShowsCurrentMode() {
         val web = com.wangzan101.mika.core.cap.web.FakeWebPort()
         val go = tools(Part.ToolCall("n1", "web_navigate", """{"url":"https://shop.example.com/a"}"""))
         val desktop = run(SpeedFlags.OFF, go, web = web)
-        assertTrue(desktop.requests[1].runtimeStates().last(), desktop.requests[1].runtimeStates().last().startsWith("当前界面:网页 shop.example.com(桌面版)"))
+        assertTrue(desktop.requests[1].runtimeStates().last(), desktop.requests[1].runtimeStates().last().startsWith("Current place: website shop.example.com (desktop version)"))
         // 版本以浏览器此刻实际用的为准,不看本任务调没调过 web_site_mode
         web.mode = "mobile"
         val mobile = run(SpeedFlags.OFF, go, web = web)
-        assertTrue(mobile.requests[1].runtimeStates().last().startsWith("当前界面:网页 shop.example.com(手机版)"))
+        assertTrue(mobile.requests[1].runtimeStates().last().startsWith("Current place: website shop.example.com (mobile version)"))
     }
 
     @Test fun foldKeepsPinnedContextWithoutItsStaleState() {
@@ -245,7 +245,7 @@ class RuntimeStateHistoryTest {
         // 第一次读屏展开了手机一组:系统提示词只在那之后变一次,之后逐字相同
         assertEquals(2, systems.distinct().size)
         assertEquals(systems[1], systems[2])
-        assertEquals("当前界面:还没读取当前界面或页面", m.requests[0].runtimeStates().single().lines()[0])
+        assertEquals("Current place: no screen or page read yet", m.requests[0].runtimeStates().single().lines()[0])
     }
 }
 
@@ -265,7 +265,7 @@ class LinkedSkillsTest {
         AgentLoop(m, toolDispatcher(screen, skills = catalog), "B", knowledge = store, skills = catalog).run("看看")
         val added = m.requests.last().filter { ContextBuilder.kindOf(it) == ContextKind.SkillsIndex }
         assertEquals(1, added.size)
-        assertTrue(ContextBuilder.sourceOf(added[0])!!.startsWith("关联 "))
+        assertTrue(ContextBuilder.sourceOf(added[0])!!.startsWith("skills linked to "))
         val body = ContextBuilder.bodyOf(added[0])!!
         assertTrue(body, linked.all { "- $it(" in body })
     }

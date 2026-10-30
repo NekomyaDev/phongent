@@ -107,7 +107,7 @@ class AnthropicModelTest {
         model(vision = false).complete("s", m, emptyList())
         val raw = server.takeRequest().body.readUtf8()
         assertFalse(raw.contains("\"image\""))
-        assertTrue(raw.contains("截图已省略"))
+        assertTrue(raw.contains("screenshot omitted"))
     }
 
     @Test fun sendsJpegMime() = runTest {

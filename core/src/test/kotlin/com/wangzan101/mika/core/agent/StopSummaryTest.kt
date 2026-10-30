@@ -125,8 +125,8 @@ class StopSummaryTest {
         val stopped = Turn("看四个设置页", "已经停下。看完了网络、蓝牙;显示、声音还没看。", "cancelled")
         val old = Turn("发消息", Conversation.CANCELLED_OUTCOME, "cancelled")
         val text = (Conversation.context(listOf(old, stopped))!!.parts.single() as Part.Text).text
-        assertTrue(text, text.contains("1. 用户说:发消息;你取消了这次任务"))
-        assertTrue(text, text.contains("2. 用户说:看四个设置页;你中途停止了这次任务,停止前:已经停下。看完了网络、蓝牙;显示、声音还没看。"))
+        assertTrue(text, text.contains("1. The user said: 发消息; the user cancelled this task"))
+        assertTrue(text, text.contains("2. The user said: 看四个设置页; the user stopped this task partway; before the stop: 已经停下。看完了网络、蓝牙;显示、声音还没看。"))
         assertEquals(null, Conversation.stopSummary(old))
         assertEquals("已经停下。看完了网络、蓝牙;显示、声音还没看。", Conversation.stopSummary(stopped))
     }

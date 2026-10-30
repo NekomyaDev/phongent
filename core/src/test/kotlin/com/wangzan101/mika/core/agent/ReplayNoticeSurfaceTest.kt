@@ -37,7 +37,7 @@ class ReplayNoticeSurfaceTest {
             AgentLoop(main, toolDispatcher(screen), "BASE", flags = SpeedFlags(replay = true),
                 routes = RouteMatcher(FakeModel(text("""{"route": 1, "slots": ["今天天气不错"]}""")), MemRoutes(route), null)).run("在备忘录里写今天天气不错")
         }
-        return main.requests.first().flatMap { it.parts }.filterIsInstance<Part.Text>().map { it.text }.single { "按以往" in it }
+        return main.requests.first().flatMap { it.parts }.filterIsInstance<Part.Text>().map { it.text }.single { "following a way that worked before" in it || "earlier way of doing this" in it }
     }
 
     @Test fun everyReplayOutcome() {

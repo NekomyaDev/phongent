@@ -60,51 +60,52 @@ screen: {{screen}}
 Recalled earlier screenshots, in the order of the view_past_screens result entries marked imageAttached. They show past screens, not the current one.
 
 ## nudge_source
-没有给出回答
+no answer given
 
 ## before_accept_source
-回答之前收到的补充
+added before the answer
 
 ## followup_source
-还没照做
+not carried out yet
 
 ## unconfirmed_source
-核对回答
+answer check
 
 ## progress_source
-步数自查
+step check
 
 ## final_source
-步数用完
+out of steps
 
 ## replay_source
-按以往的做法
+earlier way of doing this
 
 ## parallel_call_skipped
 Phone actions run one at a time. Observe the result of the first action, then try again.
 
 ## replay.completed
-已按以往的做法走完全部步骤({{total}} 步):
+All steps of the earlier way of doing this were run ({{total}} steps):
 {{steps}}
-请读一下 App 现在的状态核实结果;是查询类任务就从读到的内容里找出答案,然后直接回答用户。
+Read the app's current state to check the result; for a lookup task, find the answer in what you read, then answer the user directly.
 
 ## replay.progress
-已按以往成功的做法自动完成 {{done}}/{{total}} 步:
+{{done}} of {{total}} steps were run automatically, following a way that worked before:
 {{steps}}
 {{next}}
 
 
+
 ## replay.diverged_executed
-第 {{step}} 步已执行,但没看到预期变化:预期 {{expected}},实际读到的内容 {{seen}}。先看清这一步有没有生效,别重复做。{{error}}请从当前界面或页面接着做。
+Step {{step}} was run, but the expected change did not show: expected {{expected}}, actually read {{seen}}{{error}}. First check whether this step took effect; do not repeat it. Continue from the current screen or page.
 
 ## replay.diverged_skipped
-第 {{step}} 步预期 {{expected}},实际读到的内容 {{seen}}(这一步没有执行)。{{error}}请从当前界面或页面接着做。
+Step {{step}} expected {{expected}}, actually read {{seen}}{{error}} (this step was not run). Continue from the current screen or page.
 
 ## replay.error_code
-错误码:{{code}}。
+; error code: {{code}}
 
 ## replay.no_steps
-(无)
+(none)
 
 ## replay.handback
 {{head}}
@@ -112,7 +113,7 @@ Phone actions run one at a time. Observe the result of the first action, then tr
 {{note}}
 
 ## replay.stopped
-第 {{step}} 步是「{{action}}」,需要用户确认,没有执行。请从当前界面或页面接着做,按正常流程处理确认。
+Step {{step}} is 「{{action}}」, which needs the user's confirmation, so it was not run. Continue from the current screen or page, and handle the confirmation the normal way.
 
 ## confirmation_unavailable
 request_confirmation is not available.
@@ -124,75 +125,75 @@ app {{app}} is not the app on screen now ({{foreground}}). Observe, then call re
 These steps act on more than one screen ({{surfaces}}); one do_steps call stays on one screen. Nothing was run: split them into separate calls, one screen per batch.
 
 ## approved_step_first
-先单独执行已同意的那一步:the user approved one action. Do exactly that action as a single tool call (not inside do_steps or web_script), then continue.
+Do the approved step on its own first: the user approved one action. Do exactly that action as a single tool call (not inside do_steps or web_script), then continue.
 
 ## replay_screen_header
-当前界面(读取结果,编号可直接用):
+Current screen (read result; its refs can be used directly):
 
 ## replay_no_screen
-当前界面没能读出来,请先 observe 再接着做。
+The current screen could not be read: observe first, then continue.
 
 ## confirmation_declined
-用户没有同意,不要再尝试这个操作;汇报现状后结束
+The user did not approve. Do not try this action again; report where things stand, then end.
 
 ## confirmation_approved
-用户同意了一次。马上做这一个操作,中间不要点别处、滑动、返回或切换 App(打字可以),3 步内有效;紧接着的下一个匹配操作无论成功与否都会用掉这次同意,再做要重新申请。
+The user approved this once. Do this one action right away, without tapping anything else, scrolling, going back or switching apps in between (typing is fine). The approval is valid for 3 steps; the next matching action uses it up whether it succeeds or not, and doing it again needs a new request.
 
 ## no_answer_message
-没有在时限内收到回答
+No answer came within the time limit.
 
 ## handback_note
-交回只表示把手机还回来了,不代表这一步成功了。先读取当前界面核实结果,再继续或汇报。
+Getting the phone back only means control was returned; it does not mean the step succeeded. Read the current screen first to check the result, then continue or report.
 
 ## no_handback_note
-没有发生交回。不要说成用户处理过了;如实汇报接管的结局,需要时换别的办法或结束。
+There was no handback. Do not say the user took care of it; report how the takeover ended as it is, and try another way or end if needed.
 
 ## user_finished_note
-用户说已自己完成
+The user says they finished it themselves.
 
 ## user_finished_prompt
-用户说已自己完成,请只 observe 读一下 App 现在的状态来核实:确认完成就直接回答用户读到的结果,无法确认就 end_not_done,不要再做其他操作。
+The user says they finished it themselves. Only observe to read the app's current state and check: if it is confirmed done, answer the user directly with what you read; if you cannot confirm it, call end_not_done. Do nothing else.
 
 
 ## user_screen.sent
-用户刚截下他正在看的屏幕({{app}},{{time}}),没有附言。
+The user just captured the screen they are looking at ({{app}}, {{time}}), with no words.
 
 ## user_screen.sent_with_words
-用户刚截下他正在看的屏幕({{app}},{{time}}),附言:{{words}}
+The user just captured the screen they are looking at ({{app}}, {{time}}), with these words: {{words}}
 
 ## user_screen.blocked
-用户想把他正在看的屏幕发给你({{app}},{{time}}),但这个页面不让截图,画面和上面的字都没拿到;没有附言。
+The user tried to send you the screen they are looking at ({{app}}, {{time}}), but that page does not allow screenshots, so neither the image nor its text was captured; no words.
 
 ## user_screen.blocked_with_words
-用户想把他正在看的屏幕发给你({{app}},{{time}}),但这个页面不让截图,画面和上面的字都没拿到;附言:{{words}}
+The user tried to send you the screen they are looking at ({{app}}, {{time}}), but that page does not allow screenshots, so neither the image nor its text was captured; with these words: {{words}}
 
 ## user_screen.missing
-用户发来过他正在看的一屏({{id}}),但这张截图已经不在了。
+The user sent a screen they were looking at ({{id}}), but that screenshot is no longer available.
 
 ## user_screen.earlier
-(用户之前发来的屏幕 {{id}}:{{app}},{{time}};屏上开头是「{{gist}}」)
+(Screen {{id}} the user sent earlier: {{app}}, {{time}}; the screen begins with 「{{gist}}」)
 
 ## user_screen.earlier_blank
-(用户之前发来的屏幕 {{id}}:{{app}},{{time}};屏上没有读到字)
+(Screen {{id}} the user sent earlier: {{app}}, {{time}}; no text was read on it)
 
 ## user_screen.earlier_blocked
-(用户之前想发来屏幕:{{app}},{{time}};那个页面不让截图,没截到)
+(The user tried to send a screen earlier: {{app}}, {{time}}; that page does not allow screenshots, so nothing was captured)
 
 ## user_screen.detail
-屏幕编号:{{id}}
-App:{{app}}{{package}}
-截下时刻:{{time}}
-屏上的字(每行前面是它中心的位置 x,y,0–999,左上是 0,0;聊天里靠左的气泡是对方说的,靠右的是用户自己说的):
+Screen id: {{id}}
+App: {{app}}{{package}}
+Captured at: {{time}}
+Text on the screen (each line starts with the position of its centre x,y, 0–999, top-left is 0,0; in a chat, bubbles on the left are from the other person and bubbles on the right are the user's own):
 {{lines}}
 
 ## user_screen.no_text
-屏上没有读到字。
+No text was read on the screen.
 
 ## user_screen.ask_vision
-你看不到这张图;要知道字以外的东西(图标、图片、颜色、版面)时,用 view_user_screen 带着问题问看图模型。
+You cannot see this image. To learn anything beyond the text (icons, pictures, colours, layout), ask the vision model with view_user_screen and your question.
 
 ## user_screen.no_words
-The user sent only this screen, without words. Work out from the screen what they most likely want. If it only needs an answer, reading, looking something up or searching (nothing gets written or changed anywhere), just do it. If it would write or change something (save an entry in another app, send, post, book, pay, delete, change a setting…), first ask once with ask_user, in one line, what you plan to do, with short options such as 「记一笔」/「不用」, and go ahead only if they agree. If you do not know which app they use for that kind of job, ask in the same question, and remember their choice if you can save memories.
+The user sent only this screen, without words. Work out from the screen what they most likely want. If it only needs an answer, reading, looking something up or searching (nothing gets written or changed anywhere), just do it. If it would write or change something (save an entry in another app, send, post, book, pay, delete, change a setting…), first ask once with ask_user, in one line, what you plan to do, with short options such as 「Log it」/「No thanks」, and go ahead only if they agree. If you do not know which app they use for that kind of job, ask in the same question, and remember their choice if you can save memories.
 
 ## user_screen.blocked_reply
 The page did not allow screenshots, so you cannot see it. Say so in one line and ask the user to switch to another page and send again, or to just tell you what to do.

@@ -28,7 +28,7 @@ data class Turn(
 )
 
 object Conversation {
-    const val HEADER = "本对话之前的几轮(供参考,当前状态以这次读到的为准):"
+    const val HEADER = "Earlier turns of this conversation (for reference; what you read this time shows the current state):"
 
     /** 停止的那一轮还没有交代(或没什么可交代)时记下的话。 */
     const val CANCELLED_OUTCOME = "已取消"
@@ -55,15 +55,15 @@ object Conversation {
         // 回答如实说没办成或只办了一部分:按交出后判的结局说,下一轮别当它办成了
         val answered = t.status == "succeeded" || t.status == "unverified"
         val result = when {
-            answered && t.result == RunOutcome.Partial.wire -> "只办成了一部分:${t.outcome.clip(clip)}"
-            answered && t.result == RunOutcome.NotPossible.wire -> "没有办成:${t.outcome.clip(clip)}"
-            t.status == "succeeded" -> "结果:${t.outcome.clip(clip)}"
-            t.status == "unverified" -> "结果(没能核实):${t.outcome.clip(clip)}"
+            answered && t.result == RunOutcome.Partial.wire -> "only partly done: ${t.outcome.clip(clip)}"
+            answered && t.result == RunOutcome.NotPossible.wire -> "not done: ${t.outcome.clip(clip)}"
+            t.status == "succeeded" -> "result: ${t.outcome.clip(clip)}"
+            t.status == "unverified" -> "result (could not be verified): ${t.outcome.clip(clip)}"
             // 停止后补上的交代(做过什么、哪些没做完)带上,下一句「继续」才知道从哪接着做;旧记录里只有「已取消」
-            t.status == "cancelled" -> stopSummary(t)?.let { "你中途停止了这次任务,停止前:${it.clip(clip)}" } ?: "你取消了这次任务"
-            else -> "没有完成,原因:${t.outcome.clip(clip)}"
+            t.status == "cancelled" -> stopSummary(t)?.let { "the user stopped this task partway; before the stop: ${it.clip(clip)}" } ?: "the user cancelled this task"
+            else -> "not finished, reason: ${t.outcome.clip(clip)}"
         }
-        return "$n. 用户说:${t.userText.clip(clip)};$result"
+        return "$n. The user said: ${t.userText.clip(clip)}; $result"
     }
 
     private fun String.clip(max: Int) = if (length <= max) this else take(max) + "…"

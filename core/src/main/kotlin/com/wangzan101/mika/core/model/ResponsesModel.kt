@@ -203,7 +203,7 @@ class ResponsesModel(
 
     private companion object {
         const val ENCRYPTED_REASONING = "reasoning.encrypted_content"
-        const val IMAGE_OMITTED = "[截图已省略:当前模型不支持看图]"
+        const val IMAGE_OMITTED = "[screenshot omitted: the current model cannot see images]"
     }
 }
 

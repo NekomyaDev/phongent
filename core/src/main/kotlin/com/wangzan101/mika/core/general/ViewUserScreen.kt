@@ -39,7 +39,7 @@ internal object ViewUserScreen : AgentTool {
     override val def = ToolDef(VIEW_USER_SCREEN,
         Prompts.tool(VIEW_USER_SCREEN),
         mapOf(
-            "id" to str("The screen's id, as given with the screen (屏幕编号) or in the earlier turns."),
+            "id" to str("The screen's id, as given with the screen (Screen id) or in the earlier turns."),
             "question" to str("What you want to know about it, 1-300 characters. Needed when you cannot see images: the vision model answers it from the screenshot."),
         ), listOf("id"))
 

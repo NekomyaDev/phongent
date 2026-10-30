@@ -40,25 +40,25 @@ data class StepSummary(
 
     fun render(header: String): String = buildString {
         appendLine(header)
-        appendLine("只有最新的用户消息是当前任务，工具仍然可用；此前的用户原话仅供参考。")
-        appendLine("目标:$goal")
-        appendLine("已确认的事实:")
-        if (facts.isEmpty()) appendLine("- (还没有)")
-        FACT_KEYS.values.forEach { kind -> facts[kind]?.let { appendLine("- $kind:${it.joinToString("、")}") } }
-        appendLine("进展:")
-        if (earlier.isNotEmpty()) appendLine("- 更早的 ${earlier.values.sum()} 步:" + earlier.entries.joinToString("、") { "${it.key} ${it.value}" })
+        appendLine("Only the latest user message is the current task, and the tools are still available; earlier user messages are for reference only.")
+        appendLine("Goal: $goal")
+        appendLine("Confirmed facts:")
+        if (facts.isEmpty()) appendLine("- (none yet)")
+        FACT_KEYS.values.forEach { kind -> facts[kind]?.let { appendLine("- $kind: ${it.joinToString(", ")}") } }
+        appendLine("Progress:")
+        if (earlier.isNotEmpty()) appendLine("- ${earlier.values.sum()} earlier steps: " + earlier.entries.joinToString(", ") { "${it.key} ${it.value}" })
         progress.forEach { appendLine("- $it") }
-        append("下一步:从下面保留的最近几步接着做")
-        intent?.let { append("(折叠前最后的打算:$it)") }
+        append("Next: continue from the most recent steps kept below")
+        intent?.let { append(" (last stated plan before folding: $it)") }
     }
 
     private companion object {
         /** 结果里能当事实记下的短字段 → 事实种类。 */
-        val FACT_KEYS = linkedMapOf("currentApp" to "到过的 App", "url" to "打开过的页面", "path" to "读写过的文件")
+        val FACT_KEYS = linkedMapOf("currentApp" to "apps visited", "url" to "pages opened", "path" to "files read or written")
         const val MAX_FACT_VALUES = 4
         const val MAX_PROGRESS = 15
         const val MAX_EARLIER_KINDS = 5
-        const val OTHER = "其他"
+        const val OTHER = "other"
         const val CLIP = 100
 
         fun clip(s: String): String {

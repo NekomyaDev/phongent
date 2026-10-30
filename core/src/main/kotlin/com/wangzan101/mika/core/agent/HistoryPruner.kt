@@ -27,12 +27,12 @@ import com.wangzan101.mika.core.tool.Verb
  * 服务商有明确的图片上限时([limitImages]),超出才从最早的助手图片开始换占位。
  */
 object HistoryPruner {
-    const val OMITTED = "(之前读到的界面已省略,需要时重新读取)"
-    const val OMITTED_IMAGE = "(旧图已省略)"
+    const val OMITTED = "(screen read earlier, omitted; read it again if needed)"
+    const val OMITTED_IMAGE = "(old image omitted)"
 
     /** 更早的界面画面的占位。 */
-    fun olderImage(imageId: Int) = "(更早的画面已省略;要再看用 view_past_screens,ids [$imageId])"
-    const val OMITTED_READ = "(之前读到的内容已省略;需要时按 nextOffset、path 等重新读)"
+    fun olderImage(imageId: Int) = "(earlier screen image omitted; to see it again use view_past_screens with ids [$imageId])"
+    const val OMITTED_READ = "(content read earlier, omitted; read it again with nextOffset, path and so on if needed)"
     /** 缩短后的结果里指回证据账本的观察编号。 */
     const val OBS_IDS = "obsIds"
     /** 超过这么多字的工具结果算「大结果」。 */

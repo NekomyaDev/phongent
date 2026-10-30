@@ -40,7 +40,7 @@ class AgentLoopMemoryTest {
         }
         val msgs = model.requests.first().withoutRuntime().map { it.text() }
         assertTrue(msgs[0].startsWith(Conversation.HEADER))
-        assertTrue(msgs[1].startsWith("关于用户的记忆"))
+        assertTrue(msgs[1].startsWith("Memories about the user"))
         assertTrue(msgs[1].contains("用户点外卖不要香菜"))
         assertFalse(msgs[1].contains("张江"))
         assertEquals("帮我点个外卖", msgs[2])
