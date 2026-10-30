@@ -62,7 +62,11 @@
         <item quantity="one">%1$d scheduled task in this chat will be deleted too.</item>
         <item quantity="other">%1$d scheduled tasks in this chat will be deleted too.</item>
     </plurals>
-    <string name="drawer_delete_action">Delete chat</string>
+    <string name="drawer_actions">Chat options</string>
+    <string name="drawer_rename">Rename</string>
+    <string name="drawer_rename_title">Rename chat</string>
+    <string name="drawer_pinned">Pinned</string>
+    <string name="drawer_pinned_mark">Pinned</string>
     <string name="settings_title">Settings</string>
     <string name="chat_unconfirmed">Couldn’t confirm: %1$s</string>
     <string name="chat_unverified">Done, but couldn’t verify</string>

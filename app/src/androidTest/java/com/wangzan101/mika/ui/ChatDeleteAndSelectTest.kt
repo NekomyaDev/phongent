@@ -2,7 +2,12 @@ package com.wangzan101.mika.ui
 
 import com.wangzan101.mika.ChineseUi
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -33,7 +38,10 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 
-/** 侧栏长按删对话(确认弹窗、删掉、列表当场更新),和对话页里回答、用户的话可以选中复制。不用真机的任务环境。 */
+/**
+ * 侧栏长按一条对话弹出操作面板(改名、置顶、删除):删除先确认、删掉、列表当场更新;改名后列表换成新名字;置顶后排到最上面带图钉。
+ * 还有对话页里回答、用户的话可以选中复制。不用真机的任务环境。
+ */
 @RunWith(AndroidJUnit4::class)
 class ChatDeleteAndSelectTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -86,6 +94,7 @@ class ChatDeleteAndSelectTest {
         show(vm, drawerOpen = true)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("删除").performClick()
         compose.onNodeWithText("删除这个对话？").assertExists()
         val body = compose.onNodeWithTag("delete-conversation-body").fetchSemanticsNode().config
             .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
@@ -97,12 +106,73 @@ class ChatDeleteAndSelectTest {
         assertTrue(removed.isEmpty())
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("删除").performClick()
         compose.onNodeWithTag("confirm-delete-conversation").performClick()
         compose.waitForIdle()
         compose.waitUntil(5_000) { removed.isNotEmpty() }
         assertEquals(listOf("a"), removed)
         assertEquals(0, compose.onAllNodesWithText("天气").fetchSemanticsNodes().size)
         compose.onNodeWithText("订票").assertExists()
+    }
+
+    /** 长按弹出三项:改名、置顶、删除;只是打开面板什么都不改。 */
+    @Test fun longPressShowsTheThreeActions() {
+        store.append("a", Turn("查天气", "晴", "succeeded"))
+        store.setTitle("a", "天气")
+        show(vm(), drawerOpen = true)
+
+        compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("改名").assertExists()
+        compose.onNodeWithText("置顶").assertExists()
+        compose.onNodeWithText("删除").assertExists()
+        compose.onNodeWithText("取消置顶").assertDoesNotExist()
+        assertEquals("天气", store.title("a"))
+        assertEquals(null, store.pinnedAt("a"))
+    }
+
+    /** 改名:输入框里是现在的标题,换成新的保存;列表当场换名字,存下的也是新的。 */
+    @Test fun renameUpdatesTheRow() {
+        store.append("a", Turn("查天气", "晴", "succeeded"))
+        store.setTitle("a", "天气")
+        show(vm(), drawerOpen = true)
+
+        compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("改名").performClick()
+        compose.onNodeWithTag("rename-conversation-field").assert(hasText("天气"))
+        compose.onNodeWithTag("rename-conversation-field").performTextReplacement("   ")
+        compose.onNodeWithTag("confirm-rename-conversation").assertIsNotEnabled()
+        compose.onNodeWithTag("rename-conversation-field").performTextReplacement("上海出行")
+        compose.onNodeWithTag("confirm-rename-conversation").performClick()
+        compose.waitForIdle()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("上海出行").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(0, compose.onAllNodesWithText("天气").fetchSemanticsNodes().size)
+        assertEquals("上海出行", store.title("a"))
+        // 之后才到的起好的标题不盖掉
+        assertTrue(!store.setTitle("a", "天气"))
+    }
+
+    /** 置顶:排到「置顶」一段最上面、带图钉;再取消置顶回到「最近」。 */
+    @Test fun pinMovesTheRowToTheTop() {
+        store.append("a", Turn("查天气", "晴", "succeeded"))
+        store.setTitle("a", "天气")
+        store.append("b", Turn("订票", "好了", "succeeded"))
+        show(vm(), drawerOpen = true)
+        compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).assertCountEquals(0)
+
+        compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("置顶").performClick()
+        compose.waitForIdle()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
+        compose.onNodeWithText("置顶").assertExists()
+        compose.onAllNodesWithTag("conversation-row")[0].assert(hasText("天气"))
+        assertTrue(store.pinnedAt("a") != null)
+
+        compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithText("取消置顶").performClick()
+        compose.waitForIdle()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("置顶").assertDoesNotExist()
+        assertEquals(null, store.pinnedAt("a"))
     }
 
     @Test fun answerAndUserTextAreSelectable() {

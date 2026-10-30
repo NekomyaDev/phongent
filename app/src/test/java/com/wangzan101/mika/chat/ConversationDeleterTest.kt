@@ -52,12 +52,14 @@ class ConversationDeleterTest {
     /** 没有任务在跑:删它的定时任务、工作区和记录;别的对话不动;不去停任务。 */
     @Test fun deletesRecordsWorkspaceAndSchedules() = runTest {
         val store = store()
+        store.setPinned("a", true, at = 1L)
         deleter(store).delete("a")
         assertEquals(listOf("unschedule:t1", "unschedule:t2", "workspace:a"), calls)
         assertEquals(mapOf("t3" to "b"), schedules)
         assertEquals(setOf("b"), workspaces)
         assertEquals(listOf("b"), store.list().map { it.id })
         assertEquals(null, store.title("a"))
+        assertEquals(null, store.pinnedAt("a"))
     }
 
     /** 有任务在跑:先删定时任务,再停任务并等它收尾(收尾时存进的那一轮也删掉),然后才删文件。 */

@@ -775,6 +775,36 @@ class ChatViewModelTest {
         assertEquals(listOf("订票"), vm.ui.value.exchanges.map { it.goal })
     }
 
+    /** 侧栏里改名、置顶:存下来,侧栏按存下的重排(置顶的在「置顶」一段,最近置顶的在前);删掉的对话不再改。 */
+    @Test fun renameAndPinReorderTheDrawer() = runTest {
+        val store = ConversationStore(tmp.newFolder())
+        store.append("a", Turn("查天气", "晴", "succeeded"))
+        store.append("b", Turn("订票", "好了", "succeeded"))
+        store.append("c", Turn("写周报", "好了", "succeeded"))
+        var now = 1_000L
+        val vm = ChatViewModel(backgroundScope, state, stage, actions, store, clock = { now }, removeConversation = { store.delete(it) }).also { runCurrent() }
+        fun sections() = drawerSections(store.list(), CurrentConversation(null, false, "", ""), emptyList(), vm::runningGoal, vm.canSwitch(), 0L)
+
+        vm.renameConversation("b", " 回家的票 ")
+        vm.setPinned("c", true)
+        now = 2_000L
+        vm.setPinned("b", true)
+        val s = sections()
+        assertEquals(listOf("回家的票", "写周报"), s.pinned.map { it.title })
+        assertEquals(listOf("a"), s.recent.map { it.id })
+
+        vm.setPinned("b", false)
+        assertEquals(listOf("c"), sections().pinned.map { it.id })
+        assertEquals(setOf("a", "b"), sections().recent.mapNotNull { it.id }.toSet())
+
+        vm.deleteConversation("c")
+        runCurrent()
+        vm.renameConversation("c", "不该写进去")
+        vm.setPinned("c", true)
+        assertNull(store.title("c"))
+        assertNull(store.pinnedAt("c"))
+    }
+
     /** 删掉的对话又有人往里存了(悬浮胶囊接着在那个编号里说):侧栏重新列出它。 */
     @Test fun aDeletedConversationThatIsWrittenAgainIsListedAgain() = runTest {
         val store = ConversationStore(tmp.newFolder())

@@ -115,6 +115,28 @@ class ChatCopyTest {
         assertEquals("14:00", s.running.first().time)
     }
 
+    /** 置顶的对话在「置顶」一段,最近置顶的在前,不在「最近」里重复;有任务在跑的只列在进行中(带图钉)。 */
+    @Test fun drawerListsPinnedAboveRecent() {
+        val all = listOf(
+            ConversationSummary("a", "一", 40L),
+            ConversationSummary("b", "二", 30L, pinnedAt = 100L),
+            ConversationSummary("c", "三", 20L),
+            ConversationSummary("d", "四", 10L, pinnedAt = 200L),
+            ConversationSummary("e", "五", 5L, pinnedAt = 300L),
+        )
+        val s = drawerSections(all, CurrentConversation("a", false, "一", ""), others = listOf("e"), { null }, canSwitch = true, now = 0L, zone = zone)
+        assertEquals(listOf("e"), s.running.map { it.id })
+        assertTrue(s.running.single().pinned)
+        assertEquals(listOf("d", "b"), s.pinned.map { it.id })
+        assertTrue(s.pinned.all { it.pinned })
+        assertEquals(listOf("a", "c"), s.recent.map { it.id })
+        assertTrue(s.recent.none { it.pinned })
+        // 取消置顶:回到「最近」里按改动时间排的位置
+        val unpinned = drawerSections(all.map { if (it.id == "b") it.copy(pinnedAt = null) else it }, CurrentConversation("a", false, "一", ""), emptyList(), { null }, true, 0L, zone)
+        assertEquals(listOf("e", "d"), unpinned.pinned.map { it.id })
+        assertEquals(listOf("a", "b", "c"), unpinned.recent.map { it.id })
+    }
+
     /** 任务进行中、没开并行:只有当前对话能点。 */
     @Test fun drawerLocksOtherConversationsWhileBusy() {
         val all = listOf(ConversationSummary("a", "一", 0L), ConversationSummary("b", "二", 0L))

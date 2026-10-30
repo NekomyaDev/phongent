@@ -202,6 +202,18 @@ class CapsuleController(
         }
         // 停止后的交代写好(或写不成)时那一轮已改进对话:重读记下的轮次
         scope.launch { tasks.summarizing.collect { threadOf?.let(::loadPast) } }
+        // 卡片上这个对话的标题变了(用户在侧栏改了名、后台起好了标题):卡片顶上「接着「…」聊」跟着换
+        scope.launch {
+            val store = ConversationStore.shared(context)
+            store.changes.collect { id ->
+                if (id != threadOf) return@collect
+                val title = withContext(Dispatchers.IO) { store.title(id) }
+                if (id == threadOf && title != pastTitle) {
+                    pastTitle = title
+                    rebuildThread()
+                }
+            }
+        }
         // 转屏:按记下的边和比例重新摆;系统给新尺寸可能稍晚一点,过一会儿再摆一次
         context.registerComponentCallbacks(object : ComponentCallbacks {
             override fun onConfigurationChanged(newConfig: Configuration) {

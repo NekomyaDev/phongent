@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -67,7 +68,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wangzan101.mika.chat.ConversationSummary
 import com.wangzan101.mika.settings.Prerequisites
+import com.wangzan101.mika.ui.components.ActionSheet
+import com.wangzan101.mika.ui.components.KeyboardDismissArea
 import com.wangzan101.mika.ui.components.MikaLogo
+import com.wangzan101.mika.ui.components.SheetAction
+import com.wangzan101.mika.ui.components.keepsKeyboard
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import com.wangzan101.mika.ui.components.cardSurface
 import com.wangzan101.mika.ui.components.lazyListScrollbar
 import com.wangzan101.mika.ui.theme.MikaIcons
@@ -92,15 +105,23 @@ data class DrawerConversation(
     val enabled: Boolean,
     /** 最后改动的时间(写在标题右边);还没存进对话列表的为空。 */
     val time: String = "",
+    /** 置顶了:标题前一个小图钉,长按菜单里是「取消置顶」。 */
+    val pinned: Boolean = false,
 )
 
-data class DrawerSections(val running: List<DrawerConversation>, val recent: List<DrawerConversation>)
+/** 侧栏里的对话分段:进行中、置顶、最近。 */
+data class DrawerSections(
+    val running: List<DrawerConversation>,
+    val recent: List<DrawerConversation>,
+    val pinned: List<DrawerConversation> = emptyList(),
+)
 
 /** 当前对话在侧栏里的样子:有没有任务在跑、标题、副标题(在做什么)。 */
 data class CurrentConversation(val id: String?, val running: Boolean, val title: String, val subtitle: String)
 
 /**
- * 侧栏的两段:「进行中」是当前对话(有任务时)和别的有任务在跑的对话;「最近」是其余的对话,最近改过的在前。
+ * 侧栏的三段:「进行中」是当前对话(有任务时)和别的有任务在跑的对话;「置顶」是其余置顶了的对话,最近置顶的在前;
+ * 「最近」是剩下的对话,最近改过的在前。每个对话只出现在一段里:置顶的对话有任务在跑时列在进行中(带图钉),跑完回到置顶。
  * [canSwitch] 为假(任务进行中、没开并行)时只有当前对话可点。
  */
 fun drawerSections(
@@ -114,19 +135,23 @@ fun drawerSections(
 ): DrawerSections {
     val byId = all.associateBy { it.id }
     fun timeOf(id: String?) = byId[id]?.let { conversationTime(it.updatedAt, now, zone) }.orEmpty()
+    fun pinned(id: String?) = byId[id]?.pinnedAt != null
     val running = buildList {
-        if (current.running) add(DrawerConversation(current.id, current.title.ifBlank { tr(R.string.chat_new) }, current.subtitle, true, true, true, time = timeOf(current.id)))
+        if (current.running) add(DrawerConversation(current.id, current.title.ifBlank { tr(R.string.chat_new) }, current.subtitle, true, true, true, time = timeOf(current.id), pinned = pinned(current.id)))
         others.filter { it != current.id }.distinct().forEach { id ->
             val title = (byId[id]?.title ?: otherTitle(id))?.let(ChatCopy::plainTitle)?.ifBlank { null } ?: tr(R.string.drawer_running_task)
-            add(DrawerConversation(id, title, tr(R.string.drawer_running), running = true, current = false, enabled = canSwitch, time = timeOf(id)))
+            add(DrawerConversation(id, title, tr(R.string.drawer_running), running = true, current = false, enabled = canSwitch, time = timeOf(id), pinned = pinned(id)))
         }
     }
     val runningIds = running.mapNotNull { it.id }.toSet()
-    val recent = all.asSequence().filter { it.id !in runningIds }.take(MAX_RECENT).map { s ->
+    fun entry(s: ConversationSummary): DrawerConversation {
         val isCurrent = s.id == current.id
-        DrawerConversation(s.id, ChatCopy.plainTitle(s.title), "", false, isCurrent, canSwitch || isCurrent, conversationTime(s.updatedAt, now, zone))
-    }.toList()
-    return DrawerSections(running, recent)
+        return DrawerConversation(s.id, ChatCopy.plainTitle(s.title), "", false, isCurrent, canSwitch || isCurrent, conversationTime(s.updatedAt, now, zone), pinned = s.pinnedAt != null)
+    }
+    val rest = all.filter { it.id !in runningIds }
+    val pinnedRows = rest.filter { it.pinnedAt != null }.sortedByDescending { it.pinnedAt }.map(::entry)
+    val recent = rest.asSequence().filter { it.pinnedAt == null }.take(MAX_RECENT).map(::entry).toList()
+    return DrawerSections(running, recent, pinnedRows)
 }
 
 /** 对话的时间:今天写时刻,昨天写「昨天」,一周内写星期几,今年写几月几日,更早带年份。 */
@@ -171,8 +196,8 @@ fun ChatDrawer(
     onAbout: () -> Unit = {},
     /** 有新版本:「关于 Mika」带小红点。 */
     aboutDot: Boolean = false,
-    /** 长按一条存过的对话:要删它(先弹确认)。 */
-    onDelete: (DrawerConversation) -> Unit = {},
+    /** 长按一条存过的对话:弹出它的操作(改名、置顶、删除)。 */
+    onActions: (DrawerConversation) -> Unit = {},
 ) {
     val c = MikaTheme.colors
     Column(
@@ -206,6 +231,7 @@ fun ChatDrawer(
         val list = rememberLazyListState()
         val first = when {
             sections.running.isNotEmpty() -> "h-running"
+            sections.pinned.isNotEmpty() -> "h-pinned"
             sections.recent.isNotEmpty() -> "h-recent"
             else -> "end"
         }
@@ -213,10 +239,10 @@ fun ChatDrawer(
         LazyColumn(Modifier.fillMaxWidth().weight(1f).lazyListScrollbar(list), state = list) {
             if (sections.running.isNotEmpty()) {
                 item("h-running") { SectionLabel(stringResource(R.string.drawer_running)) }
-                items(sections.running, key = { "r-${it.id}" }) { ConversationEntry(it, onOpen, onDelete) }
+                items(sections.running, key = { "r-${it.id}" }) { ConversationEntry(it, onOpen, onActions) }
             }
-            if (sections.recent.isNotEmpty()) {
-                item("h-recent") { SectionLabel(stringResource(R.string.drawer_recent)) }
+            // 换不了对话时的说明放在第一段存着的对话(置顶或最近)上面
+            val busyNote: LazyListScope.() -> Unit = {
                 if (!canSwitch) {
                     item("busy") {
                         Text(
@@ -225,7 +251,16 @@ fun ChatDrawer(
                         )
                     }
                 }
-                items(sections.recent, key = { "c-${it.id}" }) { ConversationEntry(it, onOpen, onDelete) }
+            }
+            if (sections.pinned.isNotEmpty()) {
+                item("h-pinned") { SectionLabel(stringResource(R.string.drawer_pinned)) }
+                busyNote()
+                items(sections.pinned, key = { "p-${it.id}" }) { ConversationEntry(it, onOpen, onActions) }
+            }
+            if (sections.recent.isNotEmpty()) {
+                item("h-recent") { SectionLabel(stringResource(R.string.drawer_recent)) }
+                if (sections.pinned.isEmpty()) busyNote()
+                items(sections.recent, key = { "c-${it.id}" }) { ConversationEntry(it, onOpen, onActions) }
             }
             item("end") { Box(Modifier.height(12.dp)) }
         }
@@ -272,12 +307,12 @@ private fun SectionLabel(text: String) {
 }
 
 /**
- * 一条对话:点开它;长按(带一下振动)要删它。换不了对话时(任务进行中、没开并行)点不开,长按照样能删。
- * 还没存进对话列表的(没有编号)没东西可删,不响应长按。
+ * 一条对话:点开它;长按(带一下振动)弹出它的操作(改名、置顶、删除)。换不了对话时(任务进行中、没开并行)点不开,长按照样能用。
+ * 还没存进对话列表的(没有编号)没东西可改,不响应长按。置顶了的标题前有个小图钉。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversation) -> Unit, onDelete: (DrawerConversation) -> Unit) {
+private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversation) -> Unit, onActions: (DrawerConversation) -> Unit) {
     val c = MikaTheme.colors
     val deletable = item.id != null
     val haptic = LocalHapticFeedback.current
@@ -288,9 +323,9 @@ private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversat
             .then(
                 if (deletable) Modifier.combinedClickable(
                     onClickLabel = null,
-                    onLongClickLabel = stringResource(R.string.drawer_delete_action),
+                    onLongClickLabel = stringResource(R.string.drawer_actions),
                     // 和系统里长按一样振一下
-                    onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onDelete(item) },
+                    onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onActions(item) },
                     onClick = { if (item.enabled) onOpen(item) },
                 ) else Modifier.clickable(enabled = item.enabled, onClick = { onOpen(item) }),
             )
@@ -300,6 +335,7 @@ private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversat
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             if (item.running) Box(Modifier.size(7.dp).background(c.accent, CircleShape))
+            if (item.pinned) Icon(MikaIcons.Pin, stringResource(R.string.drawer_pinned_mark), Modifier.size(14.dp).testTag("conversation-pin"), tint = c.ink3)
             Text(item.title, Modifier.weight(1f), style = ConversationTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (item.time.isNotEmpty()) {
                 Text(item.time, Modifier.padding(start = 5.dp).testTag("conversation-time"), style = ConversationTime, color = c.ink3, maxLines = 1, softWrap = false)
@@ -309,6 +345,51 @@ private fun ConversationEntry(item: DrawerConversation, onOpen: (DrawerConversat
             Text(item.subtitle, Modifier.padding(top = 2.dp), style = ConversationTime, color = c.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+/**
+ * 长按一条对话弹出的操作面板:改名、置顶(置顶了是取消置顶)、删除(红字,点了先弹确认)。和别处的操作面板一样从底部升起。
+ */
+@Composable
+private fun ConversationActions(item: DrawerConversation, onRename: () -> Unit, onPin: (Boolean) -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    ActionSheet(
+        item.title,
+        listOf(
+            SheetAction(stringResource(R.string.drawer_rename), onClick = onRename),
+            SheetAction(stringResource(if (item.pinned) R.string.unpin else R.string.pin)) { onPin(!item.pinned) },
+            SheetAction(stringResource(R.string.confirm_delete), destructive = true, onClick = onDelete),
+        ),
+        onDismiss = onDismiss,
+    )
+}
+
+/** 给对话改名:输入框里是现在的标题(整段选中,直接打字就替换);空的存不了,两头空白去掉。 */
+@Composable
+internal fun RenameConversationDialog(title: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var value by remember(title) { mutableStateOf(TextFieldValue(title, TextRange(0, title.length))) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val ok = value.text.isNotBlank()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_rename_title)) },
+        text = {
+            KeyboardDismissArea {
+                OutlinedTextField(
+                    value, { value = it }, Modifier.fillMaxWidth().focusRequester(focus).keepsKeyboard().testTag("rename-conversation-field"),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (ok) onSave(value.text.trim()) }),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(value.text.trim()) }, Modifier.testTag("confirm-rename-conversation"), enabled = ok) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 /**
@@ -400,7 +481,11 @@ fun ChatWithDrawer(
     var revision by remember { mutableIntStateOf(0) }
     LaunchedEffect(conversationChanges) { conversationChanges.collect { revision++ } }
     val deleted by vm.deleted.collectAsState()
-    /** 长按了要删的那条和删它会连带什么;确认弹窗开着。 */
+    /** 长按了的那条;操作面板开着。 */
+    var acting by remember { mutableStateOf<DrawerConversation?>(null) }
+    /** 正在改名的那条。 */
+    var renaming by remember { mutableStateOf<DrawerConversation?>(null) }
+    /** 要删的那条和删它会连带什么;确认弹窗开着。 */
     var confirming by remember { mutableStateOf<Pair<DrawerConversation, DeleteImpact>?>(null) }
     ModalNavigationDrawer(
         drawerContent = {
@@ -428,7 +513,7 @@ fun ChatWithDrawer(
                 onBrowser = { leave(onBrowser) },
                 onAbout = { leave(onAbout) },
                 aboutDot = updateAvailable,
-                onDelete = { item -> item.id?.let { confirming = item to vm.deleteImpact(it) } },
+                onActions = { item -> if (item.id != null) acting = item },
                 onOpen = { item ->
                     close {
                         val id = item.id
@@ -448,6 +533,26 @@ fun ChatWithDrawer(
         scrimColor = MikaTheme.colors.floatShadow.copy(alpha = 0.28f),
     ) {
         content { scope.launch { if (reduceMotion) drawer.snapTo(DrawerValue.Open) else drawer.open() } }
+    }
+    acting?.let { item ->
+        val id = item.id ?: return@let
+        ConversationActions(
+            item,
+            onRename = { renaming = item },
+            onPin = { vm.setPinned(id, it) },
+            onDelete = { confirming = item to vm.deleteImpact(id) },
+            onDismiss = { acting = null },
+        )
+    }
+    renaming?.let { item ->
+        RenameConversationDialog(
+            item.title,
+            onSave = { t ->
+                renaming = null
+                item.id?.let { vm.renameConversation(it, t) }
+            },
+            onDismiss = { renaming = null },
+        )
     }
     confirming?.let { (item, impact) ->
         DeleteConversationDialog(

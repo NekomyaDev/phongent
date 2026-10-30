@@ -874,6 +874,18 @@ class ChatViewModel(
         }
     }
 
+    /** 用户在侧栏给对话 [id] 改名:换成 [title](去掉两头空白;空的不改)。之后起好的标题不会再盖掉它。 */
+    fun renameConversation(id: String, title: String) {
+        if (id in _deleted.value) return
+        runCatching { store.rename(id, title) }
+    }
+
+    /** 侧栏里置顶或取消置顶对话 [id]。 */
+    fun setPinned(id: String, pinned: Boolean) {
+        if (id in _deleted.value) return
+        runCatching { store.setPinned(id, pinned, clock()) }
+    }
+
     /** 屏上的对话被删了:不再跟它的任务(还没交给服务的开始直接作废),换成新的空对话。 */
     private fun startOver(id: String) {
         lingerJob?.cancel()
