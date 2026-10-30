@@ -6,17 +6,24 @@ import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.Message
+import com.wangzan101.mika.core.model.ModelError
 import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelReply
 import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.core.model.Part
+import com.wangzan101.mika.core.model.StopReason
 import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.settings.AesGcmKeyCipher
+import com.wangzan101.mika.settings.ClientSetup
 import com.wangzan101.mika.settings.ProviderConfig
+import com.wangzan101.mika.settings.ProviderPresets
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.settings.RoleChoice
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -43,12 +50,21 @@ class ModelSetupViewModelTest {
     private fun store() = ProviderStore(
         tmp.root, AesGcmKeyCipher { key },
         newId = { "id${++ids}" },
-        modelFactory = { cfg, _, _, _ -> Fake(cfg.capabilities) },
+        userAgent = "Mika/1.2.3",
+        modelFactory = { cfg, _, _, setup -> built += cfg.model to setup; Fake(cfg.capabilities) { reply() } },
         modelLister = { kind, url, apiKey, _ -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
     )
 
-    private class Fake(override val capabilities: Capabilities) : ChatModel {
-        override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = error("not used")
+    /** 建过的模型(模型名、请求头等);「测试并保存」的试调用回什么由 [reply] 定,默认回一句。 */
+    private val built = mutableListOf<Pair<String, ClientSetup>>()
+    private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.Text("pong")), StopReason.EndTurn, null) }
+    private val probes = mutableListOf<Triple<String, List<Message>, List<ToolSpec>>>()
+
+    private inner class Fake(override val capabilities: Capabilities, private val answer: suspend () -> ModelReply) : ChatModel {
+        override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
+            probes += Triple(system, messages, tools)
+            return answer()
+        }
     }
 
     private fun TestScope.vm(s: ProviderStore = store()) =
@@ -102,6 +118,74 @@ class ModelSetupViewModelTest {
         vm.setApiKey("good")
         assertEquals(ListState.Idle, vm.state.value.form.test)
         assertEquals("good", vm.state.value.form.apiKey)
+    }
+
+    /** 列出模型后让会当主模型的那个回一句:不带工具、回复限短、带客户端标识;成功才存。 */
+    @Test fun testAndSaveSendsOneTinyRequestToTheMainCandidate() = runTest {
+        listing[deepseekUrl] = deepseek
+        val store = store()
+        val vm = vm(store)
+        vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
+        val (model, setup) = built.first()
+        assertEquals("deepseek-chat", model)
+        assertEquals(16, setup.maxOutputTokens)
+        assertEquals("Mika/1.2.3", setup.headers["User-Agent"])
+        assertEquals("DeepSeek 没声明会话头", setOf("User-Agent"), setup.headers.keys)
+        val (_, messages, tools) = probes.single()
+        assertEquals(1, messages.size)
+        assertTrue(tools.isEmpty())
+        assertEquals(1, store.providers.value.size)
+    }
+
+    /** 试调用失败(例如服务商要的请求头没带):服务端的报错原样给人看,什么都不存。 */
+    @Test fun failedTinyRequestShowsTheServerErrorAndSavesNothing() = runTest {
+        listing[deepseekUrl] = deepseek
+        reply = { throw ModelError.BadResponse("HTTP 400 {\"error\":{\"type\":\"MissingSessionID\"}}") }
+        val store = store()
+        val vm = vm(store)
+        vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
+        val failed = vm.state.value.form.test as ListState.Failed
+        assertTrue(failed.message, failed.message.contains("MissingSessionID"))
+        assertTrue(failed.message.contains("deepseek-chat"))
+        assertTrue(store.providers.value.isEmpty())
+        assertTrue(store.list().isEmpty())
+        assertTrue(vm.state.value.showForm)
+    }
+
+    @Test fun tinyRequestThatNeverAnswersTimesOut() = runTest {
+        listing[deepseekUrl] = deepseek
+        reply = { awaitCancellation() }
+        val store = store()
+        val vm = vm(store)
+        vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
+        assertEquals(ListState.Running, vm.state.value.form.test)
+        advanceTimeBy(ModelSetupViewModel.PROBE_TIMEOUT_MS + 1); runCurrent()
+        val failed = vm.state.value.form.test as ListState.Failed
+        assertTrue(failed.message, failed.message.contains("20"))
+        assertTrue(store.providers.value.isEmpty())
+    }
+
+    /** 预设声明了会话头的(OpenCode Go):试调用就带上,存下的服务商也记着它。 */
+    @Test fun presetSessionHeaderIsUsedForTheTestAndRemembered() = runTest {
+        val go = ProviderPresets.all.first { it.sessionHeader != null }
+        listing[go.baseUrl] = ModelListResult.Ok(listOf(ListedModel("glm-x", toolCalls = true)))
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(go.label); vm.setApiKey("k"); vm.testAndSave(); runCurrent()
+        val setup = built.first().second
+        assertTrue(setup.headers[go.sessionHeader!!].orEmpty().isNotEmpty())
+        assertEquals(go.sessionHeader, store.providers.value.single().sessionHeader)
+    }
+
+    /** 服务不提供列表(没有可试的模型):不试,照旧存下。 */
+    @Test fun noListedModelsMeansNoTinyRequest() = runTest {
+        val url = "http://192.168.1.5:8000/v1"
+        listing[url] = ModelListResult.Failed(ListFailure.NotSupported)
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.testAndSave(); runCurrent()
+        assertTrue(probes.isEmpty())
+        assertEquals(1, store.providers.value.size)
     }
 
     @Test fun addingTwoProvidersInARowKeepsTheFirstMain() = runTest {

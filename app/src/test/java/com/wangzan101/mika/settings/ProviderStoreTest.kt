@@ -577,6 +577,43 @@ class ProviderStoreTest {
         assertTrue("written back", f.readText().contains("sessionHeader"))
     }
 
+    /** 试调用走真的适配器:带客户端标识和声明的会话头、不带工具;服务端的报错原样带回。 */
+    @Test
+    fun probeGoesThroughTheRealAdapterWithHeaders() = runTest {
+        val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
+        try {
+            val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3")
+            val url = server.url("/v1").toString()
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("""{"choices":[{"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}"""))
+            assertNull(s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", "x-test-session", "m", null, none))
+            val req = server.takeRequest()
+            assertEquals("/v1/chat/completions", req.path)
+            assertEquals("Mika/1.2.3", req.getHeader("User-Agent"))
+            assertTrue(req.getHeader("x-test-session").orEmpty().isNotEmpty())
+            assertEquals("Bearer sk", req.getHeader("Authorization"))
+            val body = req.body.readUtf8()
+            assertFalse(body.contains("\"tools\""))
+            assertFalse("Chat Completions 不给回复上限", body.contains("max_tokens"))
+
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(400).setBody("""{"error":{"type":"MissingSessionID"}}"""))
+            val e = s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", null, "m", null, none)
+            assertTrue(e?.message.orEmpty(), e?.message.orEmpty().contains("MissingSessionID"))
+            assertNull(server.takeRequest().getHeader("x-test-session"))
+
+            // Responses 不给回复上限
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream")
+                .setBody("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"))
+            assertNull(s.probe(ProviderConfig.Kind.OpenAiResponses, url, "sk", null, "m", null, none))
+            val responses = server.takeRequest()
+            assertEquals("/v1/responses", responses.path)
+            assertEquals("Mika/1.2.3", responses.getHeader("User-Agent"))
+            assertFalse(responses.body.readUtf8().contains("max_output_tokens"))
+        } finally {
+            server.shutdown()
+        }
+    }
+
     // ---------- 用量 ----------
 
     @Test

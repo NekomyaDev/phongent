@@ -7,11 +7,13 @@ import com.wangzan101.mika.core.chatgpt.ChatGptTokens
 import com.wangzan101.mika.core.model.AnthropicModel
 import com.wangzan101.mika.core.model.BearerToken
 import com.wangzan101.mika.core.model.Capabilities
+import com.wangzan101.mika.core.model.Author
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ClientHeaders
 import com.wangzan101.mika.core.model.GeminiModel
 import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
+import com.wangzan101.mika.core.model.Message
 import com.wangzan101.mika.core.model.ModelCatalog
 import com.wangzan101.mika.core.model.ModelEndpoint
 import com.wangzan101.mika.core.model.ModelError
@@ -20,12 +22,15 @@ import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.ModelSession
 import com.wangzan101.mika.core.model.OpenAiCompatModel
+import com.wangzan101.mika.core.model.Part
 import com.wangzan101.mika.core.model.PromptCaching
 import com.wangzan101.mika.core.model.ResponsesModel
+import com.wangzan101.mika.core.model.Role
 import com.wangzan101.mika.core.usage.UsagePurpose
 import com.wangzan101.mika.core.usage.UsageSink
 import com.wangzan101.mika.core.usage.UsageSource
 import com.wangzan101.mika.core.usage.metered
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -370,6 +375,29 @@ class ProviderStore(
         val p = provider(cfg.providerId)
         val source = UsageSource(cfg.providerId, p?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))
         modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg), ClientSetup(headers(p?.sessionHeader, session))).metered(source, usage)
+    }
+
+    /**
+     * 「测试并保存」的试调用:还没存下的服务商,按真实任务同一条路([modelFactory]、同样的请求头)建出 [model],
+     * 发一句最短的话、不带工具、回复限得很短(协议允许的话,见 [buildModel])。成功返回 null,失败返回原因(服务端的报错原样带上)。
+     * 不计量:这几个 token 不属于任何用途。会话号用新的,不属于任何对话。超时由调用方管。
+     */
+    suspend fun probe(
+        kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String?,
+        model: String, endpoint: ModelEndpoint?, caps: Capabilities,
+    ): ModelError? {
+        val cfg = ProviderConfig(PROBE_ID, kind, baseUrl, model, caps.copy(toolCalls = false))
+        val m = modelFactory(cfg, apiKey, endpoint, ClientSetup(headers(sessionHeader, ModelSession.fresh()), PROBE_MAX_TOKENS))
+        return try {
+            m.complete(PROBE_SYSTEM, listOf(Message(Role.User, listOf(Part.Text(PROBE_TEXT)), Author.Mika)), emptyList())
+            null
+        } catch (e: ModelError) {
+            e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ModelError.BadResponse(e.message.orEmpty(), e)
+        }
     }
 
     private fun headers(sessionHeader: String?, session: ModelSession) = ClientHeaders.of(userAgent, sessionHeader, session)
@@ -721,6 +749,11 @@ class ProviderStore(
         /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
         const val CHATGPT_NAME = "ChatGPT"
 
+        /** 试调用:临时配置的 id、系统提示、那句话、回复上限。 */
+        private const val PROBE_ID = "probe"
+        private const val PROBE_SYSTEM = "Reply with one short word."
+        private const val PROBE_TEXT = "ping"
+        private const val PROBE_MAX_TOKENS = 16
         private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
         /**

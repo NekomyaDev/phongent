@@ -256,7 +256,7 @@ The debug build is not precompiled and its UI is several times slower; use the p
 ### Model configuration details
 
 - Three roles: the **main model** (does the work; must support tool calling), the **vision model** (describes the UI and locates things in screenshots; off by default on a fresh install, or choose "use main model"), and the **light model** (small jobs like judging outcomes, extracting memories and understanding intent; defaults to the main model).
-- "Test and save" calls only the provider's public list-models endpoint once. If it returns a list (or the provider has no list endpoint), the provider is saved; if it cannot connect, you are told why right away. For providers without a list endpoint you can type the model name by hand.
+- "Test and save" calls the provider’s public list-models endpoint once, then asks the model that would become your main model for a very short reply (no tools, a few tokens). Only if both work is the provider saved; otherwise you see why right away, including the server’s own error message. For providers without a list endpoint only the connection is checked. For providers without a list endpoint you can type the model name by hand.
 - Capability tags on the model list (tool calling, vision, context length) show what the API reports; anything it does not report falls back to the preset's initial values and is marked "unconfirmed". They are for reference only and never block anything.
 - "Vision grounding verified" lives in "Developer options" in Settings (visible in debug builds) and applies to the current vision model.
 

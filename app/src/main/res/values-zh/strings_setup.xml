@@ -24,7 +24,7 @@
     <string name="model_key_optional">本地服务可不填</string>
     <string name="model_test_save">测试并保存</string>
     <string name="model_testing">正在测试…</string>
-    <string name="model_test_note">只列一次这家的模型，列得出来就保存。</string>
+    <string name="model_test_note">先列出这家的模型，再试着让其中一个回一句话，都成了才保存。</string>
     <string name="next">下一步</string>
     <string name="model_failed">连接失败：%1$s</string>
     <string name="cap_vision">看图</string>
@@ -35,5 +35,7 @@
     <string name="cap_reasoning">推理</string>
     <string name="model_need_url">请填写接口地址</string>
     <string name="model_url_scheme">接口地址要以 http:// 或 https:// 开头</string>
+    <string name="model_probe_failed">试着让 %1$s 回一句话没成功：%2$s</string>
+    <string name="model_probe_timeout">试着让 %1$s 回一句话，%2$d 秒没有回应</string>
     <string name="preset_custom">自定义</string>
 </resources>

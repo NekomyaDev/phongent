@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /** 列模型(「测试并保存」或刷新一个服务商)的进度。 */
 sealed interface ListState {
@@ -142,7 +144,7 @@ data class ModelSetupUi(
 }
 
 /**
- * 配置模型的状态与动作。添加服务商:选预设 → 填 Key →「测试并保存」(只列模型,列得出就存下这家和列表,列不出说原因、不存);
+ * 配置模型的状态与动作。添加服务商:选预设 → 填 Key →「测试并保存」(列模型,再让会当主模型的那个回一句话,都成了才存下这家和列表,不成说原因、不存);
  * 改了服务商、地址或 Key,进行中的测试作废。用途:从所有已连接服务商记住的模型里选,选中即生效;
  * 看图还可以「用主模型」「不用」,轻量可以「用主模型」。连上第一家(还没有主模型)时自动选它的一个模型为主模型。
  * 首次上手和设置 › 模型共用。
@@ -204,7 +206,10 @@ class ModelSetupViewModel(
         _state.update { it.copy(form = change(it.form).copy(test = ListState.Idle)) }
     }
 
-    /** 测试并保存:列得出模型(或服务不提供列表)就存下这家服务商,表单清空收起;列不出就说原因、不存。 */
+    /**
+     * 测试并保存:列得出模型(或服务不提供列表),再让一个模型回一句话(见 [probeProblem])也成了,就存下这家服务商,表单清空收起;
+     * 哪一步不成就说原因、不存。
+     */
     fun testAndSave() {
         val f = _state.value.form
         if (!f.canTest) return
@@ -223,6 +228,10 @@ class ModelSetupViewModel(
                     emptyList()
                 }
             }
+            probeProblem(f, baseUrl, key.ifEmpty { null }, models)?.let { problem ->
+                _state.update { it.copy(form = it.form.copy(test = ListState.Failed(problem))) }
+                return@launch
+            }
             withContext(io) {
                 val p = store.connect(f.providerName, f.kind, baseUrl, key, models, f.sessionHeader)
                 if (store.roles.value.main == null) {
@@ -232,6 +241,27 @@ class ModelSetupViewModel(
             }
             _state.update { snapshot(it.copy(form = AddForm.of(ProviderPresets.all.first()), formOpen = false)) }
         }
+    }
+
+    /**
+     * 列出模型后,让会被选作主模型的那个(没有就第一个)回一句最短的话,和真实任务走同一条建模型的路(请求头、会话号都一样):
+     * Key 不对、少了服务商要的请求头,这里就露出来,不等到第一句话。成功、或没有可试的模型(服务不提供列表)为 null,
+     * 失败是给人看的原因(服务端的报错原样带上),超过 [PROBE_TIMEOUT_MS] 没回也算失败。
+     */
+    private suspend fun probeProblem(f: AddForm, baseUrl: String, key: String?, models: List<ListedModel>): String? {
+        // 用 ChatGPT 登录不走这张表单(登录本身就核对过了);表单只给 Key 的接口类型,这里再挡一次
+        if (f.kind == ProviderConfig.Kind.ChatGpt) return null
+        val base = (ProviderPresets.forBaseUrl(baseUrl) ?: ProviderPresets.custom).capabilities
+        val options = ModelOptions.merge(models, base)
+        val model = ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id ?: return null
+        val caps = options.first { it.id == model }.capabilities
+        val endpoint = models.firstOrNull { it.id == model }?.endpoint
+        val error = try {
+            withContext(io) { withTimeout(PROBE_TIMEOUT_MS) { store.probe(f.kind, baseUrl, key, f.sessionHeader, model, endpoint, caps) } }
+        } catch (e: TimeoutCancellationException) {
+            return tr(R.string.model_probe_timeout, model, (PROBE_TIMEOUT_MS / 1000).toInt())
+        }
+        return error?.let { tr(R.string.model_probe_failed, model, it.message.orEmpty()) }
     }
 
     // ---------- 用 ChatGPT 登录 ----------
@@ -372,5 +402,10 @@ class ModelSetupViewModel(
             }
             _state.update { snapshot(it.copy(listing = it.listing - providerId)) }
         }
+    }
+
+    companion object {
+        /** 「测试并保存」里试调用最多等多久。 */
+        const val PROBE_TIMEOUT_MS = 20_000L
     }
 }
