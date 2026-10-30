@@ -123,7 +123,7 @@ class OpenAiCompatModel(
         return JsonObject(m + ("content" to JsonArray(withMark)))
     }
 
-    private fun mapError(status: Int, retryAfter: String?, body: String): ModelError = when {
+    private fun mapError(status: Int, retryAfter: String?, body: String): ModelError = ModelAccessErrors.of(status, body, model) ?: when {
         status == 401 -> ModelError.Auth()
         status == 402 || body.contains("insufficient_quota") -> ModelError.QuotaExceeded()
         status == 429 -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))

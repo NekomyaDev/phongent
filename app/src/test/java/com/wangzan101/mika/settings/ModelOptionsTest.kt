@@ -37,6 +37,51 @@ class ModelOptionsTest {
         assertEquals(null, ModelOptions.defaultMain(ModelOptions.merge(listOf(ListedModel("embed", toolCalls = false)), base)))
     }
 
+    /** 先自家的(预设的模型词),再接口明说能调用工具的,其余照列表顺序;明说不会调用工具的、像向量 / 语音 / 画图的不试。 */
+    @Test fun candidatesPreferTheProvidersOwnFamily() {
+        val listed = listOf(
+            ListedModel("antdigital/Ling-3.1-flash", toolCalls = true),
+            ListedModel("text-embedding-v4"),
+            ListedModel("gte-rerank-v2"),
+            ListedModel("qwen3-tts-flash"),
+            ListedModel("wanx-image", chat = false),
+            ListedModel("qwen-max"),
+            ListedModel("qwen-plus", toolCalls = true),
+            ListedModel("Other/Chat", displayName = "Qwen inside"),
+            ListedModel("qwen-coder", toolCalls = false),
+            ListedModel("moonshot-v1"),
+        )
+        val options = ModelOptions.merge(listed, base)
+        val qwen = ProviderPresets.all.single { it.label == "通义千问" }.familyTokens
+        assertEquals(listOf("qwen"), qwen)
+        assertEquals(
+            listOf("qwen-plus", "qwen-max", "Other/Chat", "antdigital/Ling-3.1-flash", "moonshot-v1"),
+            ModelOptions.candidates(options, qwen),
+        )
+        assertEquals("qwen-plus", ModelOptions.defaultMain(options, qwen))
+        // 认不出是哪家:接口明说能调用工具的在前,其余照列表顺序
+        assertEquals(listOf("antdigital/Ling-3.1-flash", "qwen-plus", "qwen-max", "Other/Chat", "moonshot-v1"), ModelOptions.candidates(options))
+        assertEquals(qwen, ModelOptions.familyOf("https://dashscope.aliyuncs.com/compatible-mode/v1/"))
+        assertEquals(emptyList<String>(), ModelOptions.familyOf("https://openrouter.ai/api/v1"))
+    }
+
+    @Test fun nonChatModelsAreRecognised() {
+        fun opt(id: String, chat: Boolean? = null) = ModelOptions.merge(listOf(ListedModel(id, chat = chat)), base).single()
+        for (id in listOf("text-embedding-3-small", "bge-reranker", "whisper-1", "gpt-4o-mini-tts", "gpt-4o-transcribe", "dall-e-3",
+            "gpt-image-1", "qwen-vl-ocr", "paraformer-realtime-v2", "omni-moderation-latest", "qwen3-asr-flash")) {
+            assertTrue(id, ModelOptions.looksNonChat(opt(id)))
+        }
+        for (id in listOf("qwen-plus", "deepseek-chat", "gpt-5-mini", "claude-sonnet-4-5", "qwen-vl-max", "step-2-16k")) {
+            assertFalse(id, ModelOptions.looksNonChat(opt(id)))
+        }
+        assertFalse("接口说是对话模型就照接口", ModelOptions.looksNonChat(opt("my-embed-chat", chat = true)))
+        assertTrue(ModelOptions.looksNonChat(opt("x", chat = false)))
+        // 全都像别的用途:没有候选,默认主模型退回第一个可当主模型的
+        val only = ModelOptions.merge(listOf(ListedModel("text-embedding-v4")), base)
+        assertEquals(emptyList<String>(), ModelOptions.candidates(only))
+        assertEquals("text-embedding-v4", ModelOptions.defaultMain(only))
+    }
+
     @Test fun modelsOnlyReachableByUnsupportedProtocolsAreNotOffered() {
         val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://gw.test/openai/v1")
         val listed = listOf(

@@ -190,7 +190,7 @@ class ResponsesModel(
     }
 
     private fun httpError(status: Int, retryAfter: String?, body: String, err: ErrorBody?): ModelError =
-        err?.let { errorOf(it.code, it.message, it.param) } ?: when {
+        err?.let { errorOf(it.code, it.message, it.param) } ?: ModelAccessErrors.of(status, body, model) ?: when {
             status == 401 -> ModelError.Auth()
             status == 403 -> if (chatGptPlan) ModelError.ChatGptNotEligible(err?.message.orEmpty().take(200)) else ModelError.Auth()
             status == 429 -> if (chatGptPlan) ModelError.ChatGptLimitReached() else ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))

@@ -634,6 +634,7 @@ class ProviderStore(
                 vision = m["vision"]?.jsonPrimitive?.booleanOrNull,
                 contextTokens = m["contextTokens"]?.jsonPrimitive?.intOrNull,
                 reasoning = m["reasoning"]?.jsonPrimitive?.booleanOrNull,
+                chat = m["chat"]?.jsonPrimitive?.booleanOrNull,
                 endpoint = (m["api"] as? JsonObject)?.let { a ->
                     ModelProtocol.of(a["protocol"]?.jsonPrimitive?.content)?.let { protocol ->
                         ModelEndpoint(protocol, a.str("baseUrl"), a["reasoningField"]?.jsonPrimitive?.content)
@@ -699,6 +700,7 @@ class ProviderStore(
                                         m.vision?.let { put("vision", it) }
                                         m.contextTokens?.let { put("contextTokens", it) }
                                         m.reasoning?.let { put("reasoning", it) }
+                                        m.chat?.let { put("chat", it) }
                                         m.endpoint?.let { e ->
                                             putJsonObject("api") {
                                                 put("protocol", e.protocol.wire); put("baseUrl", e.baseUrl)

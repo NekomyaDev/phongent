@@ -54,4 +54,13 @@
     <string name="model_preset_match">This is %1$s’s official address. Its preset fills in the address and interface type for you.</string>
     <string name="model_preset_kind_mismatch">The interface type doesn’t match either: %1$s uses the %2$s interface, but %3$s is selected.</string>
     <string name="model_use_preset">Use the %1$s preset</string>
+    <string name="model_probe_not_available">This account hasn’t activated “%1$s” or has no access to it (the provider says: %2$s). Pick another model, or activate it in the provider’s console.</string>
+    <string name="model_reason_not_available">this account hasn’t activated this model or has no access to it (the provider says: %1$s)</string>
+    <string name="model_reason_not_found">the provider has no such model</string>
+    <string name="model_reason_no_tools">it doesn’t call tools, and Mika needs a model that can call tools</string>
+    <string name="model_probe_none_usable">The provider is connected, but “%1$s” didn’t pass the test: %2$s. Pick a model from the list that your account has activated.</string>
+    <string name="model_probe_tried_unavailable">Tried %1$s; none of them is activated.</string>
+    <string name="model_probe_tried">Tried %1$s; none of them passed the test.</string>
+    <string name="model_probe_fallback">%1$s, tried first, didn’t pass the test: %2$s. The main model is “%3$s”, which passed.</string>
+    <string name="model_pick_main">Choose main model</string>
 </resources>

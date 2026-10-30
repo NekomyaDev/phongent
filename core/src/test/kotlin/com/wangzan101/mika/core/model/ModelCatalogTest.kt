@@ -98,7 +98,7 @@ class ModelCatalogTest {
         assertEquals(
             listOf(
                 ListedModel("deepseek-v4.1-flash", "DeepSeek V4.1 Flash", toolCalls = true, vision = true, contextTokens = 1_000_000,
-                    reasoning = true, endpoint = chat),
+                    reasoning = true, endpoint = chat, chat = true),
                 ListedModel("glm-5.3", "GLM-5.3", toolCalls = true, vision = false, contextTokens = 1_000_000, reasoning = true,
                     endpoint = chat.copy(reasoningField = null)),
                 ListedModel("grok-4.7", "Grok 4.7", toolCalls = true, vision = true, contextTokens = 500_000,
@@ -113,6 +113,17 @@ class ModelCatalogTest {
             list,
         )
         assertEquals(listOf(true, true, true, true, true, true), list.map { it.usable })
+    }
+
+    /** 列表写明了不是对话模型的(`type`,或输出里没有文字):记下来,选默认主模型时跳过。 */
+    @Test fun openAiCompatReadsWhetherAModelChats() = runTest {
+        server.enqueue(ok("""{"data":[
+            {"id":"e","type":"embedding"},{"id":"r","type":"rerank"},{"id":"c","type":"chat"},
+            {"id":"img","architecture":{"modality":"text->image"}},{"id":"o","architecture":{"output_modalities":["image"]}},
+            {"id":"t","architecture":{"output_modalities":["text"]}},{"id":"plain"}
+        ]}"""))
+        val list = models(catalog.openAiCompat(base, null))
+        assertEquals(listOf(false, false, true, false, false, null, null), list.map { it.chat })
     }
 
     @Test fun chatGptModelListKeepsListedSlugsInServerOrder() = runTest {

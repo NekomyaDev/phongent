@@ -7,6 +7,15 @@ sealed class ModelError(message: String, cause: Throwable? = null) : Exception(m
     class ContextTooLong : ModelError("对话内容超出模型上下文长度")
     /** 服务商那里没有这个模型(或地址不对,请求的接口不存在);[model] 是请求的模型名,不知道时为空。 */
     class ModelNotFound(val model: String = "") : ModelError(if (model.isEmpty()) "找不到该模型" else "找不到模型「$model」")
+    /**
+     * 服务商有这个模型,这个账号却用不了(没开通、没权限、没买);[detail] 是服务端的原话(截短),没有为空。
+     * 换一个模型或到服务商后台开通才行,重试没用。见 [ModelAccessErrors]。
+     */
+    class ModelNotAvailable(val model: String = "", val detail: String = "") :
+        ModelError(if (model.isEmpty()) "这个账号用不了该模型(没开通或没权限)" else "这个账号用不了模型「$model」(没开通或没权限)")
+    /** 服务端明说这个模型不支持调用工具(带工具的请求被拒)。Mika 干活靠工具,它当不了主模型。 */
+    class ToolsUnsupported(val model: String = "") :
+        ModelError(if (model.isEmpty()) "该模型不支持调用工具" else "模型「$model」不支持调用工具")
     class Network(cause: Throwable? = null) : ModelError("网络连接失败", cause)
     class Server(val status: Int) : ModelError("模型服务出错(HTTP $status)")
     class ContentRefused : ModelError("模型拒绝处理该内容")

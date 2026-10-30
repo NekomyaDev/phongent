@@ -229,7 +229,9 @@ fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActi
             }
             val manualState = ui.manualPick[p.id]
             when {
-                manual && manualState is ListState.Failed -> FooterNote(manualState.message, Modifier.testTag("manual-model-failed"), color = c.bad)
+                manualState is ListState.Failed -> FooterNote(manualState.message, Modifier.testTag("manual-model-failed"), color = c.bad)
+                // 选列表里的模型也可能先试调用(见 ModelSetupUi.probeBeforePick);手填的那一行自己显示进度
+                !manual && manualState == ListState.Running -> FooterNote(ModelSetupCopy.TESTING, Modifier.testTag("pick-probe-running"))
                 state == ListState.Running -> FooterNote(ModelsCopy.LISTING)
                 state is ListState.Failed -> FooterNote(ModelSetupCopy.failed(state.message), color = c.bad)
                 shown.size > PICK_AT_MOST -> FooterNote(ModelsCopy.more(shown.size - PICK_AT_MOST))

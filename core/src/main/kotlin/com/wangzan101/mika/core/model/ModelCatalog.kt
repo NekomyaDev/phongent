@@ -19,6 +19,7 @@ import okhttp3.Request
  * 有的服务商一个 Key 下的模型走不同的接口协议,列表里给每个模型写明协议和地址(`api` 表)。
  * [endpoint] 是其中 Mika 会说的那一种,调用这个模型时按它选适配器和地址;为 null 时按服务商的接口类型。
  * [unsupportedApis] 是写明了、但 Mika 一种也不会说的协议名:这样的模型调用必然失败,不给选(见 [usable])。
+ * [chat] 是接口说没说它是对话模型(`type` 是 chat / embedding / rerank…,或输出模态里有没有文字);没说为 null。
  */
 data class ListedModel(
     val id: String,
@@ -29,6 +30,7 @@ data class ListedModel(
     val reasoning: Boolean? = null,
     val endpoint: ModelEndpoint? = null,
     val unsupportedApis: List<String> = emptyList(),
+    val chat: Boolean? = null,
 ) {
     val usable: Boolean get() = endpoint != null || unsupportedApis.isEmpty()
 }
@@ -157,6 +159,9 @@ class ModelCatalog(private val http: OkHttpClient) {
         val arch = o["architecture"] as? JsonObject
         val inputs = (arch?.get("input_modalities") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
         val modality = arch?.str("modality")?.substringBefore("->")
+        val outputs = ((arch?.get("output_modalities") ?: o.obj("modalities")?.get("output")) as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            ?: arch?.str("modality")?.takeIf { "->" in it }?.substringAfter("->")?.split('+')
         val params = (o["supported_parameters"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
         val caps = o["capabilities"] as? JsonObject
         val modalIn = ((o.obj("modalities")?.get("input") ?: o["input_modalities"]) as? JsonArray)
@@ -184,6 +189,12 @@ class ModelCatalog(private val http: OkHttpClient) {
                 ?: o.bool("supports_reasoning") ?: reasoningLevels?.let { it.isNotEmpty() },
             endpoint = endpoint,
             unsupportedApis = if (endpoint == null) api?.keys?.toList().orEmpty() else emptyList(),
+            chat = when (o.str("type")?.lowercase()) {
+                in CHAT_TYPES -> true
+                in NON_CHAT_TYPES -> false
+                // 只出图、出声音的不是对话模型;出文字的不另记
+                else -> outputs?.takeIf { "text" !in it }?.let { false }
+            },
         )
     }
 
@@ -253,5 +264,11 @@ class ModelCatalog(private val http: OkHttpClient) {
     private companion object {
         /** 翻页上限:防止服务端一直给下一页。 */
         const val MAX_PAGES = 10
+        /** 列表里 `type` 一项的写法:是对话模型的,和不是的(向量、重排、画图、语音、审核)。 */
+        val CHAT_TYPES = setOf("chat", "llm", "language", "text", "vlm", "code")
+        val NON_CHAT_TYPES = setOf(
+            "embedding", "embeddings", "rerank", "reranker", "image", "images", "video", "audio", "tts", "stt", "asr",
+            "speech", "transcription", "moderation",
+        )
     }
 }

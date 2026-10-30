@@ -41,14 +41,23 @@ class ModelSetupNetworkTest {
     private val server = MockWebServer()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** 路径 → 回什么;没写的路径回 404 网页。 */
+    /** 路径 → 回什么;没写的路径回 404 网页。[chat] 给了时按请求里的模型名回调用接口。 */
     private val routes = mutableMapOf<String, () -> MockResponse>()
+    private var chat: ((model: String) -> MockResponse)? = null
+    private val chatModels = mutableListOf<String>()
 
     @Before fun start() {
         server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse =
-                routes[request.path?.substringBefore('?')]?.invoke()
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path?.substringBefore('?')
+                chat?.takeIf { path == "/chat/completions" }?.let { answer ->
+                    val model = Regex("\"model\"\\s*:\\s*\"([^\"]+)\"").find(request.body.readUtf8())?.groupValues?.get(1).orEmpty()
+                    synchronized(chatModels) { chatModels += model }
+                    return answer(model)
+                }
+                return routes[path]?.invoke()
                     ?: MockResponse().setResponseCode(404).setHeader("Content-Type", "text/html").setBody("<html><body>Not Found</body></html>")
+            }
         }
         server.start()
     }
@@ -108,6 +117,47 @@ class ModelSetupNetworkTest {
         assertEquals(setOf("my-model"), ProviderStore(tmp.root, AesGcmKeyCipher { key }).provider(p.id)?.verifiedModels)
         assertEquals(listOf("/models", "/models", "/chat/completions"), List(server.requestCount) { server.takeRequest().path })
     }
+
+    /** 列表里先是别家的模型:没开通的那个调用回 400,接着试下一个,通了就存下、它当主模型,说清先试的哪个没通过。 */
+    @Test fun notActivatedFirstModelFallsBackToTheNext() {
+        routes["/models"] = ::thirdPartyFirst
+        chat = { model -> if (model == "qwen-plus") toolCall() else notActivated() }
+        val (store, vm) = setUp()
+        vm.testAndWait()
+        assertEquals(listOf("antdigital/Ling-3.1-flash", "qwen-plus"), chatModels)
+        val p = store.providers.value.single()
+        assertEquals("qwen-plus", store.configFor(ModelRole.Main)?.model)
+        assertFalse(vm.state.value.showForm)
+        val note = vm.state.value.probeNote.orEmpty()
+        assertTrue(note, note.startsWith("先试的 antdigital/Ling-3.1-flash 没测试通过：这个账号没开通或没权限用这个模型（服务商说：The product is not activated"))
+        assertTrue(note, note.endsWith("主模型用了测试通过的「qwen-plus」。"))
+        assertEquals(null, vm.state.value.pickToProbe)
+        assertTrue("qwen-plus" in p.verifiedModels)
+    }
+
+    /** 试的几个都没开通:Key 是对的,存下服务商、不定主模型,请用户从列表里选。 */
+    @Test fun noCandidateActivatedSavesProviderWithoutMain() {
+        routes["/models"] = ::thirdPartyFirst
+        chat = { notActivated() }
+        val (store, vm) = setUp()
+        vm.testAndWait()
+        assertEquals(listOf("antdigital/Ling-3.1-flash", "qwen-plus", "qwen-max"), chatModels)
+        val p = store.providers.value.single()
+        assertEquals(4, p.models?.size)
+        assertEquals(null, store.roles.value.main)
+        val s = vm.state.value
+        assertEquals(p.id, s.pickToProbe)
+        assertTrue(s.probeNote.orEmpty(), s.probeNote.orEmpty().startsWith("服务商已连上，但「antdigital/Ling-3.1-flash」没测试通过："))
+        assertTrue(s.probeNote.orEmpty(), s.probeNote.orEmpty().endsWith("试了 antdigital/Ling-3.1-flash、qwen-plus、qwen-max，都没开通。"))
+    }
+
+    private fun thirdPartyFirst() = MockResponse().setHeader("Content-Type", "application/json").setBody(
+        """{"object":"list","data":[{"id":"antdigital/Ling-3.1-flash"},{"id":"text-embedding-v4"},{"id":"qwen-plus"},{"id":"qwen-max"}]}""",
+    )
+
+    private fun notActivated() = MockResponse().setResponseCode(400).setHeader("Content-Type", "application/json").setBody(
+        """{"code":"InvalidParameter","message":"The product is not activated, please confirm that you have activated products and try again after activation.","request_id":"r1"}""",
+    )
 
     @Test fun badKeyIsAKeyErrorAndNothingIsSaved() {
         routes["/models"] = { MockResponse().setResponseCode(401).setBody("""{"error":{"message":"invalid api key"}}""") }

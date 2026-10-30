@@ -92,6 +92,7 @@ class GeminiModel(
         val st = (err?.get("status") as? JsonPrimitive)?.contentOrNull.orEmpty()
         val msg = (err?.get("message") as? JsonPrimitive)?.contentOrNull ?: body
         val lower = msg.lowercase()
+        ModelAccessErrors.of(status, body, model)?.let { return it }
         return when {
             status == 401 || status == 403 -> ModelError.Auth()
             // Gemini 的 429 一律按可重试限流处理(其限流与额度文案混用,无法可靠区分)

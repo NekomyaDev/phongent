@@ -136,6 +136,7 @@ class AnthropicModelTest {
         assertTrue(errorOf(401, "{}") is ModelError.Auth)
         assertTrue(errorOf(403, "{}") is ModelError.Auth)
         assertTrue(errorOf(404, "{}") is ModelError.ModelNotFound)
+        assertTrue(errorOf(403, """{"error":{"type":"permission_error","message":"Your organization does not have access to the model"}}""") is ModelError.ModelNotAvailable)
         assertTrue(errorOf(413, "{}") is ModelError.ContextTooLong)
         assertTrue(errorOf(400, """{"error":{"type":"invalid_request_error","message":"prompt is too long: 250000 tokens"}}""") is ModelError.ContextTooLong)
         assertTrue(errorOf(400, """{"error":{"message":"Your credit balance is too low"}}""") is ModelError.QuotaExceeded)

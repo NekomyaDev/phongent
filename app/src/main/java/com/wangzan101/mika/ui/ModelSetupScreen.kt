@@ -117,7 +117,11 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
         RolePickerContent(
             ui, role,
             RolePickerActions(
-                pick = { pid, model -> vm.pick(role, pid, model); picking = null },
+                pick = { pid, model ->
+                    // 刚存下、没有一个模型试通过的那家:先试调用,通了才选上、返回
+                    if (ui.probeBeforePick(role, pid)) vm.pickManual(role, pid, model) { picking = null }
+                    else { vm.pick(role, pid, model); picking = null }
+                },
                 pickManual = { pid, model -> vm.pickManual(role, pid, model) { picking = null } },
                 choose = { vm.choose(role, it); picking = null },
                 addProvider = { vm.openForm(); picking = null },
@@ -221,7 +225,15 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
             }
         }
     }
-    ui.toolWarning?.let { FooterNote(it, Modifier.testTag("setup-tool-warning"), color = c.warn) }
+    ui.probeNote?.let { FooterNote(it, Modifier.testTag("setup-probe-note"), color = c.warn) }
+    // 刚存下的那家一个模型都没试通过:直接去选主模型(选的时候先试调用)
+    if (ui.pickToProbe != null && ui.roles.main == null) {
+        Text(
+            ModelSetupCopy.PICK_MAIN,
+            Modifier.padding(start = 16.dp, bottom = 12.dp).clickable { actions.pickRole(ModelRole.Main) }.testTag("setup-pick-main").padding(vertical = 4.dp),
+            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = c.accent,
+        )
+    }
     if (ui.showForm) AddProviderForm(ui, actions)
     FooterNote(ModelsCopy.KEY_NOTE)
 }
@@ -436,6 +448,7 @@ object ModelSetupCopy {
     val KEY_OPTIONAL: String get() = tr(R.string.model_key_optional)
     val TEST_AND_SAVE: String get() = tr(R.string.model_test_save)
     val TESTING: String get() = tr(R.string.model_testing)
+    val PICK_MAIN: String get() = tr(R.string.model_pick_main)
     val TEST_NOTE: String get() = tr(R.string.model_test_note)
     val SELF_HOSTED_NOTE: String get() = tr(R.string.model_self_hosted_note)
     val MODEL_NAME: String get() = tr(R.string.model_manual_name)

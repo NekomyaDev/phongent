@@ -135,10 +135,10 @@ class ModelSetupViewModelTest {
         assertEquals(1, messages.size)
         assertEquals(listOf("get_time"), tools.map { it.name })
         assertEquals(1, store.providers.value.size)
-        assertNull(vm.state.value.toolWarning)
+        assertNull(vm.state.value.probeNote)
     }
 
-    /** 接口通、模型只回了话:存下服务商,但不拿这个模型当主模型,提醒一句;选好主模型后提醒收起。 */
+    /** 接口通、模型只回了话:接着试下一个可当主模型的(明说不会调用工具的不试);都只回话就存下服务商、不定主模型,请用户选;选好后提醒收起。 */
     @Test fun modelThatOnlyAnswersTextIsSavedButNotMadeMain() = runTest {
         listing[deepseekUrl] = deepseek
         reply = { ModelReply(listOf(Part.Text("It is noon.")), StopReason.EndTurn, null) }
@@ -152,11 +152,99 @@ class ModelSetupViewModelTest {
         val s = vm.state.value
         assertFalse("存下了,表单收起", s.showForm)
         assertEquals(ListState.Idle, s.form.test)
-        assertEquals("deepseek-chat 没有调用工具，Mika 干活需要会调用工具的模型。服务商已保存，但没有拿这个模型当主模型。", s.toolWarning)
+        assertEquals(listOf("deepseek-chat", "deepseek-reasoner"), built.map { it.first })
+        assertEquals(
+            "服务商已连上，但「deepseek-chat」没测试通过：它不会调用工具，Mika 干活需要会调用工具的模型。从列表里选一个你开通了的模型。\n" +
+                "试了 deepseek-chat、deepseek-reasoner，都没测试通过。",
+            s.probeNote,
+        )
+        assertEquals(p.id, s.pickToProbe)
+        assertTrue(s.probeBeforePick(ModelRole.Main, p.id))
+        assertFalse(s.probeBeforePick(ModelRole.Vision, p.id))
         assertFalse(s.canNext)
         vm.pick(ModelRole.Main, p.id, "deepseek-reasoner"); runCurrent()
-        assertNull(vm.state.value.toolWarning)
+        assertNull(vm.state.value.probeNote)
+        assertNull(vm.state.value.pickToProbe)
         assertEquals("deepseek-reasoner", store.configFor(ModelRole.Main)?.model)
+    }
+
+    /** 通义千问的 Key 下先列出别家的模型:先试自家的(qwen);第一个没开通就接着试下一个,通过的当主模型,说清先试的哪个没通过。 */
+    @Test fun notActivatedModelFallsBackToTheNextCandidate() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(
+            ListedModel("antdigital/Ling-3.1-flash", toolCalls = true), ListedModel("text-embedding-v4"),
+            ListedModel("qwen3-max-preview"), ListedModel("qwen-plus"),
+        ))
+        reply = {
+            if (built.last().first != "qwen-plus") throw ModelError.ModelNotAvailable(built.last().first, "The product is not activated.")
+            ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null)
+        }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals("自家的先试、向量模型不试", listOf("qwen3-max-preview", "qwen-plus"), built.map { it.first })
+        val p = store.providers.value.single()
+        assertEquals("qwen-plus", store.configFor(ModelRole.Main)?.model)
+        assertTrue("qwen-plus" in p.verifiedModels)
+        val s = vm.state.value
+        assertFalse(s.showForm)
+        assertNull(s.pickToProbe)
+        assertEquals(
+            "先试的 qwen3-max-preview 没测试通过：这个账号没开通或没权限用这个模型（服务商说：The product is not activated.）。主模型用了测试通过的「qwen-plus」。",
+            s.probeNote,
+        )
+    }
+
+    /** 试的几个都没开通:Key 是对的,照样存下服务商,不定主模型,说清试了哪些,请用户从列表里选;选的时候先试调用,不通不选。 */
+    @Test fun allCandidatesNotActivatedSavesProviderAndAsksToPick() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(
+            ListedModel("antdigital/Ling-3.1-flash", toolCalls = true), ListedModel("qwen-plus"), ListedModel("qwen-max"), ListedModel("qwen-turbo"),
+        ))
+        reply = { throw ModelError.ModelNotAvailable(built.last().first, "The product is not activated.") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals("至多试 3 个", listOf("qwen-plus", "qwen-max", "qwen-turbo"), built.map { it.first })
+        val p = store.providers.value.single()
+        assertEquals(4, p.models?.size)
+        assertEquals("sk", store.providerKey(p.id))
+        assertNull(store.roles.value.main)
+        val s = vm.state.value
+        assertFalse(s.showForm)
+        assertEquals(ListState.Idle, s.form.test)
+        assertEquals(
+            "服务商已连上，但「qwen-plus」没测试通过：这个账号没开通或没权限用这个模型（服务商说：The product is not activated.）。从列表里选一个你开通了的模型。\n" +
+                "试了 qwen-plus、qwen-max、qwen-turbo，都没开通。",
+            s.probeNote,
+        )
+        assertEquals(p.id, s.pickToProbe)
+        // 用户选了一个:先试调用,没开通就说原因、不选
+        var picked = 0
+        vm.pickManual(ModelRole.Main, p.id, "antdigital/Ling-3.1-flash") { picked++ }; runCurrent()
+        assertEquals(
+            ListState.Failed("这个账号没开通「antdigital/Ling-3.1-flash」或没权限用（服务商说：The product is not activated.）。换一个模型，或到服务商后台开通。"),
+            vm.state.value.manualPick[p.id],
+        )
+        assertEquals(0, picked)
+        assertNull(store.roles.value.main)
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.pickManual(ModelRole.Main, p.id, "qwen-turbo") { picked++ }; runCurrent()
+        assertEquals(1, picked)
+        assertEquals("qwen-turbo", store.configFor(ModelRole.Main)?.model)
+        assertNull(vm.state.value.probeNote)
+        assertNull(vm.state.value.pickToProbe)
+    }
+
+    /** 第一个就是 Key 不对(或别的不是模型的问题):不试别的,不存。 */
+    @Test fun authErrorOnTheFirstCandidateSavesNothing() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(ListedModel("qwen-plus"), ListedModel("qwen-max")))
+        reply = { throw ModelError.Auth() }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals(listOf("qwen-plus"), built.map { it.first })
+        assertTrue(vm.state.value.form.test is ListState.Failed)
+        assertTrue(store.providers.value.isEmpty())
+        assertNull(vm.state.value.pickToProbe)
     }
 
     /** 试调用失败(例如服务商要的请求头没带):服务端的报错原样给人看,什么都不存。 */

@@ -103,6 +103,12 @@ class OpenAiCompatModelTest {
         assertTrue(errorFor(MockResponse().setResponseCode(400).setBody("exceeds the maximum context")) is ModelError.ContextTooLong)
         assertEquals("m", (errorFor(MockResponse().setResponseCode(404)) as ModelError.ModelNotFound).model)
         assertEquals(503, (errorFor(MockResponse().setResponseCode(503)) as ModelError.Server).status)
+        // 这个账号没开通这个模型:不当成 Key 或请求的问题
+        val na = errorFor(MockResponse().setResponseCode(400).setBody("""{"code":"InvalidParameter","message":"The product is not activated."}""")) as ModelError.ModelNotAvailable
+        assertEquals("m", na.model)
+        assertEquals("The product is not activated.", na.detail)
+        assertTrue(errorFor(MockResponse().setResponseCode(403).setBody("""{"error":{"message":"not authorized to access this model"}}""")) is ModelError.ModelNotAvailable)
+        assertTrue(errorFor(MockResponse().setResponseCode(400).setBody("""{"error":{"message":"m does not support tools"}}""")) is ModelError.ToolsUnsupported)
         assertTrue(errorFor(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)) is ModelError.Network)
     }
 
