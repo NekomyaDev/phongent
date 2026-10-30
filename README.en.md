@@ -218,6 +218,9 @@ Some screens (e.g. payment or password entry) block screenshots, so Mika cannot 
 **Why Android 13?**
 Mika operates apps on a separate background screen, and the built-in phone helper and that screen need Android 13 or later. From Android 14 the background screen has its own focus and does not interfere with your typing on the main screen, so it is recommended. Web, sandbox and chat also work on Android 11 and 12.
 
+**Can I use a model running on my own computer or LAN?**
+Yes. When adding a provider choose "Custom" (自定义); the base URL may start with `http://`, e.g. `http://192.168.1.10:11434/v1` (with the phone on the same Wi-Fi). Local and LAN addresses show no warning; an unencrypted address outside your LAN shows a short warning, since your API key and chats could be seen by others on the network. Use `https://` when you can.
+
 **Where do APK updates come from?**
 Only from this repository's [GitHub Releases](https://github.com/wangzan101/Mika/releases). Each release's notes list what changed and the mainland China mirror link.
 

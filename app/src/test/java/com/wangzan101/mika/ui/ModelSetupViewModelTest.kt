@@ -188,6 +188,20 @@ class ModelSetupViewModelTest {
         assertEquals(1, store.providers.value.size)
     }
 
+    /** 明文 http:本机、局域网的不提示;别的地址提醒一句,照样能测试。 */
+    @Test fun plainHttpToARemoteHostWarnsButDoesNotBlock() = runTest {
+        val vm = vm()
+        vm.selectPreset(ProviderPresets.custom.label)
+        vm.setBaseUrl("http://192.168.1.10:11434/v1")
+        assertNull(vm.state.value.form.unencryptedWarning)
+        vm.setBaseUrl("https://models.example.com/v1")
+        assertNull(vm.state.value.form.unencryptedWarning)
+        vm.setBaseUrl("http://models.example.com/v1")
+        assertEquals("这个地址不加密，API Key 和对话内容可能被同一网络里的人看到。", vm.state.value.form.unencryptedWarning)
+        vm.setApiKey("k")
+        assertTrue(vm.state.value.form.canTest)
+    }
+
     @Test fun addingTwoProvidersInARowKeepsTheFirstMain() = runTest {
         listing[deepseekUrl] = deepseek
         listing[qwenUrl] = ModelListResult.Ok(listOf(ListedModel("qwen-vl", vision = true), ListedModel("qwen-max")))

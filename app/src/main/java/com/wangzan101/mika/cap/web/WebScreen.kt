@@ -824,7 +824,7 @@ class WebScreen(
         val downloadsBefore = files?.downloads?.count() ?: 0
         tab.load(url, NAVIGATE_TIMEOUT_MS)
         if (tab.crashed) throw WebTabCrashed(tab.id)
-        // 明文 http 被系统拒绝(安卓默认不许明文):换 https 再试一次
+        // 明文 http 被拒绝:换 https 再试一次。App 的网络安全配置已允许明文,这只是退路(设备策略或 WebView 仍拒绝时)
         var upgraded: String? = null
         if (tab.mainFrameError?.contains(CLEARTEXT) == true && url.startsWith("http://", ignoreCase = true)) {
             upgraded = url

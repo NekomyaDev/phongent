@@ -6,6 +6,7 @@ import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelRole
+import com.wangzan101.mika.settings.LocalHosts
 import com.wangzan101.mika.settings.ModelOption
 import com.wangzan101.mika.settings.ModelOptions
 import com.wangzan101.mika.settings.Provider
@@ -72,6 +73,10 @@ data class AddForm(
             !baseUrl.trim().startsWith("http://") && !baseUrl.trim().startsWith("https://") -> tr(R.string.model_url_scheme)
             else -> null
         }
+
+    /** 明文 http 又不在本机、局域网的地址:提醒一句,不拦着(见 [LocalHosts])。 */
+    val unencryptedWarning: String?
+        get() = if (urlProblem == null && LocalHosts.unencryptedRemote(baseUrl)) tr(R.string.model_url_unencrypted) else null
 
     /** 自定义的 OpenAI 兼容接口(本地服务)可以不填 Key,其余都要。 */
     val keyRequired: Boolean get() = !(isCustom && kind == ProviderConfig.Kind.OpenAiCompat)

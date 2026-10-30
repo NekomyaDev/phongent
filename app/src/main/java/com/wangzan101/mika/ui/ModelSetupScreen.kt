@@ -271,6 +271,7 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         }
     }
     f.urlProblem?.takeIf { f.isCustom && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    f.unencryptedWarning?.let { FooterNote(it, Modifier.testTag("setup-url-unencrypted"), color = c.warn) }
     MikaButton(
         if (f.test == ListState.Running) ModelSetupCopy.TESTING else ModelSetupCopy.TEST_AND_SAVE,
         actions.testAndSave, Modifier.fillMaxWidth().padding(top = 2.dp).testTag("setup-test"),
