@@ -140,7 +140,7 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 ### 1. 下载安装
 
-从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
+从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。
 
 ### 2. 无障碍（可以先跳过）
 
@@ -224,7 +224,7 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
 可以。添加服务商时选「自定义」，接口地址填 `http://` 开头的也行，比如 `http://192.168.1.10:11434/v1`（手机和那台电脑在同一个 Wi-Fi 下）。本机和局域网的地址不加提示；不加密又不在局域网里的地址会提醒一句：API Key 和对话内容可能被同一网络里的人看到，能用 `https://` 就用。
 
 **APK 更新从哪来？**
-只从本仓库的 [GitHub Releases](https://github.com/wangzan101/Mika/releases) 发布。每个版本改了什么、国内备用下载链接，都写在那个版本的发布说明里。
+只从本仓库的 [GitHub Releases](https://github.com/wangzan101/Mika/releases) 发布。每个版本改了什么，都写在那个版本的发布说明里。
 
 ## 参与贡献
 
@@ -275,12 +275,6 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
 ### 发布与更新（维护者）
 
 - 发布在 GitHub Releases，tag 用 `vX.Y.Z`，APK 作为附件挂在这个版本上。
-- 发布说明里单独一行写国内备用下载，格式固定：
-
-  ```
-  国内备用下载: <url>
-  ```
-
 - 检查更新：每次打开 App 查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
 
 ## 联系作者

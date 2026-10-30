@@ -140,7 +140,7 @@ Apps and websites that already have usage knowledge (names as they appear in the
 
 ### 1. Download and install
 
-Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it. If downloads are slow in mainland China, the release notes include a mirror link (国内备用下载).
+Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it.
 
 ### 2. Accessibility (you can skip it for now)
 
@@ -224,7 +224,7 @@ Mika operates apps on a separate background screen, and the built-in phone helpe
 Yes. When adding a provider choose "Custom" (自定义); the base URL may start with `http://`, e.g. `http://192.168.1.10:11434/v1` (with the phone on the same Wi-Fi). Local and LAN addresses show no warning; an unencrypted address outside your LAN shows a short warning, since your API key and chats could be seen by others on the network. Use `https://` when you can.
 
 **Where do APK updates come from?**
-Only from this repository's [GitHub Releases](https://github.com/wangzan101/Mika/releases). Each release's notes list what changed and the mainland China mirror link.
+Only from this repository's [GitHub Releases](https://github.com/wangzan101/Mika/releases). Each release's notes list what changed.
 
 ## Contributing
 
@@ -275,12 +275,6 @@ The debug build is not precompiled and its UI is several times slower; use the p
 ### Releases and updates (maintainers)
 
 - Releases are published on GitHub Releases with tags `vX.Y.Z`, with the APK attached to the release.
-- The release notes carry the mainland China mirror on its own line, in a fixed format:
-
-  ```
-  国内备用下载: <url>
-  ```
-
 - Update checks: each time you open the app it queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
 
 ## Contact
