@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** README 里生成的段落(内置知识、服务商预设)和源头一致;不一致就跑 `./gradlew updateReadme`。 */
+/** README.md、README.en.md 里生成的段落(内置知识、服务商预设)和源头一致;不一致就跑 `./gradlew updateReadme`。 */
 class ReadmeSectionsTest {
     private val root = File("..").canonicalFile
 
@@ -13,6 +13,12 @@ class ReadmeSectionsTest {
         val readme = File(root, ReadmeSections.README).readText()
         val expected = ReadmeSections.render(readme, ReadmeSections.sections(root))
         assertEquals("README.md 里生成的段落过期了,运行 ./gradlew updateReadme", expected, readme)
+    }
+
+    @Test fun englishReadmeMatchesGenerated() {
+        val readme = File(root, ReadmeSections.README_EN).readText()
+        val expected = ReadmeSections.render(readme, ReadmeSections.sections(root, english = true))
+        assertEquals("README.en.md 里生成的段落过期了,运行 ./gradlew updateReadme", expected, readme)
     }
 
     @Test fun renderReplacesOnlyBetweenMarkers() {

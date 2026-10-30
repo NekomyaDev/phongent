@@ -17,13 +17,15 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 [下载 APK](https://github.com/wangzan101/Mika/releases/latest) · [快速开始](#快速开始) · [能做什么](#能做什么) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
 
+简体中文 | [English](README.en.md)
+
 </div>
 
 > **English summary**
 >
 > Mika is an Android app that takes a one-sentence request and carries it out on your phone. It drives apps on a private background screen (so you can keep using your phone), browses the web in a built-in desktop-class browser, and runs scripts in a local Linux sandbox. You bring your own model API key (several providers are supported as presets, plus any OpenAI-compatible, Anthropic or Gemini endpoint). There is no Mika server: your requests go only to the model provider you configure.
 >
-> Status: **public beta**, changing quickly (see [Releases](https://github.com/wangzan101/Mika/releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI and docs are in Chinese for now. Licensed under Apache-2.0.
+> Status: **public beta**, changing quickly (see [Releases](https://github.com/wangzan101/Mika/releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI is in Chinese for now (English UI in progress); see the [full English README](README.en.md). Licensed under Apache-2.0.
 
 ## Beta 说明
 

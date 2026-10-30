@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * 文档和代码不脱节:文档里反引号包着的文件路径、Kotlin 类名、工具名,必须在仓库里真的有。
- * 范围:README.md、docs/ 下全部 .md、eval/README.md、tools/sandbox/README.md。
+ * 范围:README.md、README.en.md、docs/ 下全部 .md、eval/README.md、tools/sandbox/README.md。
  * 另外,同样这些文档里不写死会变的个数(内置知识、工具、服务商、评测题有多少),见 [docsDoNotHardCodeCounts]。
  *
  * 只检查「整段反引号内容就是一个标识符」的写法;下面这些一律不查(规则,不是白名单):
@@ -43,7 +43,7 @@ class DocsConsistencyTest {
     private val sourceNames: Set<String> by lazy { sourceFiles.map { it.nameWithoutExtension }.toSet() }
 
     private fun docs(): List<File> {
-        val list = mutableListOf(File(root, "README.md"), File(root, "eval/README.md"), File(root, "tools/sandbox/README.md"))
+        val list = mutableListOf(File(root, "README.md"), File(root, "README.en.md"), File(root, "eval/README.md"), File(root, "tools/sandbox/README.md"))
         File(root, "docs").takeIf { it.isDirectory }?.walkTopDown()?.filter { it.isFile && it.extension == "md" }?.let { list += it }
         return list.filter { it.isFile }
     }
@@ -121,10 +121,14 @@ class DocsConsistencyTest {
     }
 
     /**
-     * 会变的东西不写死个数:「18 份 App」「60 多个工具」「128 道评测题」这类写法一加内容就过期。
+     * 会变的东西不写死个数:「18 份 App」「60 多个工具」「128 道评测题」(英文的「18 apps」「60+ tools」)这类写法一加内容就过期。
      * 要列清单就用 README 里生成的段落(`./gradlew updateReadme`);确实要写个数的那一行末尾加 [countOk] 并说明为什么。
      */
-    private val hardCount = Regex("""\d+\s*多?\s*(份|个|道|家)\s*(内置)?\s*(App|app|网站|站点|技能|工具|服务商|预设|(真机)?评测题)""")
+    private val hardCount = Regex(
+        """\d+\s*多?\s*(份|个|道|家)\s*(内置)?\s*(App|app|网站|站点|技能|工具|服务商|预设|(真机)?评测题)""" +
+            """|\b\d+\+?\s+(built-in\s+)?(apps?|websites?|sites?|skills?|tools?|providers?|presets?|(on-device\s+)?eval\s+tasks?)\b""",
+        RegexOption.IGNORE_CASE,
+    )
     private val countOk = "<!-- count-ok -->"
 
     @Test fun docsDoNotHardCodeCounts() {
@@ -137,10 +141,12 @@ class DocsConsistencyTest {
     }
 
     @Test fun countPatternCatchesTypicalWording() {
-        listOf("18 份 App", "12 份网站", "4 份技能", "60 多个工具", "128 道真机评测题", "7 家服务商").forEach {
+        listOf("18 份 App", "12 份网站", "4 份技能", "60 多个工具", "128 道真机评测题", "7 家服务商",
+            "18 apps", "12 websites", "4 skills", "60 tools", "60+ tools", "7 providers", "18 built-in apps", "128 eval tasks").forEach {
             assertTrue(it, hardCount.containsMatchIn(it))
         }
-        listOf("最多 3 条知识", "一次最多 9 个", "每个任务最多 3 份,关联的技能").forEach {
+        listOf("最多 3 条知识", "一次最多 9 个", "每个任务最多 3 份,关联的技能",
+            "Android 13 and later", "python3 tools/x.py", "up to 3 notes", "arm64 devices").forEach {
             assertTrue(it, !hardCount.containsMatchIn(it))
         }
     }
