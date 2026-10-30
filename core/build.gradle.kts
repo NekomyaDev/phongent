@@ -47,6 +47,28 @@ val updateReadme by tasks.registering(JavaExec::class) {
     outputs.upToDateWhen { false }
 }
 
+// 桌面上对着 OpenAI 真实服务走一遍「用 ChatGPT 登录」(登录、列模型、Responses、工具调用、换新令牌),见 docs/dev/chatgpt-signin-check.md。
+// 单独的源码集:不进 core 的产物,也不进 app
+val chatgptCheck by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations[chatgptCheck.implementationConfigurationName].extendsFrom(configurations.implementation.get())
+configurations[chatgptCheck.runtimeOnlyConfigurationName].extendsFrom(configurations.runtimeOnly.get())
+
+val chatgptSignInCheck by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "用 App 的登录代码对着 OpenAI 走一遍 ChatGPT 登录;-Ptimeout=<秒> -Pmodel=<slug> -Pkeep"
+    classpath = chatgptCheck.runtimeClasspath
+    mainClass.set("com.wangzan101.mika.core.chatgpt.check.ChatGptSignInCheckKt")
+    args(listOfNotNull(
+        providers.gradleProperty("timeout").orNull?.let { "--timeout=$it" },
+        providers.gradleProperty("model").orNull?.let { "--model=$it" },
+        if (providers.gradleProperty("keep").isPresent) "--keep" else null,
+    ))
+    outputs.upToDateWhen { false }
+}
+
 tasks.test {
     // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
     classpath = sourceSets.main.get().output + classpath
