@@ -53,4 +53,11 @@
     <string name="issue_body">- Device: %1$s\n- Android version: %2$s (SDK %3$d)\n- Mika version: %4$s (build %5$s)\n\n### What went wrong\n\n\n### Steps you took\n\n\n### What you expected\n\n</string>
     <string name="licenses_third_party">Third-party components · %1$d</string>
     <string name="licenses_footer">Full license texts and copyright notices are in LICENSE, THIRD_PARTY_NOTICES.md and the licenses/ folder of the source repository.</string>
+    <string name="about_group_already_added">Already added the author on WeChat?</string>
+    <string name="about_group_ask_mika">Have Mika message the author to join</string>
+    <string name="about_group_gap_model">Finish setup first: no model set up yet</string>
+    <string name="about_group_gap_phone">Finish setup first: phone control isn’t set up</string>
+    <string name="about_group_gap_too_old">This phone’s Android version is too old for phone control</string>
+    <string name="group_request">Hi, I’m a Mika user and would like to join the Mika beta group. Could you add me? Thanks!</string>
+    <string name="group_task">Open WeChat, type the WeChat ID %1$s into the search at the top, find that contact (the author, Wang Zan) and send him this message: “%2$s”\nIf the contact can’t be found, it means I haven’t added him on WeChat yet: don’t add him as a friend and don’t send it to anyone else; just tell me to scan the QR code in “About Mika” to add the author first.</string>
 </resources>

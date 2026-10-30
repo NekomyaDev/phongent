@@ -44,8 +44,8 @@ object AboutCopy {
     val SAVE_QR: String get() = tr(R.string.about_save_qr)
     val QR_SAVED: String get() = tr(R.string.about_qr_saved)
     val QR_SAVE_FAILED: String get() = tr(R.string.about_qr_save_failed)
-    const val GROUP_ALREADY_ADDED = "已经加过作者微信？"
-    const val GROUP_ASK_MIKA = "让 Mika 帮我发消息入群"
+    val GROUP_ALREADY_ADDED: String get() = tr(R.string.about_group_already_added)
+    val GROUP_ASK_MIKA: String get() = tr(R.string.about_group_ask_mika)
 
     val FOLLOW: String get() = tr(R.string.about_follow)
     val FOLLOW_SUB: String get() = tr(R.string.about_follow_sub, MikaLinks.X_HANDLE)
@@ -92,10 +92,12 @@ object AboutCopy {
         else CheckValue(versionName.takeIf { it.isNotEmpty() })
 
     /** 「让 Mika 帮我发消息入群」还差的那一步:提示 [message],去 [fix] 那页补上(为空时去设置首页)。 */
-    enum class GroupTaskGap(val message: String, val fix: Fix?) {
-        Model("先完成设置：还没配好模型", Fix.AddModel),
-        Phone("先完成设置：手机操作还没配好", Fix.OpenPhoneSetup),
-        TooOld("这台手机的安卓版本太低，用不了手机操作", null),
+    enum class GroupTaskGap(private val messageRes: Int, val fix: Fix?) {
+        Model(R.string.about_group_gap_model, Fix.AddModel),
+        Phone(R.string.about_group_gap_phone, Fix.OpenPhoneSetup),
+        TooOld(R.string.about_group_gap_too_old, null);
+
+        val message: String get() = tr(messageRes)
     }
 
     /** 这件事要操作微信:模型配好、手机操作就绪才开始;差什么返回什么,都齐了为 null。 */
