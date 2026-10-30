@@ -23,6 +23,9 @@ class MikaLinksTest {
         assertTrue(lines.contains("### 遇到了什么问题"))
         assertTrue(lines.contains("### 做了哪几步"))
         assertTrue(lines.contains("### 期望是什么样"))
+        // 诊断信息不自动带上:只提示用户去哪里复制
+        assertTrue(lines.contains("### 诊断信息"))
+        assertTrue(lines.contains("（可选）在 Mika「关于 › 反馈问题 › 复制诊断信息」复制后粘贴在这里"))
     }
 
     /** 型号里已经带厂商名时不重复写。 */

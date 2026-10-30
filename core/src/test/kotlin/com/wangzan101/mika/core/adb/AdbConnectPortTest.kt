@@ -96,4 +96,22 @@ class AdbConnectPortTest {
         assertEquals(listOf(4000, 5000), attempts)
         assertEquals(5000, cache.port)
     }
+
+    /** 每次连接结束都报一次各来源给了几个候选:连上的、全失败的都报。 */
+    @Test
+    fun reportsCandidateCounts() = runTest {
+        val seen = mutableListOf<ConnectCandidates>()
+        val ok = AdbConnectPort({ null }, { _, _ -> listOf(5000, 5001) }, Cache(5001), report = { seen += it })
+        assertEquals("conn@5001", ok.connect(opener(5001)))
+        assertEquals(ConnectCandidates(property = 0, mdns = 2, cache = 0, connected = true), seen.single())
+        seen.clear()
+        val none = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), report = { seen += it })
+        try {
+            none.connect(opener())
+            fail()
+        } catch (e: AdbConnectionException) {
+            assertEquals(Reason.CONNECT_FAILED, e.reason)
+        }
+        assertEquals(ConnectCandidates(0, 0, 0, connected = false), seen.single())
+    }
 }

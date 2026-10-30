@@ -70,12 +70,13 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /** 关于页上点开的底部面板。 */
-private enum class AboutSheet { Update, Changelog, Feedback, Group }
+private enum class AboutSheet { Update, Changelog, Feedback, Group, Diagnostics }
 
 /**
  * 关于 Mika:顶上图标、名字、一句话介绍、版本(Beta 标记、构建编号);下面三组——检查更新与更新记录,
  * 反馈、内测群、关注作者,开源仓库与使用说明;一段数据说明;最底下许可证与作者。
  * 外部链接都交给 [onOpenUrl](系统浏览器);手动检查的结果到了([UpdateState.manualRounds] 变了)才提示。
+ * [diagnostics] 写出诊断信息(反馈面板里「复制诊断信息」点开预览时在后台线程调)。
  */
 @Composable
 fun AboutScreen(
@@ -90,6 +91,7 @@ fun AboutScreen(
     onAskMikaToJoin: () -> Unit,
     onOpenLicense: () -> Unit,
     onBack: () -> Unit,
+    diagnostics: () -> String = { "" },
 ) {
     val c = MikaTheme.colors
     val context = LocalContext.current
@@ -175,8 +177,10 @@ fun AboutScreen(
             onGitHub = { close(); onOpenUrl(issueUrl) },
             onWeChat = { sheet = AboutSheet.Group },
             onX = { close(); onOpenUrl(MikaLinks.X) },
+            onDiagnostics = { sheet = AboutSheet.Diagnostics },
             onDismiss = close,
         )
+        AboutSheet.Diagnostics -> DiagnosticsSheet(diagnostics, onDismiss = close)
         AboutSheet.Group -> GroupSheet(onSave = saveQr, onAskMika = { close(); onAskMikaToJoin() }, onDismiss = close)
         null -> Unit
     }
@@ -299,12 +303,13 @@ private fun ChangelogSheet(latest: ReleaseInfo?, onOpenAll: () -> Unit, onDismis
 }
 
 @Composable
-private fun FeedbackSheet(onGitHub: () -> Unit, onWeChat: () -> Unit, onX: () -> Unit, onDismiss: () -> Unit) {
+private fun FeedbackSheet(onGitHub: () -> Unit, onWeChat: () -> Unit, onX: () -> Unit, onDiagnostics: () -> Unit, onDismiss: () -> Unit) {
     AboutSheetFrame(AboutCopy.FEEDBACK, AboutCopy.FEEDBACK_SHEET_SUB, "feedback-sheet", onDismiss) {
         Column(Modifier.padding(top = 6.dp)) {
             FeedbackOption(MikaIcons.Code, AboutCopy.FEEDBACK_GITHUB, AboutCopy.FEEDBACK_GITHUB_SUB, first = true, onGitHub)
             FeedbackOption(MikaIcons.Chats, AboutCopy.FEEDBACK_WECHAT, AboutCopy.FEEDBACK_WECHAT_SUB, first = false, onWeChat)
             FeedbackOption(MikaIcons.XMark, AboutCopy.FEEDBACK_X, AboutCopy.FEEDBACK_X_SUB, first = false, onX)
+            FeedbackOption(MikaIcons.Copy, AboutCopy.DIAGNOSTICS, AboutCopy.DIAGNOSTICS_SUB, first = false, onDiagnostics)
         }
     }
 }

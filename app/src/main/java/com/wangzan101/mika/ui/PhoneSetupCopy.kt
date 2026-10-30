@@ -16,6 +16,7 @@ import com.wangzan101.mika.ui.components.ValueTone
 object PhoneSetupCopy {
     val TITLE: String get() = tr(R.string.phone_title)
     val INTRO: String get() = tr(R.string.phone_intro)
+    val DIAGNOSTICS: String get() = tr(R.string.diagnostics_copy)
     val LATER: String get() = tr(R.string.phone_later)
     /** 引导页顶栏上的短标题。 */
     val BAR_TITLE: String get() = tr(R.string.phone_bar_title)

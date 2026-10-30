@@ -28,7 +28,7 @@ class PhoneSetupScreenTest {
     @get:Rule val compose = createComposeRule()
     private val calls = mutableListOf<String>()
 
-    private fun show(inputs: SetupInputs, headsUpLowered: Boolean = false) = compose.setContent {
+    private fun show(inputs: SetupInputs, headsUpLowered: Boolean = false, diagnostics: Boolean = false) = compose.setContent {
         PhoneSetupContent(
             view = PhoneSetupFlow.view(inputs),
             onStepAction = { calls += "step $it" },
@@ -43,11 +43,28 @@ class PhoneSetupScreenTest {
             onSkipAccessibility = { calls += "skipA11y" },
             onRevisit = { calls += "revisit $it" },
             onOpenPairingChannel = { calls += "pairingChannel" },
+            onDiagnostics = if (diagnostics) ({ calls += "diagnostics" }) else null,
         )
     }
 
     /** 走到配对一步、无障碍跳过了:配对码只能填在通知里。 */
     private val pairingWithoutA11y = SetupInputs(true, true, BuiltinShellStatus.NotPaired, accessibility = false, accessibilitySkipped = true)
+
+    /** 「复制诊断信息」底部一直在;失败时出错的那一步里也有一个。 */
+    @Test
+    fun diagnosticsButtonAtBottomAndInFailedStep() {
+        show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed)), diagnostics = true)
+        compose.onNodeWithTag("setup-diagnostics-failed").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-diagnostics").assertIsDisplayed().performClick()
+        assertEquals(listOf("diagnostics", "diagnostics"), calls)
+    }
+
+    @Test
+    fun diagnosticsButtonInGuidePhase() {
+        show(SetupInputs(false, false, BuiltinShellStatus.NotPaired), diagnostics = true)
+        compose.onNodeWithTag("setup-diagnostics").assertIsDisplayed()
+        compose.onNodeWithTag("setup-diagnostics-failed").assertDoesNotExist()
+    }
 
     @Test
     fun firstStepOpensAboutPhone() {

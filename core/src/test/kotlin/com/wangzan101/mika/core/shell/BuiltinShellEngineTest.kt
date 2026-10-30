@@ -122,6 +122,22 @@ class BuiltinShellEngineTest {
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.PairingWindowClosed), e.status.value)
     }
 
+    /** 诊断信息用的最近一次出错:异常类别、原因和说明;连上后清空。 */
+    @Test
+    fun lastErrorRecordedAndClearedOnSuccess() = runTest {
+        val e = engine()
+        platform.pairError = AdbPairingException.Reason.WRONG_CODE
+        e.startPairing("123456", 40000)
+        assertEquals("AdbPairingException(WRONG_CODE): x", e.lastError)
+        platform.pairError = null
+        platform.launchResults += AdbConnectionException.Reason.UNAUTHORIZED
+        e.startPairing("123456", 40000)
+        assertEquals("AdbConnectionException(UNAUTHORIZED): x", e.lastError)
+        e.retry()
+        assertEquals(BuiltinShellStatus.Running, e.status.value)
+        assertEquals(null, e.lastError)
+    }
+
     @Test
     fun startupWaitsForRedeliveryBeforeLaunching() = runTest {
         platform.pairedFlag = true

@@ -36,6 +36,15 @@ object AboutCopy {
     val FEEDBACK_X: String get() = tr(R.string.about_feedback_x)
     val FEEDBACK_X_SUB: String get() = tr(R.string.about_feedback_x_sub, MikaLinks.X_HANDLE)
 
+    val DIAGNOSTICS: String get() = tr(R.string.diagnostics_copy)
+    val DIAGNOSTICS_SUB: String get() = tr(R.string.diagnostics_copy_sub)
+    val DIAGNOSTICS_TITLE: String get() = tr(R.string.diagnostics_title)
+    val DIAGNOSTICS_NOTE: String get() = tr(R.string.diagnostics_note)
+    val DIAGNOSTICS_COPY: String get() = tr(R.string.diagnostics_copy_button)
+    val DIAGNOSTICS_SHARE: String get() = tr(R.string.diagnostics_share)
+    val DIAGNOSTICS_COPIED: String get() = tr(R.string.diagnostics_copied)
+    val DIAGNOSTICS_LOADING: String get() = tr(R.string.diagnostics_loading)
+
     val GROUP: String get() = tr(R.string.about_group)
     val GROUP_SUB: String get() = tr(R.string.about_group_sub)
     val GROUP_SHEET_TITLE: String get() = tr(R.string.about_group_sheet_title)

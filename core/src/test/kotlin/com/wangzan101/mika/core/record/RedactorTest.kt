@@ -10,6 +10,21 @@ import org.junit.Test
 import com.wangzan101.mika.core.testing.verb
 
 class RedactorTest {
+    /** Google 新格式的认证 Key(AQ. 开头)和旧的 AIza 一样,经 Redactor 的每条路都遮住。 */
+    @Test fun googleAuthKeyMaskedEverywhere() {
+        val key = "AQ." + "Ab8RN6Lq_x-Zt3VwP0kJ9sYcH2mE4uFgD7aB"
+        fun gone(s: String) { assertFalse(s, s.contains(key)); assertFalse(s, s.contains("Ab8RN6Lq_x-Zt3VwP0kJ9sYcH2mE4uFgD7aB")) }
+        assertEquals("key=*** ok", Redactor.text("key=$key ok"))
+        gone(Redactor.evidence("Key: $key"))
+        gone(Redactor.args(verb("phone_type_text"), """{"text":"$key"}""", secretField = false))
+        gone(Redactor.pageData("""{"value":"$key"}"""))
+        val n = Redactor.network(url = "https://a.test/p?x=$key", body = """{"k":"$key"}""", headers = mapOf("X-Goog-Api-Key" to key, "X-Note" to key))
+        gone(n.url!!); gone(n.body!!); n.headers!!.values.forEach(::gone)
+        // 太短的、不是开头的不算
+        assertEquals("AQ.short", Redactor.text("AQ.short"))
+        assertEquals("XAQ.Ab8RN6Lq_x-Zt3VwP0kJ9sY", Redactor.text("XAQ.Ab8RN6Lq_x-Zt3VwP0kJ9sY"))
+    }
+
     @Test fun passwordFieldTextMasked() {
         val out = Redactor.args(verb("phone_type_text"), """{"text":"hunter2","ref":"@e3","snapshotId":"s1"}""", secretField = true)
         val o = Json.parseToJsonElement(out).jsonObject

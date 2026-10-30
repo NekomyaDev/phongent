@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import android.content.ClipboardManager
 import com.wangzan101.mika.about.CheckStatus
 import com.wangzan101.mika.about.MikaLinks
 import com.wangzan101.mika.about.ReleaseInfo
@@ -47,6 +49,8 @@ class AboutScreenTest {
         var asks = 0
     }
 
+    private val sampleDiagnostics = "Mika 诊断信息 / Mika diagnostics\n\n[App]\nversion: 0.1.0 (build abc1234)\n"
+
     private fun about(update: UpdateState = UpdateState()): Calls {
         val calls = Calls()
         compose.setContent {
@@ -55,6 +59,7 @@ class AboutScreenTest {
                     versionName = "0.1.0", build = "abc1234", beta = true, update = update, issueUrl = "issue://prefilled",
                     onCheck = { calls.checks++ }, onOpenUrl = { calls.urls += it },
                     onSaveQr = { calls.saves++; true }, onAskMikaToJoin = { calls.asks++ }, onOpenLicense = { calls.licenses++ }, onBack = {},
+                    diagnostics = { sampleDiagnostics },
                 )
             }
         }
@@ -100,16 +105,37 @@ class AboutScreenTest {
     }
 
     @Test
-    fun feedbackSheetHasThreeOptions() {
+    fun feedbackSheetHasFourOptions() {
         val calls = about()
         compose.onNodeWithText("反馈问题").performClick()
         compose.awaitOne(AboutCopy.FEEDBACK_SHEET_SUB)
-        compose.onAllNodesWithTag("feedback-option").assertCountEquals(3)
+        compose.onAllNodesWithTag("feedback-option").assertCountEquals(4)
+        compose.onNodeWithText("复制诊断信息").assertIsDisplayed()
         compose.onNodeWithText(AboutCopy.FEEDBACK_WECHAT).assertIsDisplayed()
         compose.onNodeWithText(AboutCopy.FEEDBACK_X).assertIsDisplayed()
         compose.onNodeWithText(AboutCopy.FEEDBACK_GITHUB).performClick()
         compose.waitForIdle()
         assertEquals(listOf("issue://prefilled"), calls.urls)
+    }
+
+    /** 「复制诊断信息」先打开预览:整段文字看得见,点「复制」才进剪贴板。 */
+    @Test
+    fun feedbackDiagnosticsPreviewsThenCopies() {
+        about()
+        compose.onNodeWithText("反馈问题").performClick()
+        compose.awaitOne("复制诊断信息").performClick()
+        compose.awaitOne("不包含 API Key、聊天内容和屏幕内容")
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(sampleDiagnostics).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("diagnostics-text").assertIsDisplayed()
+        compose.onNodeWithTag("diagnostics-share").assertExists()
+        compose.onNodeWithTag("diagnostics-copy").performClick()
+        compose.waitForIdle()
+        var clip: String? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val cm = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(ClipboardManager::class.java)
+            clip = cm.primaryClip?.getItemAt(0)?.text?.toString()
+        }
+        assertEquals(sampleDiagnostics, clip)
     }
 
     @Test

@@ -17,6 +17,8 @@ object Redactor {
     private val SK_KEY = Regex("""\bsk-[A-Za-z0-9_\-]{16,}""")
     private val BEARER = Regex("""\bBearer\s+[A-Za-z0-9._~+/=\-]{8,}""")
     private val GOOGLE_KEY = Regex("""\bAIza[0-9A-Za-z_\-]{30,}""")
+    /** Google 新格式的认证 Key:`AQ.` 开头,后面一长串 base64url 字符。 */
+    private val GOOGLE_AUTH_KEY = Regex("""\bAQ\.[0-9A-Za-z_\-]{20,}""")
     private val GITHUB_TOKEN = Regex("""\bgh[pousr]_[A-Za-z0-9]{20,}""")
 
     /** [secretField]:端口报告这次输入的目标是密码框。 */
@@ -118,7 +120,7 @@ object Redactor {
 
     fun text(s: String): String {
         var out = s
-        for (re in listOf(SK_KEY, GOOGLE_KEY, GITHUB_TOKEN)) out = re.replace(out, MASK)
+        for (re in listOf(SK_KEY, GOOGLE_KEY, GOOGLE_AUTH_KEY, GITHUB_TOKEN)) out = re.replace(out, MASK)
         return BEARER.replace(out, "Bearer $MASK")
     }
 

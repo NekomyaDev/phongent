@@ -15,6 +15,7 @@ import android.os.Process
 import android.provider.Settings
 import com.wangzan101.mika.core.adb.AdbConnectPort
 import com.wangzan101.mika.core.adb.AdbConnection
+import com.wangzan101.mika.core.adb.ConnectCandidates
 import com.wangzan101.mika.core.adb.AdbPairing
 import com.wangzan101.mika.core.adb.AdbServiceTypes
 import com.wangzan101.mika.core.adb.AdbTls
@@ -45,7 +46,11 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
     private val app = context.applicationContext
     private var started = false
 
-    private val platform: AndroidPlatform by lazy { AndroidPlatform(app, hub) }
+    private val platform: AndroidPlatform by lazy { AndroidPlatform(app, hub) { lastConnectCandidates = it } }
+
+    /** 最近一次找连接端口时各来源给了几个候选(诊断信息用);这次进程里还没连过为 null。 */
+    @Volatile var lastConnectCandidates: ConnectCandidates? = null
+        private set
 
     /** 要起助手时替用户打开无线调试:只由 App 自己写系统设置(要起助手时没有别的连接可用)。 */
     val wirelessAutoOn: WirelessDebuggingAutoOn by lazy {
@@ -94,7 +99,11 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         e.start()
     }
 
-    private class AndroidPlatform(private val app: Context, private val hub: HelperHub) : BuiltinShellPlatform {
+    private class AndroidPlatform(
+        private val app: Context,
+        private val hub: HelperHub,
+        private val candidates: (ConnectCandidates) -> Unit,
+    ) : BuiltinShellPlatform {
         private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         private val finder = NsdAdbServiceFinder(app)
         private val portCache = object : PortCache {
@@ -142,7 +151,7 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         }
 
         suspend fun connect(tls: AdbTls = AndroidAdb.tls(AndroidAdb.identity(app))): AdbConnection =
-            AdbConnectPort(::tlsPort, finder, portCache).connect { AdbConnection.open(LOCALHOST, it, tls) }
+            AdbConnectPort(::tlsPort, finder, portCache, report = candidates).connect { AdbConnection.open(LOCALHOST, it, tls) }
 
         override fun stopHelper() {
             // destroy 会让助手进程当场退出,这一调用多半以 DeadObjectException 结束

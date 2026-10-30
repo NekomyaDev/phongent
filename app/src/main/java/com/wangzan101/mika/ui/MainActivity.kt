@@ -43,6 +43,8 @@ import com.wangzan101.mika.cap.web.WebSites
 import com.wangzan101.mika.browser.UserBrowser
 import com.wangzan101.mika.BuildConfig
 import com.wangzan101.mika.MikaApp
+import com.wangzan101.mika.about.Diagnostics
+import com.wangzan101.mika.about.DiagnosticsCollector
 import com.wangzan101.mika.about.MikaLinks
 import com.wangzan101.mika.about.QrImage
 import com.wangzan101.mika.chat.ConversationStore
@@ -372,6 +374,9 @@ private fun MikaRoot(store: ProviderStore, monitor: SystemStatusMonitor, activit
             },
             onOpenLicense = { nav.push(Route.License) },
             onBack = back,
+            diagnostics = {
+                Diagnostics.render(DiagnosticsCollector.collect(context, status))
+            },
         )
         Route.License -> LicensesScreen(onBack = back)
         Route.Browser -> BrowserScreen(remember { UserBrowser.of(context) }, onBack = back)

@@ -3,6 +3,9 @@ package com.wangzan101.mika.ui
 import com.wangzan101.mika.R
 import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.ui.components.keepsKeyboard
+import com.wangzan101.mika.about.Diagnostics
+import com.wangzan101.mika.about.DiagnosticsCollector
+import com.wangzan101.mika.about.setupInputs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,12 +54,10 @@ import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.PairingCode
 import com.wangzan101.mika.core.shell.PairingNotifyIssue
 import com.wangzan101.mika.core.shell.PhoneSetupFlow
-import com.wangzan101.mika.core.shell.SetupInputs
 import com.wangzan101.mika.core.shell.SetupPhase
 import com.wangzan101.mika.core.shell.SetupStep
 import com.wangzan101.mika.core.shell.SetupView
 import com.wangzan101.mika.core.shell.StepMark
-import com.wangzan101.mika.settings.AccessibilityState
 import com.wangzan101.mika.settings.SystemStatus
 import com.wangzan101.mika.cap.phone.PhoneServices
 import com.wangzan101.mika.ui.components.PageBackground
@@ -105,14 +106,9 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
     var askedNotifications by rememberSaveable { mutableStateOf(false) }
     var accessibilitySkipped by rememberSaveable { mutableStateOf(false) }
 
-    val inputs = SetupInputs(
-        developerOptions = status.developerOptions, wirelessDebugging = status.wirelessDebugging,
-        status = shell, discovery = discovery, notificationsAllowed = status.notificationsAllowed,
-        pairingChannel = status.pairingChannel, repair = repairing,
-        usbDebugging = status.usbDebugging, accessibility = status.accessibility == AccessibilityState.On,
-        accessibilitySkipped = accessibilitySkipped, restrictedSettings = status.restrictedSettings,
-        confirmed = confirmed, revisit = revisit,
-    )
+    var diagnosticsOpen by rememberSaveable { mutableStateOf(false) }
+
+    val inputs = status.setupInputs(discovery, repairing, accessibilitySkipped, confirmed, revisit)
     val view = PhoneSetupFlow.view(inputs)
     // 回去重做的那一步:读到它从关着变成开着,就自动回到原来的步骤,不用再点
     val revisitDetected = revisit?.let { PhoneSetupFlow.detected(it, inputs) }
@@ -170,7 +166,12 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
         onSkipAccessibility = { accessibilitySkipped = true; revisit = null },
         onRevisit = { step -> revisit = step },
         onboarding = onboarding,
+        onDiagnostics = { diagnosticsOpen = true },
     )
+    // 卡在哪一步都能把诊断信息发给作者:用的是引导页此刻的输入,用户确认过的步骤也在里面
+    if (diagnosticsOpen) {
+        DiagnosticsSheet(load = { Diagnostics.render(DiagnosticsCollector.collect(context, status, inputs)) }, onDismiss = { diagnosticsOpen = false })
+    }
 }
 
 /**
@@ -178,6 +179,7 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
  * 读开关的几步都有 [onConfirmStep](「我已经打开了,下一步」);做完的步骤可以点,[onRevisit] 回去重做,传 null 是回到原来的步骤。
  * [onboarding] 为真时是首次上手的最后一步,底部多一排分页点。[onSubmit] 收到的码已经校验过是 6 位数字。
  * 配对一步通知发不出来时([SetupView.needsNotifications]),先修通知是主按钮:[onAllowNotifications] 或 [onOpenPairingChannel]。
+ * [onDiagnostics] 不为空时底部总有「复制诊断信息」,失败时出错的那一步里也有一个。
  */
 @Composable
 fun PhoneSetupContent(
@@ -195,6 +197,7 @@ fun PhoneSetupContent(
     onRevisit: (SetupStep?) -> Unit = {},
     onboarding: Boolean = false,
     onOpenPairingChannel: () -> Unit = {},
+    onDiagnostics: (() -> Unit)? = null,
 ) {
     val canRevisit = view.phase == SetupPhase.Guide || view.phase == SetupPhase.Failed
     fun revisitable(step: SetupStep) = canRevisit && step != view.current && step in PhoneSetupFlow.REVISITABLE &&
@@ -223,7 +226,7 @@ fun PhoneSetupContent(
                         ) {
                             if (step == view.current) CurrentStepBody(
                                 step, view, onStepAction, onFailureFix, onAllowNotifications, onOpenPairingChannel, headsUpLowered, onOpenHeadsUp,
-                                onConfirmStep, onSubmit, onAppInfo, onSkipAccessibility, onRevisit,
+                                onConfirmStep, onSubmit, onAppInfo, onSkipAccessibility, onRevisit, onDiagnostics,
                             )
                             if (step == SetupStep.Connect && view.phase == SetupPhase.Working) WorkingLine()
                         }
@@ -250,6 +253,12 @@ fun PhoneSetupContent(
                         kind = ButtonKind.Text, size = ButtonSize.Medium,
                     )
                     else -> Unit
+                }
+                onDiagnostics?.let {
+                    MikaButton(
+                        PhoneSetupCopy.DIAGNOSTICS, it, Modifier.fillMaxWidth().testTag("setup-diagnostics"),
+                        kind = ButtonKind.Text, size = ButtonSize.Small,
+                    )
                 }
             }
         }
@@ -314,6 +323,7 @@ private fun CurrentStepBody(
     onAppInfo: () -> Unit,
     onSkipAccessibility: () -> Unit,
     onRevisit: (SetupStep?) -> Unit,
+    onDiagnostics: (() -> Unit)?,
 ) {
     val copy = PhoneSetupCopy.step(step)
     Text(copy.body, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = MikaTheme.colors.ink2)
@@ -326,6 +336,7 @@ private fun CurrentStepBody(
             Text(fc.body, Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.ink2)
         }
         PillButton(PhoneSetupCopy.fixLabel(f.fix), primary = true, tag = "setup-fix") { onFailureFix(f.fix) }
+        if (view.phase == SetupPhase.Failed) onDiagnostics?.let { LinkText(PhoneSetupCopy.DIAGNOSTICS, "setup-diagnostics-failed", it) }
     }
     // 没成功时最可能的原因在前面哪一步:说清楚,给回去的按钮
     view.suspect?.let { s ->

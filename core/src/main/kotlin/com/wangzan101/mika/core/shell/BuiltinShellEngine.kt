@@ -86,6 +86,10 @@ class BuiltinShellEngine(
     private val _discovery = MutableStateFlow<PairingDiscovery>(PairingDiscovery.Idle)
     override val pairingDiscovery: StateFlow<PairingDiscovery> = _discovery.asStateFlow()
 
+    /** 最近一次配对或连接失败的异常类别和说明(诊断信息用,原文未脱敏);连上后清空。 */
+    @Volatile var lastError: String? = null
+        private set
+
     private val launchLock = Mutex()
     private var failures = 0
     private var retryJob: Job? = null
@@ -203,6 +207,7 @@ class BuiltinShellEngine(
         _status.value = BuiltinShellStatus.Connecting
         val failure = attempt()
         if (failure == null) {
+            lastError = null
             _status.value = BuiltinShellStatus.Running
             return@withLock
         }
@@ -221,15 +226,21 @@ class BuiltinShellEngine(
     private suspend fun attempt(): BuiltinShellFailure? = try {
         withContext(io) { platform.launchHelper() }
         if (withTimeoutOrNull(handoffTimeoutMs) { helper.first { it != null } } != null) null
-        else BuiltinShellFailure.HelperStartFailed
+        else BuiltinShellFailure.HelperStartFailed.also { lastError = "helper handoff timed out" }
     } catch (e: CancellationException) {
         throw e
     } catch (e: AdbConnectionException) {
+        lastError = describe(e)
         val f = BuiltinShellFailures.ofConnection(e.reason)
         if (f == BuiltinShellFailure.ConnectFailed && !platform.wifiConnected()) BuiltinShellFailure.NoWifi else f
     } catch (e: Exception) {
+        lastError = describe(e)
         BuiltinShellFailure.Unknown
     }
+
+    private fun describe(e: Exception): String =
+        e.javaClass.simpleName + ((e as? AdbConnectionException)?.reason?.let { "($it)" } ?: (e as? AdbPairingException)?.reason?.let { "($it)" } ?: "") +
+            (e.message?.let { ": " + it.take(200) } ?: "")
 
     override fun startDiscovery() {
         synchronized(this) {
@@ -255,6 +266,7 @@ class BuiltinShellEngine(
         val target = port ?: (_discovery.value as? PairingDiscovery.Found)?.port
             ?: withContext(io) { platform.findPairingPort(pairingPortTimeoutMs) }
         if (target == null) {
+            lastError = "pairing port not found"
             _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.PairingWindowClosed)
             return
         }
@@ -264,8 +276,10 @@ class BuiltinShellEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: AdbPairingException) {
+            lastError = describe(e)
             BuiltinShellFailures.ofPairing(e.reason)
         } catch (e: Exception) {
+            lastError = describe(e)
             BuiltinShellFailure.Unknown
         }
         if (failure != null) {
