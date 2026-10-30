@@ -21,7 +21,7 @@ It works on a hidden background screen, so you can keep using your phone.
 
 > **Language**
 >
-> - The app UI is in Chinese; an English UI is in progress. Setting names below are given in English with the current Chinese label in parentheses, e.g. 「设置手机操作」.
+> - The app UI is in English and Chinese. It follows your system language (Chinese on a Chinese system, English otherwise), and you can switch in Settings › Language. Setting names below are given in English with the Chinese label in parentheses, e.g. 「设置手机操作」.
 > - The built-in knowledge about apps and websites is written in Chinese. That does not limit you: the model reads it fine, and you can talk to Mika in English.
 > - Many demos and built-in knowledge cover apps popular in China, but Mika is not tied to them: it can operate any app or website on your phone.
 
