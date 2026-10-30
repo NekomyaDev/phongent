@@ -32,20 +32,22 @@ class WheelPickerDeviceTest {
         return s ?: error("wheel page never showed: ${runBlocking { screen.snapshot() }.elements.map { "${it.role}:${it.name}" }}")
     }
 
-    private fun ScreenSnapshot.picker(label: String): UiElement = elements.first { it.role == "NumberPicker" && it.name == label }
-
-    /** 此刻滚轮中间那一格(读屏树里滚轮下面带字、离中线最近的那个节点)。 */
-    private fun shown(label: String): String? {
-        val s = runBlocking { screen.snapshot() }
-        val ref = s.picker(label).ref
-        val node = s.windows.flatMap { it.nodes }.flatMap(::flatten).first { it.ref == ref }
-        val items = node.children.filter { it.text != null }
-        val mid = (node.bounds[1] + node.bounds[3]) / 2
-        return items.minByOrNull { kotlin.math.abs((it.bounds[1] + it.bounds[3]) / 2 - mid) }?.text
+    /** 原版数字滚轮在读屏里不带名字:按位置认,页面上左边是「分」、右边是「锁住」(见 [WheelPickerTestActivity])。 */
+    private fun ScreenSnapshot.picker(label: String): UiElement {
+        val pickers = elements.filter { it.role == "NumberPicker" }.sortedBy { it.centerX }
+        check(pickers.size == 2) { "expected 2 NumberPickers, got ${pickers.map { it.centerX }}" }
+        return if (label == WheelPickerTestActivity.MINUTES) pickers[0] else pickers[1]
     }
 
     private fun flatten(n: com.wangzan101.mika.core.uistate.UiTreeNode): List<com.wangzan101.mika.core.uistate.UiTreeNode> =
         listOf(n) + n.children.flatMap(::flatten)
+
+    /** 再让工具调到同一个值一次:滚轮真的已经停在那里,就一下都不用动、起点就是它。 */
+    private suspend fun assertStaysAt(label: String, value: String) {
+        val s = screen.snapshot()
+        val again = screen.setWheel(s.picker(label).ref, s.snapshotId, value)
+        assertTrue("$again", again.reached && again.attempts == 0 && WheelMath.matches(again.from, value))
+    }
 
     @Test
     fun wheelsAreMarkedInTheTree() = runBlocking<Unit> {
@@ -64,7 +66,7 @@ class WheelPickerDeviceTest {
         assertTrue("$o", WheelMath.matches(o.value, "40"))
         // 0 → 40 往回走 20 格最近;每格一下,读回不另算
         assertTrue("$o", o.attempts in 20..24)
-        assertTrue(WheelMath.matches(shown(WheelPickerTestActivity.LOCKED), "40"))
+        assertStaysAt(WheelPickerTestActivity.LOCKED, "40")
     }
 
     @Test
@@ -73,9 +75,9 @@ class WheelPickerDeviceTest {
         val o = screen.setWheel(s.picker(WheelPickerTestActivity.MINUTES).ref, s.snapshotId, "40")
         assertTrue("$o", o.reached)
         assertTrue("$o", o.method in setOf("text", "actions"))
-        assertTrue(WheelMath.matches(shown(WheelPickerTestActivity.MINUTES), "40"))
+        assertStaysAt(WheelPickerTestActivity.MINUTES, "40")
         // 另一个滚轮没被动过
-        assertTrue(WheelMath.matches(shown(WheelPickerTestActivity.LOCKED), "0"))
+        assertStaysAt(WheelPickerTestActivity.LOCKED, "0")
     }
 
     @Test
