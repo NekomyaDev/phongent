@@ -47,6 +47,14 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 <table>
 <tr>
+<td align="center" width="33%"><img src="docs/media/hacker-news.gif" alt="打开 Hacker News，读出首页前 5 条和分数" width="230" /><br/>打开 Hacker News，读出首页前 5 条和分数<br/><sub>（加速 1.5 倍）</sub></td>
+<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="在 Google Flights 上找旧金山到纽约最便宜的直飞" width="230" /><br/>在 Google Flights 上找旧金山到纽约最便宜的直飞<br/><sub>（加速 3 倍；价格按网络所在地区显示为港币）</sub></td>
+<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="在 Amazon 上找 30 美元以内、4.5 星以上的 USB-C 充电器，加进购物车，停在结账前" width="230" /><br/>在 Amazon 上找 30 美元以内、4.5 星以上的 USB-C 充电器，加进购物车，停在结账前<br/><sub>（加速 3.5 倍）</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
 <td align="center" width="33%"><img src="docs/media/job-greet.jpg" alt="在 BOSS 直聘网页上找岗位、打招呼" width="230" /><br/>在 BOSS 直聘网页上找岗位、打招呼</td>
 <td align="center" width="33%"><img src="docs/media/music-vip.jpg" alt="打开汽水音乐，看广告领听歌权益" width="230" /><br/>打开汽水音乐，看广告领听歌权益</td>
 <td align="center" width="33%"><img src="docs/media/food-order.jpg" alt="在美团上凑满减、点外卖，付款前问你" width="230" /><br/>在美团上凑满减、点外卖，付款前问你</td>

@@ -38,8 +38,8 @@ It works on a hidden background screen, so you can keep using your phone.
 <table>
 <tr>
 <td align="center" width="33%"><img src="docs/media/hacker-news.gif" alt="Reads the top 5 Hacker News stories with their points" width="230" /><br/>Reads the top 5 Hacker News stories with their points<br/><sub>(1.5× speed)</sub></td>
-<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="Finds the cheapest nonstop flight from San Francisco to New York on Google Flights" width="230" /><br/>Finds the cheapest nonstop SFO → New York flight on Google Flights<br/><sub>(3× speed; prices show in HKD because of the network region)</sub></td>
-<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="Finds a USB-C charger under $30 rated 4.5+ on Amazon and adds it to the cart" width="230" /><br/>Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout<br/><sub>(3.5× speed)</sub></td>
+<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="Finds the cheapest nonstop SFO → New York flight on Google Flights" width="230" /><br/>Finds the cheapest nonstop SFO → New York flight on Google Flights<br/><sub>(3× speed; prices show in HKD because of the network region)</sub></td>
+<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout" width="230" /><br/>Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout<br/><sub>(3.5× speed)</sub></td>
 </tr>
 </table>
 
