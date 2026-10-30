@@ -127,6 +127,16 @@
                 android:value="Runs a user-requested phone task on the app's own virtual display and shows its progress" />
         </service>
 
+        <!-- 电脑连接(MCP):用户在设置里打开后才运行,让监听端口在后台也开着;关掉就停 -->
+        <service
+            android:name=".mcp.McpService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user-enabled local network endpoint open so the user's own computer can hand tasks to the app" />
+        </service>
+
         <!-- 后台准备运行环境(解出随 APK 自带的根文件系统),只在准备期间运行 -->
         <service
             android:name=".sandbox.SandboxService"
