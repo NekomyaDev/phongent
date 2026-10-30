@@ -90,11 +90,11 @@
     <string name="chatgpt_plan_note">Using ChatGPT plan. On Plus, the 5-hour limit is shared with other apps that use your plan; Pro has no 5-hour limit.</string>
     <string name="chatgpt_signed_out_note">Signed out on this phone. Continue with ChatGPT to use your plan again; your model choices are kept.</string>
     <string name="chatgpt_revoke_unconfirmed">Signed out on this phone, but ChatGPT didn’t confirm it. You can also disconnect Mika in your ChatGPT settings.</string>
-    <string name="chatgpt_fail_denied">Sign-in was cancelled.</string>
+    <string name="chatgpt_fail_denied">Sign-in was cancelled. If the page said the required permission isn’t available: using your plan needs ChatGPT Plus or Pro. With a free account, add another provider’s API key instead.</string>
     <string name="chatgpt_fail_mismatch">The sign-in reply didn’t match this attempt. Please try again.</string>
     <string name="chatgpt_fail_no_client">ChatGPT didn’t finish registering Mika. Please try again.</string>
     <string name="chatgpt_fail_timed_out">Sign-in timed out. Please try again.</string>
-    <string name="chatgpt_fail_exchange">ChatGPT didn’t accept the sign-in. Please try again.</string>
+    <string name="chatgpt_fail_exchange">ChatGPT didn’t accept this sign-in. Using your plan in Mika needs ChatGPT Plus or Pro; if you have one, please try again.</string>
     <string name="chatgpt_fail_id_token">Couldn’t verify your ChatGPT account. Please try again.</string>
     <string name="chatgpt_fail_no_plan">Mika wasn’t allowed to use your ChatGPT plan. Sign in again and allow plan usage (needs Plus or Pro).</string>
     <string name="chatgpt_fail_network">Couldn’t reach ChatGPT. Check your network and try again.</string>

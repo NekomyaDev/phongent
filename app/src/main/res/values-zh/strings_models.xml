@@ -86,11 +86,11 @@
     <string name="chatgpt_plan_note">使用 ChatGPT 套餐额度。Plus 每 5 小时的额度和其他用你套餐的 App 共用；Pro 没有 5 小时的限制。</string>
     <string name="chatgpt_signed_out_note">这台手机上已退出登录。点「使用 ChatGPT 继续」就能接着用套餐；选好的模型都还在。</string>
     <string name="chatgpt_revoke_unconfirmed">这台手机上已退出登录，但 ChatGPT 那边没有确认。也可以在 ChatGPT 设置里断开 Mika。</string>
-    <string name="chatgpt_fail_denied">已取消登录。</string>
+    <string name="chatgpt_fail_denied">已取消登录。如果授权页提示「所需权限不可用」：用套餐额度需要 ChatGPT Plus 或 Pro，免费账号可以改用其他服务商的 API Key。</string>
     <string name="chatgpt_fail_mismatch">登录回来的信息和这次对不上，请再试一次。</string>
     <string name="chatgpt_fail_no_client">ChatGPT 没有完成对 Mika 的注册，请再试一次。</string>
     <string name="chatgpt_fail_timed_out">登录超时了，请再试一次。</string>
-    <string name="chatgpt_fail_exchange">ChatGPT 没有接受这次登录，请再试一次。</string>
+    <string name="chatgpt_fail_exchange">ChatGPT 没有接受这次登录。如果这个账号不是 Plus 或 Pro，就不能把套餐额度用在 Mika 里；否则请再试一次。</string>
     <string name="chatgpt_fail_id_token">核对不了你的 ChatGPT 账号，请再试一次。</string>
     <string name="chatgpt_fail_no_plan">没有允许 Mika 使用你的 ChatGPT 套餐。请重新登录并允许使用套餐额度（需要 Plus 或 Pro）。</string>
     <string name="chatgpt_fail_network">连不上 ChatGPT，请检查网络后再试。</string>

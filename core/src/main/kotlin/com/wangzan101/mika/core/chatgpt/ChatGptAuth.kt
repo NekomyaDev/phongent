@@ -39,7 +39,8 @@ data class TokenSet(
 /** 换令牌的结果:拿到了、被拒(带服务端的错误代码;[terminal] 为真表示这个刷新令牌不能再用)、或一时失败(网络、5xx)。 */
 sealed interface TokenResult {
     data class Ok(val tokens: TokenSet) : TokenResult
-    data class Rejected(val code: String, val terminal: Boolean) : TokenResult
+    /** [detail] 是服务端给的错误说明(error_description 或 error.message),只用于给人看,不含令牌。 */
+    data class Rejected(val code: String, val terminal: Boolean, val detail: String? = null) : TokenResult
     data class Failed(val error: ModelError) : TokenResult
 }
 
@@ -148,7 +149,8 @@ class ChatGptAuth(
         if (raw.status in 500..599) return TokenResult.Failed(ModelError.Server(raw.status))
         if (raw.status != 200) {
             val code = root?.let { (it["error"] as? JsonObject)?.str("code") ?: it.str("error") ?: it.str("code") } ?: "http_${raw.status}"
-            return TokenResult.Rejected(code, code in TERMINAL_REFRESH_ERRORS)
+            val detail = root?.let { it.str("error_description") ?: (it["error"] as? JsonObject)?.str("message") }
+            return TokenResult.Rejected(code, code in TERMINAL_REFRESH_ERRORS, detail)
         }
         val access = root?.str("access_token") ?: return TokenResult.Failed(ModelError.BadResponse("换令牌的返回里没有 access_token"))
         return TokenResult.Ok(

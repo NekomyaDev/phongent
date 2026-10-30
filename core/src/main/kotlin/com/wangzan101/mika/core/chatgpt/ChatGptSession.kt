@@ -115,7 +115,7 @@ suspend fun signInWithChatGpt(
     if (issued != clientId) onRegistered(issued)
     val tokens = when (val r = auth.exchange(issued, code, attempt)) {
         is TokenResult.Ok -> r.tokens
-        is TokenResult.Rejected -> throw SignInException(SignInFailure.Exchange, r.code)
+        is TokenResult.Rejected -> throw SignInException(SignInFailure.Exchange, listOfNotNull(r.code, r.detail).joinToString(" — "))
         is TokenResult.Failed -> throw SignInException(SignInFailure.Network, r.error.message.orEmpty(), r.error)
     }
     val idToken = tokens.idToken ?: throw SignInException(SignInFailure.IdToken, "no id_token")

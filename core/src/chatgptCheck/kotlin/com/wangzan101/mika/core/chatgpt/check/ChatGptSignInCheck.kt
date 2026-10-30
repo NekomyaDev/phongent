@@ -304,7 +304,7 @@ private class Check(private val timeoutSec: Long, private val modelArg: String?,
 private fun explain(e: Throwable): String = when (e) {
     is SignInException -> when (e.reason) {
         SignInFailure.Denied -> "授权页返回了错误(${e.message?.substringAfter(": ", "")}):" +
-            "access_denied 是在授权页点了取消,或这个账号不允许授权给其他 App"
+            "access_denied 是在授权页点了取消;授权页若写着「所需权限不可用」,说明账号不是 Plus 或 Pro,不能把套餐额度给其他 App"
         SignInFailure.StateMismatch -> "回调里的 state 和这次发起的不一致(不是这次登录的回调)"
         SignInFailure.ClientMismatch -> "回调给出的 client_id 和保存的不一致:删掉 ~/.mika-dev/chatgpt-check/host.json 里的 clientId 后重来"
         SignInFailure.NoClientId -> "第一次注册,回调里却没有给出 client_id"
