@@ -43,7 +43,7 @@ class ModelSetupViewModelTest {
     private fun store() = ProviderStore(
         tmp.root, AesGcmKeyCipher { key },
         newId = { "id${++ids}" },
-        modelFactory = { cfg, _ -> Fake(cfg.capabilities) },
+        modelFactory = { cfg, _, _ -> Fake(cfg.capabilities) },
         modelLister = { kind, url, apiKey -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
     )
 

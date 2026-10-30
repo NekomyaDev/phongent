@@ -170,6 +170,14 @@ class OpenAiCompatModelTest {
         assertFalse("reasoning_content" in messages[2])
     }
 
+    @Test fun modelsListedWithReasoningContentFieldReplayItWithTools() = runTest {
+        val m = OpenAiCompatModel(server.url("/v1").toString().trimEnd('/'), "k", "kimi-k3", caps(), OkHttpClient(), "reasoning_content")
+        server.enqueue(ok("""{"choices":[{"finish_reason":"stop","message":{"content":"ok"}}]}"""))
+        val history = user + Message(Role.Assistant, listOf(Part.Thinking("先想"), Part.Text("next")), Author.Mika)
+        m.complete("s", history, listOf(ToolSpec("phone_tap", "d", """{"type":"object"}""")))
+        assertEquals("先想", body()["messages"]!!.jsonArray[2].jsonObject["reasoning_content"]!!.jsonPrimitive.content)
+    }
+
     @Test fun readsPromptCacheHitTokens() = runTest {
         server.enqueue(ok("""{"choices":[{"finish_reason":"stop","message":{"content":"hi"}}],"usage":{"prompt_tokens":900,"completion_tokens":10,"prompt_cache_hit_tokens":640,"prompt_cache_miss_tokens":260}}"""))
         assertEquals(Usage(900, 10, 640), model().complete("sys", user, emptyList()).usage)

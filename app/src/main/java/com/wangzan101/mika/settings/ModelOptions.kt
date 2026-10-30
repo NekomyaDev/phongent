@@ -22,8 +22,11 @@ data class ModelOption(
 }
 
 object ModelOptions {
-    /** 把列出的模型和预设能力合并。可当主模型的排前面,其余保持服务商给的顺序。 */
-    fun merge(listed: List<ListedModel>, base: Capabilities): List<ModelOption> = listed.map { m ->
+    /**
+     * 把列出的模型和预设能力合并。可当主模型的排前面,其余保持服务商给的顺序。
+     * 只写了 Mika 不会说的接口协议的模型(见 [ListedModel.usable])调用必然失败,不列出来。
+     */
+    fun merge(listed: List<ListedModel>, base: Capabilities): List<ModelOption> = listed.filter { it.usable }.map { m ->
         ModelOption(
             id = m.id,
             capabilities = base.copy(

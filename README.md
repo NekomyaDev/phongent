@@ -160,7 +160,7 @@ Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成
 
 <!-- generated:providers:start -->
 <!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
-内置 DeepSeek、通义千问、Kimi、智谱、OpenRouter、Anthropic、Gemini 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini 接口都能接。
+内置 DeepSeek、通义千问、Kimi、智谱、OpenRouter、OpenCode Go、Anthropic、Gemini 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini 接口都能接。
 <!-- generated:providers:end -->
 
 1. 添加服务商：选一个预设，或选「自定义」填接口地址；填 API Key。

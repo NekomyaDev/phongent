@@ -7,7 +7,9 @@ import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.GeminiModel
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.ModelCatalog
+import com.wangzan101.mika.core.model.ModelEndpoint
 import com.wangzan101.mika.core.model.ModelListResult
+import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.OpenAiCompatModel
 import com.wangzan101.mika.core.model.PromptCaching
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
@@ -53,7 +56,18 @@ data class ProviderConfig(
     /** 所属 [Provider] 的 id;为空时由 [ProviderStore.save] 按接口类型、地址和名字归到对应服务商。 */
     val providerId: String = "",
 ) {
-    enum class Kind { OpenAiCompat, Anthropic, Gemini }
+    enum class Kind {
+        OpenAiCompat, Anthropic, Gemini;
+
+        companion object {
+            /** 模型单独指定的协议用哪种接口类型的适配器。 */
+            fun of(protocol: ModelProtocol): Kind = when (protocol) {
+                ModelProtocol.ChatCompletions -> OpenAiCompat
+                ModelProtocol.Messages -> Anthropic
+                ModelProtocol.GenerateContent -> Gemini
+            }
+        }
+    }
 }
 
 /**
@@ -143,7 +157,8 @@ class ProviderStore(
     private val usage: UsageSink = UsageSink { _, _ -> },
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val modelLister: suspend (ProviderConfig.Kind, String, String?) -> ModelListResult = ::listAvailable,
-    private val modelFactory: (ProviderConfig, String?) -> ChatModel = ::buildModel,
+    /** 建可调用的模型:配置、Key、服务商列表里给这个模型单独指定的接口(没有为 null,按配置的接口类型和地址)。 */
+    private val modelFactory: (ProviderConfig, String?, ModelEndpoint?) -> ChatModel = ::buildModel,
 ) {
     private val configFile = File(dir, CONFIG_FILE)
     private val keyFile = File(dir, KEY_FILE)
@@ -308,8 +323,12 @@ class ProviderStore(
      */
     fun modelFor(role: ModelRole): ChatModel? = configFor(role)?.let { cfg ->
         val source = UsageSource(cfg.providerId, provider(cfg.providerId)?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))
-        modelFactory(cfg, apiKey(cfg.id)).metered(source, usage)
+        modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg)).metered(source, usage)
     }
+
+    /** 服务商最近一次列出的模型里,给这个模型单独指定的接口;每次建模型时现查,重新列过就用新的。 */
+    private fun endpointOf(cfg: ProviderConfig): ModelEndpoint? =
+        provider(cfg.providerId)?.models?.firstOrNull { it.id == cfg.model }?.endpoint
 
     /** 列出这个服务商的可用模型(见 [ModelCatalog])。 */
     suspend fun listModels(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?): ModelListResult =
@@ -414,6 +433,12 @@ class ProviderStore(
                 vision = m["vision"]?.jsonPrimitive?.booleanOrNull,
                 contextTokens = m["contextTokens"]?.jsonPrimitive?.intOrNull,
                 reasoning = m["reasoning"]?.jsonPrimitive?.booleanOrNull,
+                endpoint = (m["api"] as? JsonObject)?.let { a ->
+                    ModelProtocol.of(a["protocol"]?.jsonPrimitive?.content)?.let { protocol ->
+                        ModelEndpoint(protocol, a.str("baseUrl"), a["reasoningField"]?.jsonPrimitive?.content)
+                    }
+                },
+                unsupportedApis = m["unsupportedApis"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
             )
         },
     )
@@ -471,6 +496,13 @@ class ProviderStore(
                                         m.vision?.let { put("vision", it) }
                                         m.contextTokens?.let { put("contextTokens", it) }
                                         m.reasoning?.let { put("reasoning", it) }
+                                        m.endpoint?.let { e ->
+                                            putJsonObject("api") {
+                                                put("protocol", e.protocol.wire); put("baseUrl", e.baseUrl)
+                                                e.reasoningField?.let { put("reasoningField", it) }
+                                            }
+                                        }
+                                        if (m.unsupportedApis.isNotEmpty()) putJsonArray("unsupportedApis") { m.unsupportedApis.forEach { add(it) } }
                                     }
                                 }
                             }
@@ -542,11 +574,20 @@ class ProviderStore(
             ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty())
         }
 
-        private fun buildModel(cfg: ProviderConfig, apiKey: String?): ChatModel = when (cfg.kind) {
-            ProviderConfig.Kind.OpenAiCompat -> OpenAiCompatModel(cfg.baseUrl, apiKey, cfg.model, cfg.capabilities, http)
-            ProviderConfig.Kind.Anthropic -> AnthropicModel(cfg.baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
-            ProviderConfig.Kind.Gemini -> GeminiModel(cfg.baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
+        /** 模型单独指定了接口的,按它的协议选适配器、用它的地址;否则按配置的接口类型和地址。Key 都用服务商的。 */
+        private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?): ChatModel {
+            val (kind, baseUrl) = adapterFor(cfg, endpoint)
+            return when (kind) {
+                ProviderConfig.Kind.OpenAiCompat ->
+                    OpenAiCompatModel(baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField)
+                ProviderConfig.Kind.Anthropic -> AnthropicModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
+                ProviderConfig.Kind.Gemini -> GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http)
+            }
         }
+
+        /** 调用这个模型用哪种适配器、交给它什么 Base URL。 */
+        internal fun adapterFor(cfg: ProviderConfig, endpoint: ModelEndpoint?): Pair<ProviderConfig.Kind, String> =
+            if (endpoint == null) cfg.kind to cfg.baseUrl else ProviderConfig.Kind.of(endpoint.protocol) to endpoint.adapterBaseUrl
 
         /** 产品里的那份(App 建):配置在 files/settings 下,Key 用 Android 密钥库加密,用量记到 [usage]。 */
         fun create(context: Context, usage: UsageSink): ProviderStore =

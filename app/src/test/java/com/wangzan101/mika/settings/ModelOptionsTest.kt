@@ -2,6 +2,8 @@ package com.wangzan101.mika.settings
 
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ListedModel
+import com.wangzan101.mika.core.model.ModelEndpoint
+import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.PromptCaching
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,6 +35,25 @@ class ModelOptionsTest {
         assertEquals("sure", ModelOptions.defaultMain(options))
         assertEquals("guess", ModelOptions.defaultMain(ModelOptions.merge(listOf(ListedModel("guess")), base)))
         assertEquals(null, ModelOptions.defaultMain(ModelOptions.merge(listOf(ListedModel("embed", toolCalls = false)), base)))
+    }
+
+    @Test fun modelsOnlyReachableByUnsupportedProtocolsAreNotOffered() {
+        val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://gw.test/openai/v1")
+        val listed = listOf(
+            ListedModel("responses-only", toolCalls = true, unsupportedApis = listOf("responses")),
+            ListedModel("chat", toolCalls = true, endpoint = chat),
+            ListedModel("plain"),
+        )
+        val options = ModelOptions.merge(listed, base)
+        assertEquals(listOf("chat", "plain"), options.map { it.id })
+        assertEquals("chat", ModelOptions.defaultMain(options))
+    }
+
+    @Test fun openCodeGoPresetListsFromItsCatalogAddress() {
+        val p = ProviderPresets.all.single { it.label == "OpenCode Go" }
+        assertEquals(ProviderConfig.Kind.OpenAiCompat, p.kind)
+        assertEquals("https://opencode.ai/zen/go/v1", p.baseUrl)
+        assertEquals(p, ProviderPresets.forBaseUrl("https://opencode.ai/zen/go/v1/"))
     }
 
     @Test fun contextLabels() {

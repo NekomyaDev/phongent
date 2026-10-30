@@ -63,6 +63,86 @@ class ModelCatalogTest {
         assertEquals("/v1/models?limit=1000&after_id=claude-a", server.takeRequest().path)
     }
 
+    /** 按协议逐个给地址的列表:形状照一家订阅服务的真实返回删减而来。 */
+    private val perModelApi = """{"object":"list","data":[
+        {"id":"deepseek-v4.1-flash","object":"model","name":"DeepSeek V4.1 Flash","type":"chat",
+         "modalities":{"input":["text","image/jpeg","image/png"],"output":["text"]},
+         "capabilities":{"tools":{"supported":true},"reasoning":{"supported":true,"effort":["low","high"]}},
+         "limit":{"context":1000000,"output":384000},
+         "api":{"chat-completions":{"base_url":"https://gw.test/inference/openai/v1",
+                "compatibility":{"reasoning_field":"reasoning_content"},"capabilities":{"tools":{"choice":["auto","none"]}}}}},
+        {"id":"glm-5.3","object":"model","name":"GLM-5.3",
+         "modalities":{"input":["text"],"output":["text"]},
+         "capabilities":{"tools":{"supported":true},"reasoning":{"supported":true}},"limit":{"context":1000000},
+         "api":{"chat-completions":{"base_url":"https://gw.test/inference/openai/v1"}}},
+        {"id":"grok-4.7","object":"model","name":"Grok 4.7",
+         "modalities":{"input":["text","image/png"],"output":["text"]},
+         "capabilities":{"tools":{"supported":true}},"limit":{"context":500000},
+         "api":{"responses":{"base_url":"https://gw.test/inference/openai/v1"}}},
+        {"id":"claude-haiku-5-5","object":"model","name":"Claude Haiku 5.5",
+         "modalities":{"input":["text","image/webp"],"output":["text"]},
+         "capabilities":{"tools":{"supported":true},"reasoning":{"supported":true}},"limit":{"context":1000000},
+         "api":{"messages":{"base_url":"https://gw.test/inference/anthropic/v1"}}},
+        {"id":"gemini-4-argon","object":"model","name":"Gemini 4 Argon",
+         "modalities":{"input":["text","image/png","video/mp4"],"output":["text"]},
+         "capabilities":{"tools":{"supported":true},"reasoning":{"supported":true}},"limit":{"context":1048576},
+         "api":{"generate-content":{"base_url":"https://gw.test/inference/google/v1beta"}}},
+        {"id":"both","api":{"responses":{"base_url":"https://gw.test/r"},"messages":{"base_url":"https://gw.test/m/v1"}}}
+    ]}"""
+
+    @Test fun openAiCompatReadsPerModelProtocolsAndCapabilities() = runTest {
+        server.enqueue(ok(perModelApi))
+        val list = models(catalog.openAiCompat("$base/zen/v1", "k"))
+        assertEquals("/zen/v1/models", server.takeRequest().path)
+        val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://gw.test/inference/openai/v1", "reasoning_content")
+        assertEquals(
+            listOf(
+                ListedModel("deepseek-v4.1-flash", "DeepSeek V4.1 Flash", toolCalls = true, vision = true, contextTokens = 1_000_000,
+                    reasoning = true, endpoint = chat),
+                ListedModel("glm-5.3", "GLM-5.3", toolCalls = true, vision = false, contextTokens = 1_000_000, reasoning = true,
+                    endpoint = chat.copy(reasoningField = null)),
+                ListedModel("grok-4.7", "Grok 4.7", toolCalls = true, vision = true, contextTokens = 500_000,
+                    unsupportedApis = listOf("responses")),
+                ListedModel("claude-haiku-5-5", "Claude Haiku 5.5", toolCalls = true, vision = true, contextTokens = 1_000_000,
+                    reasoning = true, endpoint = ModelEndpoint(ModelProtocol.Messages, "https://gw.test/inference/anthropic/v1")),
+                ListedModel("gemini-4-argon", "Gemini 4 Argon", toolCalls = true, vision = true, contextTokens = 1_048_576,
+                    reasoning = true, endpoint = ModelEndpoint(ModelProtocol.GenerateContent, "https://gw.test/inference/google/v1beta")),
+                // 写了几种协议的,取会说的那一种
+                ListedModel("both", endpoint = ModelEndpoint(ModelProtocol.Messages, "https://gw.test/m/v1")),
+            ),
+            list,
+        )
+        assertEquals(listOf(true, true, false, true, true, true), list.map { it.usable })
+    }
+
+    @Test fun adapterBaseUrlDropsTheVersionPathTheAdapterAddsItself() {
+        assertEquals("https://gw.test/openai/v1", ModelEndpoint(ModelProtocol.ChatCompletions, "https://gw.test/openai/v1/").adapterBaseUrl)
+        assertEquals("https://gw.test/anthropic", ModelEndpoint(ModelProtocol.Messages, "https://gw.test/anthropic/v1").adapterBaseUrl)
+        assertEquals("https://gw.test/anthropic", ModelEndpoint(ModelProtocol.Messages, "https://gw.test/anthropic").adapterBaseUrl)
+        assertEquals("https://gw.test/google", ModelEndpoint(ModelProtocol.GenerateContent, "https://gw.test/google/v1beta/").adapterBaseUrl)
+    }
+
+    @Test fun eachAdapterCallsTheListedAddressWithoutDoublingTheVersion() = runTest {
+        val caps = Capabilities(toolCalls = true, vision = false, contextTokens = 64_000, reasoning = false)
+        val user = listOf(Message(Role.User, listOf(Part.Text("hi")), Author.User))
+        val http = OkHttpClient()
+
+        server.enqueue(ok("""{"choices":[{"finish_reason":"stop","message":{"content":"ok"}}]}"""))
+        val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "$base/inference/openai/v1")
+        OpenAiCompatModel(chat.adapterBaseUrl, "k", "glm", caps, http).complete("s", user, emptyList())
+        assertEquals("/inference/openai/v1/chat/completions", server.takeRequest().path)
+
+        server.enqueue(ok("""{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn"}"""))
+        val messages = ModelEndpoint(ModelProtocol.Messages, "$base/inference/anthropic/v1")
+        AnthropicModel(messages.adapterBaseUrl, "k", "claude", caps, http).complete("s", user, emptyList())
+        assertEquals("/inference/anthropic/v1/messages", server.takeRequest().path)
+
+        server.enqueue(ok("""{"candidates":[{"content":{"role":"model","parts":[{"text":"ok"}]},"finishReason":"STOP"}]}"""))
+        val generate = ModelEndpoint(ModelProtocol.GenerateContent, "$base/inference/google/v1beta")
+        GeminiModel(generate.adapterBaseUrl, "k", "gem", caps, http).complete("s", user, emptyList())
+        assertEquals("/inference/google/v1beta/models/gem:generateContent", server.takeRequest().path)
+    }
+
     @Test fun geminiKeepsOnlyGenerativeModelsAndPages() = runTest {
         server.enqueue(ok("""{"models":[
             {"name":"models/gemini-x","displayName":"X","inputTokenLimit":1048576,"supportedGenerationMethods":["generateContent","countTokens"],"thinking":true},

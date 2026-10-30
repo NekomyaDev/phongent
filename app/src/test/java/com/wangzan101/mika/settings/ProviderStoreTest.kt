@@ -4,6 +4,8 @@ import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.Message
+import com.wangzan101.mika.core.model.ModelEndpoint
+import com.wangzan101.mika.core.model.ModelProtocol
 import com.wangzan101.mika.core.model.ModelReply
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.StopReason
@@ -28,9 +30,11 @@ class ProviderStoreTest {
 
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
     private val built = mutableListOf<Pair<ProviderConfig, String?>>()
+    private val endpoints = mutableListOf<ModelEndpoint?>()
 
-    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }) { cfg, apiKey ->
+    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }) { cfg, apiKey, endpoint ->
         built += cfg to apiKey
+        endpoints += endpoint
         FakeModel(cfg.capabilities)
     }
 
@@ -455,12 +459,60 @@ class ProviderStoreTest {
         assertEquals(RoleChoices(main = null, vision = RoleChoice.SameAsMain, light = RoleChoice.SameAsMain), r.keepOnly(emptySet()))
     }
 
+    // ---------- 按模型指定的接口 ----------
+
+    private val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://x.test/openai/v1", "reasoning_content")
+    private val messages = ModelEndpoint(ModelProtocol.Messages, "https://x.test/anthropic/v1")
+    private val generate = ModelEndpoint(ModelProtocol.GenerateContent, "https://x.test/google/v1beta")
+
+    @Test
+    fun perModelEndpointsPersistWithTheList() {
+        val s = store()
+        val listed = listOf(
+            ListedModel("a", endpoint = chat), ListedModel("b", endpoint = messages), ListedModel("c", endpoint = generate),
+            ListedModel("r", unsupportedApis = listOf("responses")), ListedModel("plain"),
+        )
+        s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", listed)
+        assertEquals(listed, store().providers.value.single().models)
+    }
+
+    @Test
+    fun eachModelIsBuiltWithTheEndpointItsListingNamed() = runTest {
+        val s = store()
+        val p = s.connect(
+            "X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k",
+            listOf(ListedModel("a", endpoint = chat), ListedModel("b", endpoint = messages), ListedModel("plain")),
+        )
+        s.use(ModelRole.Main, p.id, "b", none)
+        s.use(ModelRole.Light, p.id, "plain", none)
+        store().modelFor(ModelRole.Main)
+        store().modelFor(ModelRole.Light)
+        assertEquals(listOf(messages, null), endpoints)
+        assertEquals(listOf("k", "k"), built.map { it.second })
+        // 重新列出、地址换了,下次建模型用新的
+        val moved = messages.copy(baseUrl = "https://y.test/anthropic/v1")
+        s.rememberModels(p.id, listOf(ListedModel("b", endpoint = moved)))
+        s.modelFor(ModelRole.Main)
+        assertEquals(moved, endpoints.last())
+    }
+
+    @Test
+    fun adapterAndBaseUrlFollowTheProtocolWithoutRepeatingTheVersionPath() {
+        val c = cfg("1")
+        assertEquals(ProviderConfig.Kind.OpenAiCompat to "https://example.test/v1", ProviderStore.adapterFor(c, null))
+        assertEquals(ProviderConfig.Kind.OpenAiCompat to "https://x.test/openai/v1", ProviderStore.adapterFor(c, chat))
+        assertEquals(ProviderConfig.Kind.Anthropic to "https://x.test/anthropic", ProviderStore.adapterFor(c, messages))
+        assertEquals(ProviderConfig.Kind.Gemini to "https://x.test/google", ProviderStore.adapterFor(c, generate))
+        val anthropicConfig = c.copy(kind = ProviderConfig.Kind.Anthropic, baseUrl = "https://api.anthropic.com")
+        assertEquals(ProviderConfig.Kind.Anthropic to "https://api.anthropic.com", ProviderStore.adapterFor(anthropicConfig, null))
+    }
+
     // ---------- 用量 ----------
 
     @Test
     fun everyModelHandedOutIsMeteredUnderTheRoleItWasAskedFor() = runTest {
         val seen = mutableListOf<Pair<UsageSource, Usage?>>()
-        val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }) { cfg, _ -> FakeModel(cfg.capabilities) }
+        val s = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }) { cfg, _, _ -> FakeModel(cfg.capabilities) }
         val p = connected(s, name = "甲")
         s.use(ModelRole.Main, p.id, "m1", none)
         s.choose(ModelRole.Vision, RoleChoice.SameAsMain)

@@ -578,7 +578,7 @@ object ModelsCopy {
     fun modelCount(p: Provider): String? = when {
         p.models == null -> null
         p.models.isEmpty() -> tr(R.string.models_no_list)
-        else -> trPlural(R.plurals.models_count, p.models.size)
+        else -> trPlural(R.plurals.models_count, p.models.count { it.usable })
     }
 
     /** 服务商一行的说明:已连接 · N 个模型 · 哪些用途在用;刷新失败时说明。 */

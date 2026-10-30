@@ -22,18 +22,22 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/** OpenAI Chat Completions 兼容端点(DeepSeek/Qwen/Kimi/GLM/OpenRouter/本地服务等)。差异只放在 [capabilities]。 */
+/**
+ * OpenAI Chat Completions 兼容端点(DeepSeek/Qwen/Kimi/GLM/OpenRouter/本地服务等)。差异只放在 [capabilities]。
+ * [reasoningField] 是模型列表里写明的思考内容字段;为 `reasoning_content` 时,带工具的请求回传此前的思考。
+ */
 class OpenAiCompatModel(
     baseUrl: String,
     private val apiKey: String?,
     private val model: String,
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
+    reasoningField: String? = null,
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/chat/completions"
-    private val replayDeepSeekReasoning = model.startsWith("deepseek-", ignoreCase = true) ||
-        baseUrl.toHttpUrlOrNull()?.host == "api.deepseek.com"
+    private val replayReasoningContent = reasoningField == "reasoning_content" ||
+        model.startsWith("deepseek-", ignoreCase = true) || baseUrl.toHttpUrlOrNull()?.host == "api.deepseek.com"
     private val json = Json { ignoreUnknownKeys = true }
 
     private companion object {
@@ -74,7 +78,7 @@ class OpenAiCompatModel(
     private fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, includeUsage: Boolean = true): Request {
         val payload = buildJsonObject {
             put("model", model)
-            val replayReasoning = replayDeepSeekReasoning && tools.isNotEmpty()
+            val replayReasoning = replayReasoningContent && tools.isNotEmpty()
             val wire = listOf(buildJsonObject { put("role", "system"); put("content", system) }) +
                 messages.flatMap { serialize(it, replayReasoning) }
             put("messages", JsonArray(if (capabilities.promptCaching == PromptCaching.Explicit) withCacheMarks(wire) else wire))
@@ -175,7 +179,7 @@ class OpenAiCompatModel(
         else -> ""
     }
 
-    // DeepSeek 的带工具请求必须原样回传此前助手消息的 reasoning_content。
+    // DeepSeek(以及列表里说思考放在 reasoning_content 的模型)的带工具请求要原样回传此前助手消息的 reasoning_content。
     private fun assistantJson(m: Message, replayReasoning: Boolean): JsonObject {
         val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n") { it.text }
         val thinking = m.parts.filterIsInstance<Part.Thinking>().joinToString("") { it.text }
