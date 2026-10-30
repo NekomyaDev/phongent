@@ -1,6 +1,7 @@
 package com.wangzan101.mika.cap.web.cdp
 
 import android.content.Context
+import android.icu.util.ULocale
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
@@ -20,6 +21,7 @@ import com.wangzan101.mika.core.cap.web.WebUrlPolicy
 import android.os.ParcelFileDescriptor
 import com.wangzan101.mika.cap.web.WebHost
 import com.wangzan101.mika.cap.web.WebTab
+import com.wangzan101.mika.i18n.AppLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +59,7 @@ import com.wangzan101.mika.cap.web.WebOwner
  *
  * 桌面版网页也在这里:标签一建好就把 WebView 设置换成桌面 UA(连不上 DevTools 时的退路)并在文档开始注入身份补丁,
  * 会话连上后再用仿真把 UA-CH、视口、触摸与指针一并换成桌面(见 [DesktopProfile]);按站点记住的手机版站点都换回默认。
+ * 用户在 Mika 里选定了界面语言时,两种版本的网页都按那种语言请求(见 [PageLanguage]);跟随系统时不动。
  */
 class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     enum class Route { Unknown, Direct, Relay, None }
@@ -108,6 +111,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         }
         applySettings(st, mobile = false)
         applyIdentityScript(link)
+        link.acceptLanguage = chosenAcceptLanguage()
     }
 
     /** 主文档加载前(主线程,可挂起):按目标网站选好手机版或桌面版,并尽量在第一次导航前连好会话、设好仿真。 */
@@ -116,6 +120,13 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         val mobile = wantsMobile(link, url) ?: false
         val changed = link.mobile != mobile
         if (changed) switchMode(link, mobile)
+        // 用户中途换了 Mika 的语言:已开着的标签在下一次主文档加载前换过来(这里重设仿真,这一页就按新的语言请求)
+        chosenAcceptLanguage().let { lang ->
+            if (lang != link.acceptLanguage) {
+                link.acceptLanguage = lang
+                link.configured = null
+            }
+        }
         // 连接与仿真在后台做,这里至多等一小会儿:到点就照常加载(这一页先按 WebView 设置的退路走,连上后再换)
         bounded(BEFORE_LOAD_WAIT_MS) {
             val s = attach(link)
@@ -245,6 +256,8 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         @Volatile var policy: ((String?) -> Boolean)? = null
         /** 用户亲手操作的标签(见 [setHandOperated]):不加视口仿真。 */
         @Volatile var handOperated = false
+        /** 网页按哪种语言请求(Accept-Language 的值);null 是跟随系统、不覆盖。建标签和每次主文档加载前按 Mika 的语言取。 */
+        @Volatile var acceptLanguage: String? = null
         /** 会话上已设好的版本;null 是还没设。 */
         @Volatile var configured: Boolean? = null
         @Volatile var degradedAt = 0L
@@ -278,6 +291,10 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     @Volatile private var desktopUa: String? = null
     @Volatile private var desktopMetadata: UserAgentMetadata? = null
     @Volatile private var defaultMetadata: UserAgentMetadata? = null
+    /** WebView 的默认手机身份(UA 与 CDP 样子的 UA-CH):手机版选定了语言时照搬它,只换语言。 */
+    @Volatile private var defaultUa: String = ""
+    @Volatile private var defaultMetadataJson: JsonObject? = null
+    @Volatile private var appContext: Context? = null
     @Volatile private var debuggingOn = false
 
     private val socketName: String get() = DevtoolsSocket.name(Process.myPid())
@@ -289,8 +306,10 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
             debuggingOn = true
         }
         if (modes == null) modes = SiteModes(File(context.applicationContext.filesDir, "web"))
+        if (appContext == null) appContext = context.applicationContext
         if (desktopUa != null) return
         val defaultUa = runCatching { WebSettings.getDefaultUserAgent(context) }.getOrDefault("")
+        this.defaultUa = defaultUa
         val (major, full) = DesktopProfile.version(defaultUa) ?: ("120" to "120.0.0.0")
         val metadataOk = WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)
         // 第一次改设置之前取内核自己的 UA-CH,手机版站点换回它
@@ -298,6 +317,13 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         val engine = probe?.brandVersionList?.map { Brand(it.brand, it.majorVersion, it.fullVersion) }
         val brands = DesktopProfile.brands(engine, major, full)
         defaultMetadata = probe
+        defaultMetadataJson = probe?.let { m ->
+            DesktopProfile.metadata(
+                m.brandVersionList.map { Brand(it.brand, it.majorVersion, it.fullVersion) }, m.fullVersion.orEmpty(), m.platform.orEmpty(),
+                m.platformVersion.orEmpty(), m.architecture.orEmpty(), m.model.orEmpty(), m.isMobile,
+                if (m.bitness == UserAgentMetadata.BITNESS_DEFAULT) "" else m.bitness.toString(), m.isWow64,
+            )
+        }
         desktopMetadata = if (metadataOk) {
             UserAgentMetadata.Builder()
                 .setBrandVersionList(brands.map { UserAgentMetadata.BrandVersion.Builder().setBrand(it.brand).setMajorVersion(it.major).setFullVersion(it.full).build() })
@@ -308,7 +334,16 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         desktopUa = DesktopProfile.userAgent(major)
     }
 
-    // 退路这一层:UA、UA-CH(支持时)、宽视口。仿真连上后以仿真为准
+    /**
+     * 用户在 Mika 里选定的语言对应的 Accept-Language;跟随系统为 null。标签补全成带地区的(en → en-Latn-US,
+     * zh-Hans → zh-Hans-CN)再写成请求头。
+     */
+    private fun chosenAcceptLanguage(): String? {
+        val tag = appContext?.let { runCatching { AppLanguage.current(it).tag }.getOrNull() } ?: return null
+        return PageLanguage.acceptLanguage(ULocale.addLikelySubtags(ULocale.forLanguageTag(tag)).toLanguageTag())
+    }
+
+    // 退路这一层:UA、UA-CH(支持时)、宽视口。仿真连上后以仿真为准(语言只有仿真能设,见 [attach] 里的重新加载)
     private fun applySettings(st: WebSettings, mobile: Boolean) {
         st.userAgentString = if (mobile) null else desktopUa
         st.useWideViewPort = !mobile
@@ -355,8 +390,9 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         link.metricsSet = false
         link.sessionScriptId = null
         runCatching { configure(link, s) }.onFailure { Log.w(TAG, "emulation on tab ${tab.id}: ${it.message}") }
-        if (!link.everAttached && link.loadedBeforeAttach && !link.mobile) {
-            // 页面在仿真设好之前就加载了(弹出的标签等):按桌面版重新加载一次
+        if (!link.everAttached && link.loadedBeforeAttach && (!link.mobile || link.acceptLanguage != null)) {
+            // 页面在仿真设好之前就加载了(弹出的标签、第一页没等到会话等):按桌面版或选定的语言重新加载一次。
+            // WebView 设置里没有语言这一项,只有仿真能换请求头,所以手机版选定了语言时也要重载
             withContext(Dispatchers.Main) { if (!tab.destroyed) tab.view.reload() }
         }
         link.everAttached = true
@@ -367,8 +403,8 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     private suspend fun configure(link: Link, s: CdpSession) {
         val mobile = link.mobile
         if (mobile) {
-            // 空 UA 即撤销覆盖,回到 WebView 设置里的(已换回默认)
-            s.send("Emulation.setUserAgentOverride", buildJsonObject { put("userAgent", "") }, timeoutMs = CALL_TIMEOUT_MS)
+            // 跟随系统时空 UA 即撤销覆盖,回到 WebView 设置里的(已换回默认);选定了语言时照搬默认身份、只换语言
+            s.send("Emulation.setUserAgentOverride", PageLanguage.mobileOverride(defaultUa, defaultMetadataJson, link.acceptLanguage), timeoutMs = CALL_TIMEOUT_MS)
             s.send("Emulation.clearDeviceMetricsOverride", timeoutMs = CALL_TIMEOUT_MS)
             link.metricsSet = false
             s.inputScale = 1.0
@@ -385,7 +421,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
                 (if (v.width > 0 && v.height > 0) v.width to v.height else DesktopProfile.HOST_WIDTH to DesktopProfile.HOST_HEIGHT) to (v.display?.displayId ?: -1)
             }
             val (w, h) = size
-            desktop?.let { s.send("Emulation.setUserAgentOverride", it, timeoutMs = CALL_TIMEOUT_MS) }
+            desktop?.let { s.send("Emulation.setUserAgentOverride", PageLanguage.withLanguage(it, link.acceptLanguage), timeoutMs = CALL_TIMEOUT_MS) }
             // 触摸、指针与悬停:每条单独发,内核不认的那条不影响别的
             for ((m, p) in DesktopProfile.emulationCalls()) {
                 runCatching { s.send(m, p, timeoutMs = CALL_TIMEOUT_MS) }.onFailure { Log.i(TAG, "$m not applied on tab ${link.tab.id}: ${it.message}") }
