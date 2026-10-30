@@ -31,14 +31,22 @@ An on-device AI agent for Android that operates apps and the web to get things d
 - 目前主要在一台安卓 14 手机上测试过。别的安卓版本、别的手机上可能遇到没见过的问题，欢迎[反馈](#参与贡献)。
 - Mika 会替你操作第三方 App 和网站，请先读[免责声明](#免责声明)。
 
-<!-- 演示素材录好放进 docs/media/ 后，去掉这段注释的首尾即可显示。
 ## 演示
 
-| | |
-|---|---|
-| ![后台操作微信给联系人发消息](docs/media/wechat-send.gif)<br>后台操作微信，给联系人发消息 | ![在招聘网站批量打招呼](docs/media/job-greet.gif)<br>在招聘网站批量打招呼 |
-| ![双击胶囊，把这一屏发给 Mika](docs/media/screen-ask.gif)<br>双击胶囊，把这一屏发给 Mika | ![网页办事：搜索、筛选、读出结果](docs/media/web-task.gif)<br>网页办事：搜索、筛选、读出结果 |
--->
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="260" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>
+<td align="center" width="50%"><img src="docs/media/xhs-summary.gif" alt="打开小红书，总结一位博主的内容" width="260" /><br/>打开小红书，总结一位博主的内容<br/><sub>（加速播放）</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/media/job-greet.jpg" alt="在 BOSS 直聘网页上找岗位、打招呼" width="230" /><br/>在 BOSS 直聘网页上找岗位、打招呼</td>
+<td align="center" width="33%"><img src="docs/media/music-vip.jpg" alt="打开汽水音乐，看广告领听歌权益" width="230" /><br/>打开汽水音乐，看广告领听歌权益</td>
+<td align="center" width="33%"><img src="docs/media/food-order.jpg" alt="在美团上凑满减、点外卖，付款前问你" width="230" /><br/>在美团上凑满减、点外卖，付款前问你</td>
+</tr>
+</table>
 
 ## 能做什么
 
