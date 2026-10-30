@@ -82,9 +82,16 @@ enum class AppLanguage(val tag: String?) {
             return base.createConfigurationContext(Configuration().apply { setLocales(locales) })
         }
 
-        /** 界面以外取文字用的资源:跟着 App 语言。 */
+        /**
+         * 界面以外取文字用的资源:跟着 App 语言。安卓 13 起也按系统记下的应用语言另建一份,
+         * 不直接用 Application 的资源:进程不是系统按 App 正常拉起时(如测试启动),那份资源还是系统语言。
+         */
         fun resources(app: Context): Resources {
-            val tag = if (systemManaged) null else legacy(app)
+            val tag = if (systemManaged) {
+                app.getSystemService(LocaleManager::class.java).applicationLocales.takeUnless { it.isEmpty }?.toLanguageTags()
+            } else {
+                legacy(app)
+            }
             if (tag == null) return app.resources
             cached?.takeIf { it.first == tag }?.let { return it.second }
             val r = app.createConfigurationContext(Configuration().apply { setLocales(LocaleList.forLanguageTags(tag)) }).resources

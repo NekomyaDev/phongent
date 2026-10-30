@@ -98,6 +98,12 @@ class LiveRunTest {
     fun runGoal() {
         val goal = args.getString("liveGoal")
         assumeTrue(goal != null)
+        // 测试拉起的进程没套上 App 语言,照正常启动把默认语言换成它:内置浏览器按它向网站要页面语言
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+            ctx.getSystemService(android.app.LocaleManager::class.java).applicationLocales
+                .takeUnless { it.isEmpty }?.let { android.os.LocaleList.setDefault(it) }
+        }
         val run = args.getString("liveRun") ?: "run"
         val timeoutMs = (args.getString("liveTimeoutSec")?.toLong() ?: 600) * 1000
         val onTakeover = args.getString("liveOnTakeover") ?: "cancel"

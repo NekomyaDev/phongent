@@ -14,6 +14,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
+import androidx.test.platform.app.InstrumentationRegistry
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.AppLanguage
 
 /**
  * 界面测试的几个步骤,不依赖前一个测试留下的状态:每个测试的活动是新开的,但上一个测试的窗口(活动、弹窗)
@@ -48,10 +51,14 @@ internal fun ComposeContentTestRule.scrollAndClick(key: Any, text: String) {
 /**
  * 在对话页输入框里写下 [text] 再点发送。发送走按钮自己的点击动作,不按屏幕坐标点:写字时输入框拿到焦点、输入法开始弹起,
  * 输入栏跟着键盘往上走;按坐标点的那一下取的是动画途中的位置,常落在输入栏外面——没点到发送,
- * 还被当成「在输入区外点了一下」收起了键盘,字留在框里,任务没开始。
+ * 还被当成「在输入区外点了一下」收起了键盘,字留在框里,任务没开始。按钮名按 App 当前的界面语言取。
  */
 internal fun ComposeContentTestRule.typeAndSend(text: String) {
     onNode(hasSetTextAction()).performTextInput(text)
-    onNodeWithContentDescription("发送").performSemanticsAction(SemanticsActions.OnClick)
+    onNodeWithContentDescription(appString(R.string.chat_send)).performSemanticsAction(SemanticsActions.OnClick)
     waitForIdle()
 }
+
+/** 按 App 当前界面语言取的文字。 */
+internal fun appString(id: Int): String =
+    AppLanguage.resources(InstrumentationRegistry.getInstrumentation().targetContext).getString(id)
