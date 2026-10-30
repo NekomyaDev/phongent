@@ -4,6 +4,8 @@
 
 # Mika
 
+简体中文 | [English](README.en.md)
+
 **你手机上的私人 AI 助理，替你操作 App、上网、把事办成。**
 
 它在一块看不见的后台屏上干活，你照样刷你的手机。
@@ -16,8 +18,6 @@ An on-device AI agent for Android that operates apps and the web to get things d
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
 
 [下载 APK](https://github.com/wangzan101/Mika/releases/latest) · [快速开始](#快速开始) · [能做什么](#能做什么) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
-
-简体中文 | [English](README.en.md)
 
 </div>
 

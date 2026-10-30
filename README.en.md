@@ -4,6 +4,8 @@
 
 # Mika
 
+[简体中文](README.md) | English
+
 **A personal AI assistant on your phone that operates apps, browses the web and gets things done for you.**
 
 It works on a hidden background screen, so you can keep using your phone.
@@ -14,8 +16,6 @@ It works on a hidden background screen, so you can keep using your phone.
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
 
 [Download APK](https://github.com/wangzan101/Mika/releases/latest) · [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [FAQ](#faq) · [Contributing](#contributing)
-
-[简体中文](README.md) | English
 
 </div>
 
@@ -34,6 +34,14 @@ It works on a hidden background screen, so you can keep using your phone.
 ## Demo
 
 <p align="center"><img src="docs/media/wechat-send-side.gif" alt="Operating WeChat in the background to send a message to File Transfer" width="520" /><br/>Sending a WeChat message in the background: Mika's chat page on the left, each step on Mika's background screen on the right<br/><sub>(4× speed; the chat list is blurred)</sub></p>
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/media/hacker-news.gif" alt="Reads the top 5 Hacker News stories with their points" width="230" /><br/>Reads the top 5 Hacker News stories with their points<br/><sub>(1.5× speed)</sub></td>
+<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="Finds the cheapest nonstop flight from San Francisco to New York on Google Flights" width="230" /><br/>Finds the cheapest nonstop SFO → New York flight on Google Flights<br/><sub>(3× speed; prices show in HKD because of the network region)</sub></td>
+<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="Finds a USB-C charger under $30 rated 4.5+ on Amazon and adds it to the cart" width="230" /><br/>Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout<br/><sub>(3.5× speed)</sub></td>
+</tr>
+</table>
 
 <table>
 <tr>
