@@ -1,5 +1,7 @@
 package com.wangzan101.mika.acceptance
 
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.wangzan101.mika.DeviceTaskState
 import android.app.UiAutomation
 import android.content.Context
@@ -115,6 +117,12 @@ class LiveRunTest {
         note("model=${cfg.model} goal=$goal")
 
         compose.typeAndSend(goal!!)
+        // 发出去就收起键盘:对话页下面的后台屏小画面才露得出来,和真人发完就收键盘一样
+        compose.runOnUiThread {
+            val w = compose.activity.window
+            compose.activity.currentFocus?.clearFocus()
+            WindowCompat.getInsetsController(w, w.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
         val chat = (context.applicationContext as MikaApp).chat
         chat.ui.value.blocked?.let { error("blocked by prerequisites: $it") }
         // 发出去了,对话里就有这一问;没有就立刻报,不白等到超时
@@ -173,6 +181,8 @@ class LiveRunTest {
                 note("chat status at end: ${chat.ui.value.exchanges.lastOrNull()?.status}")
                 break
             }
+            // 界面测试的时钟只在测试推它时才走:等的时候一起往前推,对话页的步骤、计时、小画面才会照常刷新(录演示要用)
+            compose.mainClock.advanceTimeBy(250)
             Thread.sleep(250)
         }
         val wall = (System.currentTimeMillis() - t0) / 1000.0
