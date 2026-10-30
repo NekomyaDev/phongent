@@ -276,7 +276,7 @@ The debug build is not precompiled and its UI is several times slower; use the p
   国内备用下载: <url>
   ```
 
-- Update checks: once a day the app queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
+- Update checks: each time you open the app it queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
 
 ## Contact
 

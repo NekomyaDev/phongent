@@ -276,7 +276,7 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
   国内备用下载: <url>
   ```
 
-- 检查更新：App 每天查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
+- 检查更新：每次打开 App 查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
 
 ## 联系作者
 

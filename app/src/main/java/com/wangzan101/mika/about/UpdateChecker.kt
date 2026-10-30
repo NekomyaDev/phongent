@@ -39,11 +39,14 @@ data class UpdateState(
     val hasUpdate: Boolean get() = update != null
 }
 
-/** 自动检查一天最多一次;上次时间比现在还晚(改过系统时间)也算到期。 */
+/**
+ * 每次打开 App 都自动查一次,只挡住连着来的:离上次自动检查不到 [MIN_GAP_MS](来回切几下、旋转屏幕)不再查。
+ * 上次时间比现在还晚(改过系统时间)也算到期。
+ */
 object UpdateSchedule {
-    const val INTERVAL_MS = 24 * 60 * 60 * 1000L
+    const val MIN_GAP_MS = 2 * 60 * 1000L
 
-    fun due(lastAttempt: Long?, now: Long): Boolean = lastAttempt == null || now - lastAttempt >= INTERVAL_MS || now < lastAttempt
+    fun due(lastAttempt: Long?, now: Long): Boolean = lastAttempt == null || now - lastAttempt >= MIN_GAP_MS || now < lastAttempt
 }
 
 /**
@@ -66,7 +69,7 @@ class UpdateChecker(
     private var lastAttempt: Long? = null
     private var loaded = false
 
-    /** 打开 App 时调:到期才在后台查一次,失败不吭声。 */
+    /** 每次打开 App 时调:到期就在后台查一次,失败不吭声。 */
     fun autoCheckInBackground() {
         scope.launch { autoCheck() }
     }
@@ -79,11 +82,14 @@ class UpdateChecker(
     /** 读出存着的结果(只读一次),红点不用等联网。 */
     suspend fun load() = mutex.withLock { loadLocked() }
 
-    /** 到期就查一次,返回这次有没有真的去查。 */
+    /**
+     * 到期就查一次,返回这次有没有真的去查。开查前先记下这次的时间:同时进来的第二次(查还没完)看到的是刚记的时间,
+     * 不会再查一遍。
+     */
     suspend fun autoCheck(): Boolean {
         val due = mutex.withLock {
             loadLocked()
-            UpdateSchedule.due(lastAttempt, now())
+            UpdateSchedule.due(lastAttempt, now()).also { if (it) lastAttempt = now() }
         }
         if (due) check(manual = false)
         return due
@@ -94,7 +100,6 @@ class UpdateChecker(
             loadLocked()
             if (manual) _state.update { it.copy(status = CheckStatus.Checking) }
             val found = withContext(Dispatchers.IO) { fetchLatest() }
-            if (!manual) lastAttempt = now()
             if (found != null) {
                 _state.update { it.withLatest(found) }
             }

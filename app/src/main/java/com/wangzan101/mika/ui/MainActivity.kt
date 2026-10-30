@@ -98,7 +98,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         monitor.start()
-        // 每天最多悄悄查一次新版本,失败不吭声
+        // 每次打开都悄悄查一次新版本(两分钟内连着打开的只查一次),失败不吭声
         (application as MikaApp).updates.autoCheckInBackground()
     }
 

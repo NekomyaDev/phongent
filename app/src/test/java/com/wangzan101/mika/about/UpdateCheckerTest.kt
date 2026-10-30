@@ -1,5 +1,7 @@
 package com.wangzan101.mika.about
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -103,15 +105,15 @@ class UpdateCheckerTest {
         assertNull(c.state.value.update)
     }
 
-    /** 自动检查失败不改界面上的状态,也不重复打扰:当天不再查。 */
+    /** 自动检查失败不改界面上的状态;每次打开都查,只挡住两分钟内连着来的。 */
     @Test
-    fun autoCheckIsSilentAndOncePerDay() = runTest {
+    fun autoCheckIsSilentAndRunsOnEveryOpenButNotInBursts() = runTest {
         val c = checker()
         assertTrue(c.autoCheck())
         assertEquals(CheckStatus.Idle, c.state.value.status)
         assertEquals(0, c.state.value.manualRounds)
         val before = hits.size
-        clock += UpdateSchedule.INTERVAL_MS - 1
+        clock += UpdateSchedule.MIN_GAP_MS - 1
         assertFalse(c.autoCheck())
         assertEquals(before, hits.size)
         clock += 1
@@ -131,7 +133,7 @@ class UpdateCheckerTest {
         val again = checker()
         again.load()
         assertEquals("0.2.0", again.state.value.update?.version)
-        assertFalse("checked today already", again.autoCheck())
+        assertFalse("just checked", again.autoCheck())
 
         val upgraded = checker(current = "0.2.0")
         upgraded.load()
@@ -139,11 +141,24 @@ class UpdateCheckerTest {
         assertNotNull(upgraded.state.value.latest)
     }
 
+    /** 同时进来的两次自动检查(查还没完)只真的查一次;隔十分钟再打开照样查。 */
+    @Test
+    fun concurrentAutoChecksHitGitHubOnce() = runTest {
+        github = release("v0.2.0")
+        val c = checker()
+        val ran = listOf(async { c.autoCheck() }, async { c.autoCheck() }).awaitAll()
+        assertEquals(listOf(true, false), ran.sorted().reversed())
+        assertEquals(1, hits.size)
+        clock += 10 * 60 * 1000L
+        assertTrue(c.autoCheck())
+        assertEquals(2, hits.size)
+    }
+
     @Test
     fun scheduleRules() {
         assertTrue(UpdateSchedule.due(null, 5))
-        assertFalse(UpdateSchedule.due(1_000, 1_000 + UpdateSchedule.INTERVAL_MS - 1))
-        assertTrue(UpdateSchedule.due(1_000, 1_000 + UpdateSchedule.INTERVAL_MS))
+        assertFalse(UpdateSchedule.due(1_000, 1_000 + UpdateSchedule.MIN_GAP_MS - 1))
+        assertTrue(UpdateSchedule.due(1_000, 1_000 + UpdateSchedule.MIN_GAP_MS))
         assertTrue("clock moved back", UpdateSchedule.due(10_000, 5_000))
     }
 }
