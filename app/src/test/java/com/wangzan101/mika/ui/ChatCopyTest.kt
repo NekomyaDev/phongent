@@ -22,9 +22,9 @@ class ChatCopyTest {
         assertEquals("夜深了", ChatCopy.greeting(23))
     }
 
-    @Test fun fiveDistinctNonBlankExamples() {
-        assertEquals(5, ChatCopy.examples.size)
-        assertEquals(5, ChatCopy.examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
+    @Test fun sixDistinctNonBlankExamples() {
+        assertEquals(6, ChatCopy.examples.size)
+        assertEquals(6, ChatCopy.examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
     }
 
     @Test fun titleIsTheFirstLineOfTheFirstMessage() {

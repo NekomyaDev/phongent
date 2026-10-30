@@ -18,6 +18,7 @@ object ChatCopy {
     data class Example(val kind: ExampleKind, val text: String)
 
     val examples = listOf(
+        Example(ExampleKind.App, "打开微信，给王赞发消息，让他拉我进Mika内测体验群"),
         Example(ExampleKind.App, "帮我总结微信群聊，Mika内测体验群今天都聊了些啥"),
         Example(ExampleKind.Web, "在Boss直聘上帮我投递AI产品经理岗位，150个投满"),
         Example(ExampleKind.App, "帮我打开汽水音乐，看广告领取24小时听歌VIP会员"),
