@@ -1,32 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mika</string>
-    <string name="a11y_service_description">这项系统权限能让 Mika 读取和操作任何屏幕上的内容。Mika 只在它自己的虚拟屏幕上用它来完成你交给它的任务；只有你把主屏幕上的任务交给它时，才会在主屏幕上操作。</string>
-
-    <!-- 接管与追问 -->
-    <string name="channel_attention">需要你处理</string>
-    <string name="takeover_title">需要你处理</string>
-    <string name="takeover_title_reason">需要你处理:%1$s</string>
-    <string name="takeover_reason_captcha">验证码</string>
-    <string name="takeover_reason_login">登录</string>
-    <string name="takeover_reason_access_blocked">风控验证</string>
-    <string name="takeover_reason_payment">付款</string>
-    <string name="takeover_reason_decision">需要你决定</string>
-    <string name="takeover_handed_over_hint">已把这个 App 放到主屏。处理完点「处理好了」;如果你已经自己把事办完了,点「我自己做完了」。</string>
-    <string name="takeover_web_busy">设置里正在登录网站,先在那边点「完成」,再点「我来处理」。</string>
-    <string name="takeover_move_to_main_failed">没能把 App 挪到主屏,再点一次「我来处理」试试。</string>
-    <string name="takeover_move_back_failed">没能把 App 挪回 Mika 的屏幕,再点一次试试。</string>
-    <string name="action_take_over">我来处理</string>
-    <string name="action_hand_back">处理好了</string>
-    <string name="action_finished_myself">我自己做完了</string>
-    <string name="action_skip">跳过</string>
-    <string name="action_cancel_task">取消任务</string>
-    <string name="input_title">需要你回答</string>
-    <string name="no_answer_note">%1$d 分钟内没回答会按没回答处理。</string>
-    <string name="input_too_late">回答来晚了:已过 %1$d 分钟,Mika 已按没回答继续。</string>
-    <string name="action_approve">同意</string>
-    <string name="action_decline">不同意</string>
-    <string name="confirmation_locked_hint">解锁后查看对象和内容</string>
-    <string name="action_reply">回复</string>
-    <string name="reply_hint">输入你的回答</string>
+    <string name="app_name" translatable="false">Mika</string>
+    <string name="a11y_service_description">This system permission lets Mika read and operate what\'s on any screen. Mika uses it only on its own virtual screen to do the tasks you give it, and acts on your main screen only when you hand it a task there.</string>
+    <string name="channel_attention">Needs you</string>
+    <string name="takeover_title">Needs you</string>
+    <string name="takeover_title_reason">Needs you: %1$s</string>
+    <string name="takeover_reason_captcha">CAPTCHA</string>
+    <string name="takeover_reason_login">Sign-in</string>
+    <string name="takeover_reason_access_blocked">Security check</string>
+    <string name="takeover_reason_payment">Payment</string>
+    <string name="takeover_reason_decision">Your call</string>
+    <string name="takeover_handed_over_hint">The app is now on your main screen. Tap “Done” when you\'re finished; if you\'ve already done the whole thing yourself, tap “I did it myself”.</string>
+    <string name="takeover_web_busy">A website sign-in is open in Settings. Tap “Done” there first, then tap “I’ll handle it”.</string>
+    <string name="takeover_move_to_main_failed">Couldn’t move the app to the main screen. Tap “I’ll handle it” to try again.</string>
+    <string name="takeover_move_back_failed">Couldn’t move the app back to Mika’s screen. Try again.</string>
+    <string name="action_take_over">I’ll handle it</string>
+    <string name="action_hand_back">Done</string>
+    <string name="action_finished_myself">I did it myself</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_cancel_task">Cancel task</string>
+    <string name="input_title">Needs your answer</string>
+    <string name="no_answer_note">If there’s no answer within %1$d min, Mika will go on without one.</string>
+    <string name="input_too_late">Too late: after %1$d min Mika went on without an answer.</string>
+    <string name="action_approve">Approve</string>
+    <string name="action_decline">Decline</string>
+    <string name="confirmation_locked_hint">Unlock to see the recipient and content</string>
+    <string name="action_reply">Reply</string>
+    <string name="reply_hint">Type your answer</string>
+    <string name="ui_locale">en</string>
+    <string name="list_sep">", "</string>
+    <string name="date_month_day">%2$s %3$d</string>
+    <string name="date_year_month_day">%3$s %4$d, %1$d</string>
+    <string name="ok_got_it">Got it</string>
+    <string name="cancel">Cancel</string>
 </resources>

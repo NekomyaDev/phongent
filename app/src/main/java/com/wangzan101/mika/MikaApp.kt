@@ -1,5 +1,8 @@
 package com.wangzan101.mika
 
+import com.wangzan101.mika.i18n.ResourceTexts
+import com.wangzan101.mika.i18n.UiText
+import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Application
 import android.net.Uri
 import android.util.Log
@@ -215,6 +218,9 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
 
     override fun onCreate() {
         super.onCreate()
+        // 界面以外的文字(通知、服务、悬浮胶囊)按 App 语言取
+        AppLanguage.applyDefaultLocale(this)
+        UiText.source = ResourceTexts { AppLanguage.resources(this) }
         registerActivityLifecycleCallbacks(foreground)
         capsule.start()
         // 内置助手的真实现,并开始看着助手(Mika 进程起来后,还活着的助手会自己交接 Binder)

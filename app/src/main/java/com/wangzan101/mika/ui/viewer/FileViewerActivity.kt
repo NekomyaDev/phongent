@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui.viewer
 
+import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -18,6 +19,11 @@ import com.wangzan101.mika.ui.theme.animationsOff
  * 自成一个 Activity,对话里的文件卡片之外,别处(悬浮胶囊、通知)也能用 [FileViewer.open] 打开。
  */
 class FileViewerActivity : ComponentActivity() {
+    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

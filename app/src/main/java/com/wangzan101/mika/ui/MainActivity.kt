@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.AppLanguage
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.wangzan101.mika.ui.components.KeyboardDismissArea
@@ -65,6 +66,11 @@ class MainActivity : ComponentActivity() {
         // 用户选过「不再询问」时系统不再弹窗,只能去设置里打开
         if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
         monitor.refresh()
+    }
+
+    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.phone.a11y
 
+import com.wangzan101.mika.i18n.AppLanguage
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
@@ -79,7 +80,7 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
             setViewTreeSavedStateRegistryOwner(owners)
             setViewTreeViewModelStoreOwner(owners)
             addView(
-                ComposeView(service).apply { setContent(content) },
+                ComposeView(AppLanguage.wrap(service)).apply { setContent(content) },
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT),
             )
             this.onOutside = onOutside

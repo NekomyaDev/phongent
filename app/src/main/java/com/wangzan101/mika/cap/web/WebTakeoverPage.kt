@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.web
 
+import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -41,6 +42,11 @@ open class WebTakeoverPage : Activity() {
             record()
             ticker.postDelayed(this, RECORD_INTERVAL_MS)
         }
+    }
+
+    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
