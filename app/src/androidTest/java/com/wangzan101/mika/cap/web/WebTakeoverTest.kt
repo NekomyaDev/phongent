@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.web
 
+import com.wangzan101.mika.ChineseUi
 import android.os.SystemClock
 import android.view.Display
 import android.view.MotionEvent
@@ -32,6 +33,8 @@ import kotlin.coroutines.resume
 /** 真机测试:网页接管把同一个 WebView 拿到主屏、再放回后台宿主,页面状态不丢。 */
 @RunWith(AndroidJUnit4::class)
 class WebTakeoverTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val tmp = TemporaryFolder()
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val ctx = instr.targetContext

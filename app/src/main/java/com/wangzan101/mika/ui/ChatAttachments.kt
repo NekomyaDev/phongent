@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import androidx.compose.ui.res.stringResource
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -80,26 +83,26 @@ import com.wangzan101.mika.ui.theme.MikaType
 
 /** 对话页附件的说法。 */
 object AttachCopy {
-    const val ADD = "添加附件"
-    const val CLOSE = "收起附件面板"
-    const val CAMERA = "相机"
-    const val ALBUM = "相册"
-    const val FILES = "文件"
-    const val RECENT = "最近的照片"
-    const val RECENT_PARTIAL = "你允许 Mika 访问的照片"
-    const val ALL = "全部照片"
-    const val CHANGE = "更改范围"
-    const val NO_PHOTOS = "还没有照片"
-    const val NEED_ACCESS = "在这里直接选照片,需要允许 Mika 访问照片"
-    const val GRANT = "允许访问照片"
-    const val GRANT_HINT = "不允许也可以点上面的「相册」,用系统的照片选择器"
-    const val FULL = "一次最多 ${AttachTray.LIMIT} 个附件"
-    const val NO_CAMERA = "没有能拍照的相机 App"
-    const val GONE = "这个附件已经不在了"
-    const val IMPORTING = "正在添加附件…"
+    val ADD: String get() = tr(R.string.attach_add)
+    val CLOSE: String get() = tr(R.string.attach_close)
+    val CAMERA: String get() = tr(R.string.attach_camera)
+    val ALBUM: String get() = tr(R.string.attach_album)
+    val FILES: String get() = tr(R.string.attach_files)
+    val RECENT: String get() = tr(R.string.attach_recent)
+    val RECENT_PARTIAL: String get() = tr(R.string.attach_recent_partial)
+    val ALL: String get() = tr(R.string.attach_all)
+    val CHANGE: String get() = tr(R.string.attach_change)
+    val NO_PHOTOS: String get() = tr(R.string.attach_no_photos)
+    val NEED_ACCESS: String get() = tr(R.string.attach_need_access)
+    val GRANT: String get() = tr(R.string.attach_grant)
+    val GRANT_HINT: String get() = tr(R.string.attach_grant_hint)
+    val FULL: String get() = tr(R.string.attach_full, AttachTray.LIMIT)
+    val NO_CAMERA: String get() = tr(R.string.attach_no_camera)
+    val GONE: String get() = tr(R.string.attach_gone)
+    val IMPORTING: String get() = tr(R.string.attach_importing)
 
-    fun remove(name: String) = "去掉$name"
-    fun overLimit(n: Int) = "一次最多 ${AttachTray.LIMIT} 个附件,另外 $n 个没加上"
+    fun remove(name: String) = tr(R.string.attach_remove, name)
+    fun overLimit(n: Int) = tr(R.string.attach_over_limit, AttachTray.LIMIT, n)
 }
 
 // ---------- 面板 ----------
@@ -271,7 +274,7 @@ private fun RecentCell(photo: PendingAttachment, order: Int?, onClick: () -> Uni
     Box(
         Modifier.testTag("recent-photo").aspectRatio(1f).clip(CellShape).background(c.fill)
             .semantics { selected = order != null }
-            .clickable(onClickLabel = if (order != null) "取消选择" else "选择", onClick = onClick),
+            .clickable(onClickLabel = if (order != null) stringResource(R.string.attach_deselect) else stringResource(R.string.attach_select), onClick = onClick),
     ) {
         thumb?.let { Image(it, photo.name, Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
         if (order != null) Box(Modifier.matchParentSize().background(c.accent.copy(alpha = 0.12f)).border(2.5.dp, c.accent, CellShape))
@@ -354,7 +357,7 @@ private fun SentPhotos(photos: List<AttachmentMessage.Item>, conversationId: Str
         val ratio = thumb?.let { (it.width.toFloat() / it.height.coerceAtLeast(1)).coerceIn(0.56f, 1.8f) } ?: 0.75f
         Box(
             Modifier.testTag("sent-photo").width(minOf(SingleWidth, maxWidth)).aspectRatio(ratio).clip(GridPhotoShape).background(c.fill)
-                .clickable(role = Role.Image, onClickLabel = "查看大图") { onOpen(p) },
+                .clickable(role = Role.Image, onClickLabel = stringResource(R.string.attach_view_large)) { onOpen(p) },
         ) {
             thumb?.let { Image(it, p.name, Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
         }
@@ -370,7 +373,7 @@ private fun SentPhotos(photos: List<AttachmentMessage.Item>, conversationId: Str
                     val thumb = conversationId?.let { rememberAttachImage(AttachImage.Sent(it, p.path), px) }
                     Box(
                         Modifier.testTag("sent-photo").size(cell).background(c.fill)
-                            .clickable(role = Role.Image, onClickLabel = "查看大图") { onOpen(p) },
+                            .clickable(role = Role.Image, onClickLabel = stringResource(R.string.attach_view_large)) { onOpen(p) },
                     ) {
                         thumb?.let { Image(it, p.name, Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
                     }
@@ -385,7 +388,7 @@ private fun SentFileCard(f: AttachmentMessage.Item, maxWidth: Dp, onClick: () ->
     val c = MikaTheme.colors
     Row(
         Modifier.testTag("sent-file").widthIn(min = minOf(220.dp, maxWidth), max = maxWidth).cardSurface(c, FileCardShape).clip(FileCardShape)
-            .clickable(onClickLabel = "打开", role = Role.Button, onClick = onClick)
+            .clickable(onClickLabel = stringResource(R.string.chat_open), role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

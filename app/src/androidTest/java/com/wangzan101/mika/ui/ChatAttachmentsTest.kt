@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.ChineseUi
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import org.junit.runner.RunWith
 /** 对话页的附件:「＋」面板开关、面板里的照片、输入框上方待发的那一排、发出去的消息怎么画。 */
 @RunWith(AndroidJUnit4::class)
 class ChatAttachmentsTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     /** 假的图:每张都是一块 40×30 的空图,不读手机。 */

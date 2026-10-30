@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.web
 
+import org.junit.Rule
+import com.wangzan101.mika.ChineseUi
 import android.view.Display
 import android.view.View
 import android.view.ViewGroup
@@ -41,6 +43,8 @@ import kotlin.coroutines.resume
  */
 @RunWith(AndroidJUnit4::class)
 class WebStackTakeoverTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val ctx = instr.targetContext
     private lateinit var stack: WebStack

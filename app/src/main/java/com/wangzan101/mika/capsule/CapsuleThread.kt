@@ -1,5 +1,7 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.agent.Conversation
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.agent.Turn
@@ -139,7 +141,7 @@ object CapsuleThreads {
 
     /** 操作过 App 的那一轮收成的一行:「✓ 微信、淘宝 · 办好了」「12306 · 没办成」;最多列两处。 */
     fun appLine(places: List<String>, kind: CapsuleKind): String {
-        val where = places.take(2).joinToString("、") + if (places.size > 2) " 等" else ""
+        val where = places.take(2).joinToString(tr(R.string.list_sep)) + if (places.size > 2) tr(R.string.and_more) else ""
         val mark = if (kind == CapsuleKind.Done) "✓ " else ""
         return "$mark$where · ${CapsuleCards.status(kind)}"
     }

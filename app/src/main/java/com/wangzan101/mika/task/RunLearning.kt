@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.agent.RunOutcome
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.knowledge.FrontMatter
@@ -117,8 +119,8 @@ class RunLearning(
                 skills.update(name) { s -> if (s.status == SkillStatus.active || s.status == SkillStatus.trial) SkillOutcomes.record(s, result, followed = true, injectedOnly = injectedOnly) else null }
             } ?: return@mapNotNull null
             when (next.status) {
-                SkillStatus.suspended -> SkillNote("这项技能最近不灵,先停用了", suspended = name)
-                SkillStatus.active -> if (uses.isNotEmpty() && result == SkillResult.verified) SkillNote("这项技能已核实:$name") else null
+                SkillStatus.suspended -> SkillNote(tr(R.string.skill_suspended), suspended = name)
+                SkillStatus.active -> if (uses.isNotEmpty() && result == SkillResult.verified) SkillNote(tr(R.string.skill_verified, name)) else null
                 else -> null
             }
         }
@@ -145,7 +147,7 @@ class RunLearning(
             return null
         }
         val description = FrontMatter.parse(draft.skill.markdown).first["description"] as? String ?: draft.skill.name
-        return SkillNote("Mika 学会了一项技能:$description", draftId = id)
+        return SkillNote(tr(R.string.skill_learned, description), draftId = id)
     }
 
     private suspend fun draftApp(a: RunAftermath, events: List<RunEvent>): SkillNote? {
@@ -165,7 +167,7 @@ class RunLearning(
             drafter.draft(runId, a.goal, done.answer, events, a.tools, app, ids(), events.lastOrNull()?.atMs ?: 0L)
         } ?: return null
         if (!guarded(false) { drafts.putPending(draft) }) return null
-        return SkillNote("Mika 为 ${app.display} 起草了 APP.md，尚未核实")
+        return SkillNote(tr(R.string.skill_app_draft, app.display))
     }
 
     /** 学的每一步出错都不影响别的步骤;取消照常往外抛。 */

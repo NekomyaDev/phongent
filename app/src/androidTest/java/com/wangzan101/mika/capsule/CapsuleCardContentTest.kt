@@ -1,5 +1,6 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.ChineseUi
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipe
@@ -36,6 +37,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CapsuleCardContentTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createComposeRule()
 
     private val calls = mutableListOf<String>()

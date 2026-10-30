@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.ui.components.keepsKeyboard
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -171,7 +173,7 @@ fun PhoneSetupContent(
     val c = MikaTheme.colors
     PageBackground {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
-            TopBar(PhoneSetupCopy.BAR_TITLE, MikaIcons.Back, onClose, "返回")
+            TopBar(PhoneSetupCopy.BAR_TITLE, MikaIcons.Back, onClose, stringResource(R.string.back))
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                 if (view.phase == SetupPhase.Success) {
                     Text(
@@ -421,7 +423,7 @@ fun PhoneHelperSection(status: BuiltinShellStatus, onRepair: () -> Unit, onUnpai
             title = { Text(PhoneSetupCopy.UNPAIR_TITLE) },
             text = { Text(PhoneSetupCopy.UNPAIR_BODY) },
             confirmButton = { TextButton({ confirming = false; onUnpair() }) { Text(PhoneSetupCopy.UNPAIR_CONFIRM, color = MikaTheme.colors.bad) } },
-            dismissButton = { TextButton({ confirming = false }) { Text("取消") } },
+            dismissButton = { TextButton({ confirming = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

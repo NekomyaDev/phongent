@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.ui.viewer.ViewerKind
 import com.wangzan101.mika.ui.viewer.ViewerKinds
 
@@ -50,11 +53,11 @@ object AttachmentMessage {
 
     /** 只发了附件时怎么称呼:「照片」「3 张照片」「合同.pdf」「合同.pdf 等 2 个文件」「照片和文件」。 */
     fun label(p: Parsed): String = when {
-        p.photos.isNotEmpty() && p.files.isNotEmpty() -> "照片和文件"
-        p.photos.size == 1 -> "照片"
-        p.photos.isNotEmpty() -> "${p.photos.size} 张照片"
+        p.photos.isNotEmpty() && p.files.isNotEmpty() -> tr(R.string.attach_photos_and_files)
+        p.photos.size == 1 -> tr(R.string.attach_photo)
+        p.photos.isNotEmpty() -> trPlural(R.plurals.attach_n_photos, p.photos.size)
         p.files.size == 1 -> p.files[0].name
-        p.files.isNotEmpty() -> "${p.files[0].name} 等 ${p.files.size} 个文件"
+        p.files.isNotEmpty() -> tr(R.string.attach_file_and_more, p.files[0].name, p.files.size)
         else -> ""
     }
 
@@ -76,7 +79,7 @@ object PhotoGrid {
 object FileBadge {
     enum class Kind { Pdf, Sheet, Doc, Slides, Archive, Other }
 
-    fun text(name: String): String = ext(name).uppercase().take(4).ifEmpty { "文件" }
+    fun text(name: String): String = ext(name).uppercase().take(4).ifEmpty { tr(R.string.attach_files) }
 
     fun kind(name: String): Kind = when (ext(name)) {
         "pdf" -> Kind.Pdf

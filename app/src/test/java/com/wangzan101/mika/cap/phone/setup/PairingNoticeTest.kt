@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.phone.setup
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.PairingDiscovery
@@ -8,6 +10,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PairingNoticeTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test
     fun codeEntryAppearsOnlyOnceThePairingWindowIsFound() {
         assertNull(PairingNotice.of(BuiltinShellStatus.NotPaired, PairingDiscovery.Searching))

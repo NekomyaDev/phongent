@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -302,7 +304,7 @@ class TaskService : Service() {
                 run.shellDied = true
                 TaskState.Failed(SHELL_DIED, FailKind.Environment)
             } catch (e: Exception) {
-                TaskState.Failed("任务出错:${e.message ?: e::class.simpleName}", FailKind.Environment)
+                TaskState.Failed(tr(R.string.task_error, e.message ?: e::class.simpleName), FailKind.Environment)
             }
             // shell 进程没了,虚拟屏和上面的 App 一起没了;任务没法接着做
             val end = if (run.shellDied && result !is TaskState.Succeeded) TaskState.Failed(SHELL_DIED, FailKind.Environment) else result
@@ -315,11 +317,11 @@ class TaskService : Service() {
             stopRunId?.let { summarizeStop(run, it, draft, store) }
             if (run.conditionCheck) {
                 val outcome = if (end is TaskState.Succeeded) ConditionOutcome.parse(end.answer)
-                    else ConditionOutcome.Error((end as? TaskState.Failed)?.reason ?: "条件检查中断")
+                    else ConditionOutcome.Error((end as? TaskState.Failed)?.reason ?: tr(R.string.task_condition_interrupted))
                 TriggerRuntime.checked(this@TaskService, run.triggerWindowKey.orEmpty(), run.triggerActionGoal.orEmpty(),
                     run.triggerThreadId.orEmpty(), outcome)
                 if (outcome is ConditionOutcome.Error) {
-                    val failure = TaskState.Failed("定时检查未完成：${outcome.reason}", FailKind.Environment)
+                    val failure = TaskState.Failed(tr(R.string.task_check_unfinished, outcome.reason), FailKind.Environment)
                     recordTurn(store, run.conversationId, run.goal, failure, run.runId.value)
                     runCatching { notifyResult(run, failure, "condition:${run.key}") }
                         .onFailure { Log.w(TAG, "condition failure notification failed", it) }
@@ -474,29 +476,29 @@ class TaskService : Service() {
 
     private fun progressNotification(run: TaskRun, state: TaskState): Notification {
         val (_, text) = describe(state) { ConfirmationNotifier.appLabel(this, it) }
-        val warning = run.muteFailedFor?.let { "\n该 App 可能会出声" }.orEmpty() +
+        val warning = run.muteFailedFor?.let { "\n" + tr(R.string.task_may_make_sound) }.orEmpty() +
             (if (state is TaskState.WaitingTakeover && !takeoverFirst(run)) "\n$TAKEOVER_QUEUED" else "")
         val b = Notification.Builder(this, CHANNEL_PROGRESS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Mika:${ScreenCopy.plain(run.goal)}")
+            .setContentTitle(tr(R.string.task_notif_title, ScreenCopy.plain(run.goal)))
             .setContentText(text + warning)
             .setStyle(Notification.BigTextStyle().bigText(text + warning))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp())
         val active = center.running().size
-        if (active >= 2) b.setSubText("$active 个任务进行中")
+        if (active >= 2) b.setSubText(trPlural(R.plurals.task_active, active))
         when (state) {
             is TaskState.WaitingTakeover ->
                 if (awaitingUser(run, state) && takeoverFirst(run)) takeoverActions(run).forEach(b::addAction)
-                else b.addAction(action(run, "停止", ACTION_CANCEL, 2))
+                else b.addAction(action(run, tr(R.string.chat_stop), ACTION_CANCEL, 2))
             is TaskState.WaitingInput -> {
                 b.addAction(replyAction(run, state.options))
-                b.addAction(action(run, "停止", ACTION_CANCEL, 2))
+                b.addAction(action(run, tr(R.string.chat_stop), ACTION_CANCEL, 2))
             }
             else -> {
-                if (state is TaskState.Held && state.reason.resumable) b.addAction(action(run, "继续", ACTION_RESUME, 1))
-                b.addAction(action(run, "停止", ACTION_CANCEL, 2))
+                if (state is TaskState.Held && state.reason.resumable) b.addAction(action(run, tr(R.string.chat_continue), ACTION_RESUME, 1))
+                b.addAction(action(run, tr(R.string.chat_stop), ACTION_CANCEL, 2))
             }
         }
         return b.build()
@@ -540,7 +542,7 @@ class TaskService : Service() {
                 }
                 val payment = StatusCopy.paymentLines(state.item, state.amount, state.address)
                 val behind = run.takeover?.let(takeoverQueue::behind) ?: 0
-                val waiting = if (behind > 0) "还有 $behind 个任务等你处理" else null
+                val waiting = if (behind > 0) trPlural(R.plurals.task_behind, behind) else null
                 takeoverTitle(state.reason) to listOfNotNull(state.message, payment, extra, waiting).joinToString("\n")
             }
             is TaskState.WaitingInput -> getString(R.string.input_title) to
@@ -650,7 +652,7 @@ class TaskService : Service() {
             // 标中断后当场善后(定时窗口、补送、告知、写进对话):进程还在,不等下次启动;用 App 级作用域,服务没了也做完
             center.store.interruptUnfinished()
             (application as com.wangzan101.mika.MikaApp).runRecovery.settleInterrupted()
-            taskState._state.value = TaskState.Failed("任务运行中断，可重新发起", FailKind.Environment)
+            taskState._state.value = TaskState.Failed(tr(R.string.task_interrupted), FailKind.Environment)
             taskState._runs.value = emptyList()
             taskState._activeConversations.value = emptyList()
             taskState.shownRun = null
@@ -663,7 +665,7 @@ class TaskService : Service() {
         /** 建通知频道;重复建没有副作用。App 启动时的恢复也要用,所以不依赖服务实例。 */
         internal fun ensureChannels(context: Context) {
             val nm = context.getSystemService(NotificationManager::class.java)
-            val names = mapOf(CHANNEL_PROGRESS to "任务进度", CHANNEL_RESULT to "任务结果", CHANNEL_ATTENTION to context.getString(R.string.channel_attention))
+            val names = mapOf(CHANNEL_PROGRESS to tr(R.string.channel_progress), CHANNEL_RESULT to tr(R.string.channel_result), CHANNEL_ATTENTION to tr(R.string.channel_attention))
             // 旧的结果频道建成了较低级别,App 调不高;换新 id,旧的删掉免得设置里多一项
             nm.deleteNotificationChannel(OLD_CHANNEL_RESULT)
             CHANNEL_IMPORTANCE.forEach { (id, importance) -> nm.createNotificationChannel(NotificationChannel(id, names.getValue(id), importance)) }
@@ -756,11 +758,11 @@ class TaskService : Service() {
         private const val ID_RESULT_FIRST = 10_000
         private const val RESULT_IDS = 1_000
         private val resultCount = AtomicInteger()
-        private const val TAKEOVER_QUEUED = "先处理完另一个任务的接管,再处理这个"
+        private val TAKEOVER_QUEUED: String get() = tr(R.string.task_takeover_queued)
         private const val TAG = "MikaTask"
-        const val TOO_OLD = "Mika 要在单独的虚拟屏里操作 App,需要安卓 13 及以上。"
-        internal const val PREPARING = "正在准备"
-        const val SHELL_DIED = "手机操作助手断开了,虚拟屏随之关闭;等它重新连上后再试"
+        val TOO_OLD: String get() = tr(R.string.task_too_old)
+        internal val PREPARING: String get() = tr(R.string.runtime_preparing)
+        val SHELL_DIED: String get() = tr(R.string.task_shell_died)
 
         /** 循环的状态里哪些可以由发布写出去。 */
         internal fun loopMayPublish(state: TaskState) = state.isActive()
@@ -868,19 +870,19 @@ class TaskService : Service() {
         /** 通知的标题和正文;[appLabel] 把包名换成 App 名。 */
         internal fun describe(state: TaskState, appLabel: (String) -> String = { it }): Pair<String, String> = when (state) {
             TaskState.Idle -> "Mika" to ""
-            is TaskState.Running -> "正在执行" to (state.progress?.let(StatusCopy::progress) ?: when {
+            is TaskState.Running -> tr(R.string.task_running) to (state.progress?.let(StatusCopy::progress) ?: when {
                 state.step == 0 -> state.note
-                else -> "第 ${state.step} 步:${state.note}".trimEnd(':')
+                else -> tr(R.string.task_step_note, state.step, state.note).trimEnd(':', ' ')
             })
-            is TaskState.Held -> if (state.reason == TaskGate.LOCKED) "等待解锁" to "解锁手机后会自动继续" else "已暂停" to state.reason.why
-            is TaskState.WaitingTakeover -> "需要你处理" to state.message
-            is TaskState.WaitingInput -> "需要你回答" to state.prompt
+            is TaskState.Held -> if (state.reason == TaskGate.LOCKED) tr(R.string.task_wait_unlock) to tr(R.string.task_wait_unlock_body) else tr(R.string.chat_paused) to state.reason.why
+            is TaskState.WaitingTakeover -> tr(R.string.takeover_title) to state.message
+            is TaskState.WaitingInput -> tr(R.string.input_title) to state.prompt
             is TaskState.WaitingConfirmation -> ConfirmationCopy.title(state.request) to ConfirmationCopy.body(state.request, appLabel(state.request.app))
             is TaskState.Succeeded ->
-                if (!state.doubtful) "任务完成" to state.answer
-                else "办完了,但没能核实" to (state.note?.let { "原因:$it\n" }.orEmpty() + state.answer)
-            is TaskState.Failed -> "任务没有完成" to state.reason
-            TaskState.Cancelled -> "任务已停止" to "你停止了这个任务"
+                if (!state.doubtful) tr(R.string.task_done) to state.answer
+                else tr(R.string.chat_unverified) to (state.note?.let { tr(R.string.task_reason, it) + "\n" }.orEmpty() + state.answer)
+            is TaskState.Failed -> tr(R.string.task_not_done) to state.reason
+            TaskState.Cancelled -> tr(R.string.task_stopped) to tr(R.string.task_stopped_body)
         }
     }
 }

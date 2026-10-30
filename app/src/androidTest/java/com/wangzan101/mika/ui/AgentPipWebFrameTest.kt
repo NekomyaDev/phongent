@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.ChineseUi
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -17,6 +18,8 @@ import org.junit.runner.RunWith
 /** 小窗按画面比例定大小:横向网页看得到左右两端,长屏手机的画面看得到最底下。 */
 @RunWith(AndroidJUnit4::class)
 class AgentPipWebFrameTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createComposeRule()
 
     @Test fun landscapeWebFrameShowsBothEdges() {

@@ -1,11 +1,15 @@
 package com.wangzan101.mika.task
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ParallelCapabilityTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test fun android13IsOne() {
         val limit = ParallelCapability.detect(sdk = 33, lowRam = false, userMax = 3, secondDisplayFailed = false)
         assertEquals(ParallelLimit(1, "安卓 14 以上才支持同时进行多个任务"), limit)

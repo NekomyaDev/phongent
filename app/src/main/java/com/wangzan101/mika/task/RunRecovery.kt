@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.Channel
@@ -80,24 +82,24 @@ class RunRecovery(
             val prior = outbox.get(deliveryId)
             val state = when (prior?.state) {
                 null, DeliveryState.Pending -> outbox.deliver(channel, peer,
-                    prior?.delivery ?: Delivery.Result(deliveryId, run.threadId, reply, restored = true, title = "恢复的任务结果")).state
+                    prior?.delivery ?: Delivery.Result(deliveryId, run.threadId, reply, restored = true, title = tr(R.string.recovered_result))).state
                 DeliveryState.Attempting -> outbox.deliver(channel, peer, prior.delivery).state
                 else -> prior.state
             }
             when (state) {
                 DeliveryState.Delivered -> finish(run, reply)
                 DeliveryState.Failed -> outbox.deliver(channel, peer, Delivery.Notice("failed:$deliveryId", run.threadId,
-                    "上次任务已完成，但结果通知送达失败；请在对话里查看"))
+                    tr(R.string.recover_delivery_failed)))
                 else -> outbox.deliver(channel, peer, Delivery.Notice("uncertain:$deliveryId", run.threadId,
-                    "上次结果可能已送达，请先在对话里查看，避免重复处理"))
+                    tr(R.string.recover_maybe_delivered)))
             }
         } else {
             val turnId = "interrupted:${run.id.value}"
             if (conversations.turns(run.threadId).none { it.runId == turnId }) {
-                conversations.append(run.threadId, Turn(run.goal, "任务中断了，可以重新发起。", "failed", runId = turnId))
+                conversations.append(run.threadId, Turn(run.goal, tr(R.string.recover_interrupted_turn), "failed", runId = turnId))
             }
             outbox.deliver(channel, peer, Delivery.Notice(turnId, run.threadId,
-                "${run.goal.take(40)}：运行中断，可在对话里重新发起"))
+                tr(R.string.recover_interrupted, run.goal.take(40))))
         }
     }
 

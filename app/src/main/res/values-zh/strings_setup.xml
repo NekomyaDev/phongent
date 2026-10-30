@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="welcome_title">你好,我是 Mika</string>
+    <string name="welcome_lead">你手机上的私人助理。\n说要做什么,我在后台替你办完。</string>
+    <string name="welcome_note">开始前需要配一个模型、打开手机操作,约 3 分钟</string>
+    <string name="welcome_start">开始设置</string>
+    <string name="welcome_apps">操作 App</string>
+    <string name="welcome_apps_body">在后台的一块屏幕上点、输入、翻页,不占用你的屏幕</string>
+    <string name="welcome_web">上网查</string>
+    <string name="welcome_web_body">自带浏览器,读网页、比价、查资料</string>
+    <string name="welcome_files">处理文件</string>
+    <string name="welcome_files_body">表格、PDF、数据,在独立的环境里算和整理</string>
+    <string name="welcome_schedule">按时去做</string>
+    <string name="welcome_schedule_body">每天、每周,或者条件满足时自动去做</string>
+    <string name="back">返回</string>
+    <string name="hide">隐藏</string>
+    <string name="show">显示</string>
+    <string name="model_setup_title">配置模型</string>
+    <string name="model_setup_lead">Mika 用你自己的模型服务来思考。先连一家服务商，再给每件事选模型。</string>
+    <string name="model_setup_onboarding_note">只有主模型必须选，另外两个可以以后再说。</string>
+    <string name="model_kind">接口</string>
+    <string name="model_base_url">接口地址</string>
+    <string name="model_key_hint">粘贴服务商给的 Key</string>
+    <string name="model_key_optional">本地服务可不填</string>
+    <string name="model_test_save">测试并保存</string>
+    <string name="model_testing">正在测试…</string>
+    <string name="model_test_note">只列一次这家的模型，列得出来就保存。</string>
+    <string name="next">下一步</string>
+    <string name="model_failed">连接失败：%1$s</string>
+    <string name="cap_vision">看图</string>
+    <string name="cap_vision_unconfirmed">看图 · 未确认</string>
+    <string name="cap_no_tools">不支持工具调用</string>
+    <string name="cap_tools">工具调用</string>
+    <string name="cap_tools_unconfirmed">工具调用 · 未确认</string>
+    <string name="cap_reasoning">推理</string>
+    <string name="model_need_url">请填写接口地址</string>
+    <string name="model_url_scheme">接口地址要以 http:// 或 https:// 开头</string>
+</resources>

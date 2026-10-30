@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">Language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_system_detail">Chinese on a Chinese system, English otherwise</string>
+    <string name="language_chinese" translatable="false">中文</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="settings_basic">Basic</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_not_set">Not set</string>
+    <string name="settings_phone_ops">Phone control</string>
+    <string name="settings_during_work">While working</string>
+    <string name="settings_during_work_sub">Screen stays on, the app being used is muted</string>
+    <string name="settings_notif_sub">When they pop up, change in system settings</string>
+    <string name="settings_privacy">Privacy &amp; data</string>
+    <string name="settings_memory_sub">What Mika remembers and the skills it learned</string>
+    <string name="settings_web_logins">Website sign-ins</string>
+    <plurals name="settings_count_sites">
+        <item quantity="one">%1$d site</item>
+        <item quantity="other">%1$d sites</item>
+    </plurals>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_sandbox">Files &amp; computing environment</string>
+    <string name="settings_routes">Saved routes</string>
+    <plurals name="settings_count_routes">
+        <item quantity="one">%1$d route</item>
+        <item quantity="other">%1$d routes</item>
+    </plurals>
+    <string name="settings_recovery">Recovery &amp; repair</string>
+    <string name="settings_developer">Developer options</string>
+    <string name="settings_about">About Mika</string>
+    <string name="pill_unsupported">Not supported</string>
+    <string name="pill_available">Ready</string>
+    <string name="pill_needs_attention">Needs attention</string>
+    <string name="sandbox_ready">Ready</string>
+    <string name="sandbox_preparing">Preparing</string>
+    <string name="sandbox_not_prepared">Not set up</string>
+    <string name="settings_all_ready_detail">Model set up · Phone control ready</string>
+</resources>

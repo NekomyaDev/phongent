@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AttachmentMessageTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test fun photosAndFilesAreSplitOutOfTheWords() {
         val text = "帮我看看这两张图和合同\n附件:/workspace/inbox/IMG_1.jpg(1.2 MB)\n附件:/workspace/inbox/租房合同（草稿）.pdf(48 KB)\n附件:/workspace/inbox/b.HEIC(900 KB)"
         val p = AttachmentMessage.parse(text)

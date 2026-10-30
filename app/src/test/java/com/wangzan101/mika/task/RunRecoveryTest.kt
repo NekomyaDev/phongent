@@ -1,5 +1,6 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.Channel
@@ -23,6 +24,8 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class RunRecoveryTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
 
     private class RecordingChannel : Channel {

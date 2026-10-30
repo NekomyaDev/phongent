@@ -1,5 +1,6 @@
 package com.wangzan101.mika.confirm
 
+import com.wangzan101.mika.i18n.tr
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
@@ -24,18 +25,18 @@ object ConfirmationCopy {
     /** 展开的卡片和通知里内容最多显示的字数(和申报时的上限一致)。 */
     const val DETAIL_MAX = 200
     /** 确认卡片上的说明:只有花钱的操作要你同意,每次只同意这一次。 */
-    const val NOTE = "花钱的操作每次都要你同意。"
+    val NOTE: String get() = tr(R.string.confirm_note)
 
     fun actionLabel(action: IrrevAction): String = when (action) {
-        IrrevAction.send -> "发送"
-        IrrevAction.pay -> "付款"
-        IrrevAction.delete -> "删除"
-        IrrevAction.order -> "下单"
-        IrrevAction.submit -> "提交"
-        IrrevAction.other -> "其他操作"
+        IrrevAction.send -> tr(R.string.chat_send)
+        IrrevAction.pay -> tr(R.string.confirm_pay)
+        IrrevAction.delete -> tr(R.string.confirm_delete)
+        IrrevAction.order -> tr(R.string.confirm_order)
+        IrrevAction.submit -> tr(R.string.confirm_submit)
+        IrrevAction.other -> tr(R.string.confirm_other)
     }
 
-    fun title(r: ConfirmationRequest) = "要你同意:" + actionLabel(r.action)
+    fun title(r: ConfirmationRequest) = tr(R.string.confirm_title, actionLabel(r.action))
 
     /** 收起的一行:「在 <App 名> · 对象:<对谁> · 内容:<前 60 字> · 金额:<多少>」;空的字段不写。 */
     fun body(r: ConfirmationRequest, appName: String): String = fields(r, appName, CONTENT_MAX).joinToString(" · ")
@@ -46,10 +47,10 @@ object ConfirmationCopy {
     private fun fields(r: ConfirmationRequest, appName: String, contentMax: Int): List<String> {
         val content = plain(r.content).let { if (it.length > contentMax) it.take(contentMax) + "…" else it }
         return listOfNotNull(
-            "在 " + plain(appName),
-            plain(r.target).takeIf { it.isNotEmpty() }?.let { "对象:$it" },
-            content.takeIf { it.isNotEmpty() }?.let { "内容:$it" },
-            r.amount?.let(::plain)?.takeIf { it.isNotEmpty() }?.let { "金额:$it" },
+            tr(R.string.confirm_in_app, plain(appName)),
+            plain(r.target).takeIf { it.isNotEmpty() }?.let { tr(R.string.confirm_target, it) },
+            content.takeIf { it.isNotEmpty() }?.let { tr(R.string.confirm_content, it) },
+            r.amount?.let(::plain)?.takeIf { it.isNotEmpty() }?.let { tr(R.string.payment_amount, it) },
         )
     }
 

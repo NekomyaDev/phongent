@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -149,7 +152,7 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
     val onPick: (ModelRole) -> Unit = { role -> if (ui.providers.isEmpty()) actions.openForm() else actions.pickRole(role) }
     PageBackground {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).windowInsetsPadding(WindowInsets.ime)) {
-            TopBar(if (onboarding) ModelSetupCopy.TITLE else ModelsCopy.TITLE, MikaIcons.Back, onBack, "返回")
+            TopBar(if (onboarding) ModelSetupCopy.TITLE else ModelsCopy.TITLE, MikaIcons.Back, onBack, stringResource(R.string.back))
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
                 Text(
                     if (onboarding) ModelSetupCopy.LEAD else ModelsCopy.LEAD, Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -244,7 +247,7 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
             if (f.keyRequired) ModelSetupCopy.KEY_HINT else ModelSetupCopy.KEY_OPTIONAL, first = !f.isCustom,
             keyboard = KeyboardType.Password, secret = !showKey, modifier = Modifier.testTag("setup-api-key"),
         ) {
-            Text(if (showKey) "隐藏" else "显示", Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent)
+            Text(if (showKey) stringResource(R.string.hide) else stringResource(R.string.show), Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent)
         }
     }
     f.urlProblem?.takeIf { f.isCustom && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
@@ -288,36 +291,36 @@ internal val ModelIdStyle = MikaType.Body.copy(fontSize = 15.sp, fontWeight = Fo
 
 /** 配置模型页(上手时)和添加服务商表单的文字(纯函数,便于测试)。用途的说法在 [ModelsCopy]。 */
 object ModelSetupCopy {
-    const val TITLE = "配置模型"
-    const val LEAD = "Mika 用你自己的模型服务来思考。先连一家服务商，再给每件事选模型。"
-    const val ONBOARDING_NOTE = "只有主模型必须选，另外两个可以以后再说。"
-    const val CANCEL = "取消"
-    const val KIND = "接口"
-    const val BASE_URL = "接口地址"
+    val TITLE: String get() = tr(R.string.model_setup_title)
+    val LEAD: String get() = tr(R.string.model_setup_lead)
+    val ONBOARDING_NOTE: String get() = tr(R.string.model_setup_onboarding_note)
+    val CANCEL: String get() = tr(R.string.cancel)
+    val KIND: String get() = tr(R.string.model_kind)
+    val BASE_URL: String get() = tr(R.string.model_base_url)
     const val API_KEY = "API Key"
-    const val KEY_HINT = "粘贴服务商给的 Key"
-    const val KEY_OPTIONAL = "本地服务可不填"
-    const val TEST_AND_SAVE = "测试并保存"
-    const val TESTING = "正在测试…"
-    const val TEST_NOTE = "只列一次这家的模型，列得出来就保存。"
-    const val NEXT = "下一步"
+    val KEY_HINT: String get() = tr(R.string.model_key_hint)
+    val KEY_OPTIONAL: String get() = tr(R.string.model_key_optional)
+    val TEST_AND_SAVE: String get() = tr(R.string.model_test_save)
+    val TESTING: String get() = tr(R.string.model_testing)
+    val TEST_NOTE: String get() = tr(R.string.model_test_note)
+    val NEXT: String get() = tr(R.string.next)
 
-    fun failed(reason: String) = "连接失败：$reason"
+    fun failed(reason: String) = tr(R.string.model_failed, reason)
 
     /** 模型的能力标签:(文字, 是否强调色)。接口没给、按预设推断的标「未确认」。只作参考,不拦选择。 */
     fun tags(o: ModelOption, forVision: Boolean = false): List<Pair<String, Boolean>> = buildList {
         val caps = o.capabilities
         if (forVision) {
-            add((if (o.visionKnown) "看图" else "看图 · 未确认") to false)
+            add((if (o.visionKnown) tr(R.string.cap_vision) else tr(R.string.cap_vision_unconfirmed)) to false)
         } else {
             when {
-                !caps.toolCalls -> add("不支持工具调用" to false)
-                o.toolCallsKnown -> add("工具调用" to true)
-                else -> add("工具调用 · 未确认" to false)
+                !caps.toolCalls -> add(tr(R.string.cap_no_tools) to false)
+                o.toolCallsKnown -> add(tr(R.string.cap_tools) to true)
+                else -> add(tr(R.string.cap_tools_unconfirmed) to false)
             }
-            if (caps.vision && o.visionKnown) add("看图" to false)
+            if (caps.vision && o.visionKnown) add(tr(R.string.cap_vision) to false)
         }
-        if (caps.reasoning) add("推理" to false)
+        if (caps.reasoning) add(tr(R.string.cap_reasoning) to false)
         if (o.contextKnown) add(ModelOptions.contextLabel(caps.contextTokens) to false)
     }
 }

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.chat.ConversationSummary
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.settings.AccessibilityState
@@ -13,6 +15,8 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 class ChatCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test fun greetingFollowsTheTimeOfDay() {
         assertEquals("早上好", ChatCopy.greeting(7))
         assertEquals("中午好", ChatCopy.greeting(12))
@@ -25,6 +29,8 @@ class ChatCopyTest {
     @Test fun sixDistinctNonBlankExamples() {
         assertEquals(6, ChatCopy.examples.size)
         assertEquals(6, ChatCopy.examples.map { it.text }.filter { it.isNotBlank() }.toSet().size)
+        assertEquals("打开微信，给王赞发消息，让他拉我进Mika内测体验群", ChatCopy.examples.first().text)
+        assertEquals("帮我订明天早上9:40、9:50、10:00 的闹钟", ChatCopy.examples[4].text)
     }
 
     @Test fun titleIsTheFirstLineOfTheFirstMessage() {

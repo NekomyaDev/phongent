@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.tr
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -94,17 +95,17 @@ private val LogoShape = RoundedCornerShape(22.dp)
 
 /** 欢迎页的文字。 */
 object WelcomeCopy {
-    const val TITLE = "你好,我是 Mika"
-    const val LEAD = "你手机上的私人助理。\n说要做什么,我在后台替你办完。"
-    const val NOTE = "开始前需要配一个模型、打开手机操作,约 3 分钟"
-    const val START = "开始设置"
+    val TITLE: String get() = tr(R.string.welcome_title)
+    val LEAD: String get() = tr(R.string.welcome_lead)
+    val NOTE: String get() = tr(R.string.welcome_note)
+    val START: String get() = tr(R.string.welcome_start)
 
     data class Item(val icon: ImageVector, val title: String, val body: String)
 
-    val FEATURES = listOf(
-        Item(MikaIcons.Apps, "操作 App", "在后台的一块屏幕上点、输入、翻页,不占用你的屏幕"),
-        Item(MikaIcons.Globe, "上网查", "自带浏览器,读网页、比价、查资料"),
-        Item(MikaIcons.Doc, "处理文件", "表格、PDF、数据,在独立的环境里算和整理"),
-        Item(MikaIcons.Clock, "按时去做", "每天、每周,或者条件满足时自动去做"),
+    val FEATURES get() = listOf(
+        Item(MikaIcons.Apps, tr(R.string.welcome_apps), tr(R.string.welcome_apps_body)),
+        Item(MikaIcons.Globe, tr(R.string.welcome_web), tr(R.string.welcome_web_body)),
+        Item(MikaIcons.Doc, tr(R.string.welcome_files), tr(R.string.welcome_files_body)),
+        Item(MikaIcons.Clock, tr(R.string.welcome_schedule), tr(R.string.welcome_schedule_body)),
     )
 }

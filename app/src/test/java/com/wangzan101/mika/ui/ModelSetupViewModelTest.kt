@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ListFailure
@@ -29,6 +30,8 @@ import javax.crypto.KeyGenerator
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ModelSetupViewModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
 
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()

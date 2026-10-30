@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import org.junit.Rule
+import com.wangzan101.mika.ChineseUi
 import com.wangzan101.mika.DeviceTaskState
 import android.content.Context
 import android.view.Display
@@ -36,6 +38,8 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 @RunWith(AndroidJUnit4::class)
 class TaskServiceTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var shell: IMikaShell
     /**

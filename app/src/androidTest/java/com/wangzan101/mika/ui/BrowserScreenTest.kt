@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.ChineseUi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -38,6 +39,8 @@ import org.junit.runner.RunWith
 /** 侧栏的「浏览器」入口;起始页的几段(搜索、常用网站、整理、最近打开),网页的顶栏和工具栏、「更多」面板、「给 Mika 登录」横幅。 */
 @RunWith(AndroidJUnit4::class)
 class BrowserScreenTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createComposeRule()
 
     private val calls = mutableListOf<String>()

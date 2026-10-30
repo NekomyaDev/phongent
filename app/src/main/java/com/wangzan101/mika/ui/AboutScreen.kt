@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -149,9 +150,10 @@ fun AboutScreen(
         Column(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 buildAnnotatedString {
-                    append("基于 ")
+                    val (before, after) = stringResource(R.string.about_released_under).split("%1\$s").let { it[0] to it.getOrElse(1) { "" } }
+                    append(before)
                     withStyle(SpanStyle(color = c.accent)) { append(AboutCopy.LICENSE_LINK) }
-                    append(" 发布")
+                    append(after)
                 },
                 Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onOpenLicense).padding(horizontal = 6.dp, vertical = 2.dp)
                     .testTag("about-license"),

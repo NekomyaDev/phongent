@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.about.CheckStatus
 import com.wangzan101.mika.about.MikaLinks
 import com.wangzan101.mika.about.UpdateState
@@ -8,71 +10,70 @@ import com.wangzan101.mika.settings.Problem
 
 /** 关于页的文字,以及「检查更新」一行、设置首页「关于 Mika」一行、侧栏入口上的提示怎么显示。 */
 object AboutCopy {
-    const val TITLE = "关于 Mika"
-    const val TAGLINE = "你手机上的私人助理，替你把事办成"
+    val TITLE: String get() = tr(R.string.settings_about)
+    val TAGLINE: String get() = tr(R.string.about_tagline)
     const val BETA = "Beta"
 
-    const val CHECK = "检查更新"
-    const val CHECK_SUB = "从 GitHub 发布页获取新版本"
-    const val CHECK_SUB_NEW = "有新版本"
-    const val UP_TO_DATE = "已是最新"
-    const val UP_TO_DATE_TOAST = "已是最新版本"
-    const val OFFLINE = "连不上 GitHub"
-    const val OFFLINE_TOAST = "暂时连不上 GitHub，稍后再试"
-    const val CHANGELOG = "更新记录"
-    const val CHANGELOG_SUB = "每个版本改了什么"
-    const val CHANGELOG_EMPTY = "还没取到更新记录，连上网后点「检查更新」"
-    const val CHANGELOG_ALL = "在 GitHub 上看全部"
+    val CHECK: String get() = tr(R.string.about_check)
+    val CHECK_SUB: String get() = tr(R.string.about_check_sub)
+    val CHECK_SUB_NEW: String get() = tr(R.string.about_check_sub_new)
+    val UP_TO_DATE: String get() = tr(R.string.about_up_to_date)
+    val UP_TO_DATE_TOAST: String get() = tr(R.string.about_up_to_date_toast)
+    val OFFLINE: String get() = tr(R.string.about_offline)
+    val OFFLINE_TOAST: String get() = tr(R.string.about_offline_toast)
+    val CHANGELOG: String get() = tr(R.string.about_changelog)
+    val CHANGELOG_SUB: String get() = tr(R.string.about_changelog_sub)
+    val CHANGELOG_EMPTY: String get() = tr(R.string.about_changelog_empty)
+    val CHANGELOG_ALL: String get() = tr(R.string.about_changelog_all)
 
-    const val FEEDBACK = "反馈问题"
-    const val FEEDBACK_SUB = "GitHub、微信、X 都可以"
-    const val FEEDBACK_SHEET_SUB = "遇到问题、有想法，选一个方便的地方告诉作者"
-    const val FEEDBACK_GITHUB = "去 GitHub 提问题"
-    const val FEEDBACK_GITHUB_SUB = "报 Bug、提需求，能跟踪进度"
-    const val FEEDBACK_WECHAT = "加作者微信"
-    const val FEEDBACK_WECHAT_SUB = "进内测群，聊用法、快速反馈"
-    const val FEEDBACK_X = "在 X 上找作者"
-    const val FEEDBACK_X_SUB = "${MikaLinks.X_HANDLE} · 私信或发帖 @ 都行"
+    val FEEDBACK: String get() = tr(R.string.about_feedback)
+    val FEEDBACK_SUB: String get() = tr(R.string.about_feedback_sub)
+    val FEEDBACK_SHEET_SUB: String get() = tr(R.string.about_feedback_sheet_sub)
+    val FEEDBACK_GITHUB: String get() = tr(R.string.about_feedback_github)
+    val FEEDBACK_GITHUB_SUB: String get() = tr(R.string.about_feedback_github_sub)
+    val FEEDBACK_WECHAT: String get() = tr(R.string.about_feedback_wechat)
+    val FEEDBACK_WECHAT_SUB: String get() = tr(R.string.about_feedback_wechat_sub)
+    val FEEDBACK_X: String get() = tr(R.string.about_feedback_x)
+    val FEEDBACK_X_SUB: String get() = tr(R.string.about_feedback_x_sub, MikaLinks.X_HANDLE)
 
-    const val GROUP = "加入内测群"
-    const val GROUP_SUB = "加作者微信，拉你进 Mika 内测体验群"
-    const val GROUP_SHEET_TITLE = "加入 Mika 内测体验群"
-    const val GROUP_SHEET_SUB = "扫码加作者微信，备注「Mika」，拉你进群"
-    const val GROUP_HINT = "长按图片保存 · 或在微信里扫一扫"
-    const val SAVE_QR = "保存二维码"
-    const val QR_SAVED = "二维码已保存到相册"
-    const val QR_SAVE_FAILED = "没能保存，可以截屏保存"
+    val GROUP: String get() = tr(R.string.about_group)
+    val GROUP_SUB: String get() = tr(R.string.about_group_sub)
+    val GROUP_SHEET_TITLE: String get() = tr(R.string.about_group_sheet_title)
+    val GROUP_SHEET_SUB: String get() = tr(R.string.about_group_sheet_sub)
+    val GROUP_HINT: String get() = tr(R.string.about_group_hint)
+    val SAVE_QR: String get() = tr(R.string.about_save_qr)
+    val QR_SAVED: String get() = tr(R.string.about_qr_saved)
+    val QR_SAVE_FAILED: String get() = tr(R.string.about_qr_save_failed)
     const val GROUP_ALREADY_ADDED = "已经加过作者微信？"
     const val GROUP_ASK_MIKA = "让 Mika 帮我发消息入群"
 
-    const val FOLLOW = "关注作者"
-    const val FOLLOW_SUB = "X ${MikaLinks.X_HANDLE}，第一时间看新功能"
-    const val REPO = "开源仓库"
-    const val REPO_SUB = "${MikaLinks.REPO_LABEL} · 欢迎点星"
-    const val GUIDE = "使用说明与参与方式"
-    const val GUIDE_SUB = "上手指南；不会写代码也能补充 App 知识"
+    val FOLLOW: String get() = tr(R.string.about_follow)
+    val FOLLOW_SUB: String get() = tr(R.string.about_follow_sub, MikaLinks.X_HANDLE)
+    val REPO: String get() = tr(R.string.about_repo)
+    val REPO_SUB: String get() = tr(R.string.about_repo_sub, MikaLinks.REPO_LABEL)
+    val GUIDE: String get() = tr(R.string.about_guide)
+    val GUIDE_SUB: String get() = tr(R.string.about_guide_sub)
 
-    const val DATA_NOTE = "你发给 Mika 的话、屏幕内容和截图，只发给你自己设置的模型服务商。" +
-        "Mika 没有自己的服务器，不收集你的数据；检查更新时只访问 GitHub。"
-    const val LICENSE_LINK = "Apache-2.0 开源许可"
-    const val AUTHOR = "由 王赞 开发 · © 2026"
-    const val LICENSE_TITLE = "Apache-2.0 许可证"
+    val DATA_NOTE: String get() = tr(R.string.about_data_note)
+    val LICENSE_LINK: String get() = tr(R.string.about_license_link)
+    val AUTHOR: String get() = tr(R.string.about_author)
+    val LICENSE_TITLE: String get() = tr(R.string.about_license_title)
 
-    const val UPDATE_DOWNLOAD = "从 GitHub 下载"
-    const val UPDATE_MIRROR = "国内备用下载"
-    const val UPDATE_LATER = "以后再说"
-    const val NO_BROWSER = "没有能打开链接的浏览器"
+    val UPDATE_DOWNLOAD: String get() = tr(R.string.about_update_download)
+    val UPDATE_MIRROR: String get() = tr(R.string.about_update_mirror)
+    val UPDATE_LATER: String get() = tr(R.string.about_update_later)
+    val NO_BROWSER: String get() = tr(R.string.about_no_browser)
 
-    fun version(versionName: String): String = "版本 $versionName"
+    fun version(versionName: String): String = tr(R.string.about_version, versionName)
 
-    fun buildLabel(build: String): String = "构建 $build"
+    fun buildLabel(build: String): String = tr(R.string.about_build, build)
 
-    fun available(version: String): String = "$version 可更新"
-    fun updateTitle(version: String): String = "发现新版本 $version"
+    fun available(version: String): String = tr(R.string.about_available, version)
+    fun updateTitle(version: String): String = tr(R.string.about_update_title, version)
 
     /** 「当前 0.1.0 Beta · 2026-11-05 发布」;不知道发布日期时只写当前版本。 */
     fun updateSub(current: String, beta: Boolean, date: String?): String =
-        "当前 $current${if (beta) " $BETA" else ""}" + (date?.let { " · $it 发布" } ?: "")
+        tr(R.string.about_current, current + if (beta) " $BETA" else "") + (date?.let { tr(R.string.about_released_on, it) } ?: "")
 
     /** 「检查更新」一行右边:正在查转圈,有新版写版本号带红点,查过一次写结果;从没查过什么都不写。 */
     data class CheckValue(val text: String?, val dot: Boolean = false, val spinner: Boolean = false, val highlight: Boolean = false)

@@ -1,5 +1,6 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.i18n.tr
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -94,18 +95,18 @@ private val CountText = TextStyle(fontSize = 10.sp, lineHeight = 12.sp, fontWeig
 
 /** 胶囊上的固定说法。 */
 object CapsuleCopy {
-    const val STOP = "不做了"
-    const val EXPAND = "展开看这件事"
-    const val TALK = "和 Mika 说话"
-    const val SWAP_SIDE = "移到屏幕另一边"
+    val STOP: String get() = tr(R.string.capsule_stop)
+    val EXPAND: String get() = tr(R.string.capsule_expand)
+    val TALK: String get() = tr(R.string.capsule_talk)
+    val SWAP_SIDE: String get() = tr(R.string.capsule_swap_side)
     const val IDLE = "Mika"
 
     /** 读屏时一颗图标的说法:在做什么、要不要你处理、结果;好几件时的件数已在 [CapsuleView.Shown.text] 里。 */
     fun describe(view: CapsuleView.Shown): String = when {
         view.kind == CapsuleKind.Idle -> IDLE
-        view.kind.needsYou -> "${view.text}，点开处理"
-        view.kind == CapsuleKind.Running -> "Mika 在干活：${view.text}，点开看详情"
-        view.kind == CapsuleKind.Held || view.kind == CapsuleKind.Cancelled -> "Mika ${view.text}，点开看详情"
+        view.kind.needsYou -> tr(R.string.capsule_desc_needs, view.text)
+        view.kind == CapsuleKind.Running -> tr(R.string.capsule_desc_running, view.text)
+        view.kind == CapsuleKind.Held || view.kind == CapsuleKind.Cancelled -> tr(R.string.capsule_desc_other, view.text)
         else -> "Mika ${view.text}"
     }
 }

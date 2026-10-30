@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.LruCache
@@ -48,11 +50,11 @@ import java.time.format.DateTimeFormatter
 
 /** 用户发来的屏幕在界面上的说法(对话页、卡片、截屏按钮共用)。 */
 object ScreenCopy {
-    const val TAG = "你此刻的屏幕"
-    const val BLOCKED = "没截到：这个页面不允许截图"
-    const val CAMERA = "截当前屏幕发给 Mika"
-    const val REMOVE = "不要这张截图"
-    const val SEND_SCREEN = "把此刻的屏幕发给 Mika"
+    val TAG: String get() = tr(R.string.screen_tag)
+    val BLOCKED: String get() = tr(R.string.screen_blocked)
+    val CAMERA: String get() = tr(R.string.screen_camera)
+    val REMOVE: String get() = tr(R.string.screen_remove)
+    val SEND_SCREEN: String get() = tr(R.string.screen_send)
 
     private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 

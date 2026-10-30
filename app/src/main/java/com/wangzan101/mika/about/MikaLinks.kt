@@ -1,5 +1,7 @@
 package com.wangzan101.mika.about
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import java.net.URLEncoder
 
 /** Mika 对外的地址都在这里:仓库、问题、作者、检查更新用的两个来源。换地址只改这一处。 */
@@ -37,12 +39,7 @@ object MikaLinks {
     fun issueBody(d: Device): String {
         val model = if (d.model.startsWith(d.manufacturer, ignoreCase = true)) d.model else "${d.manufacturer} ${d.model}"
         return buildString {
-            append("- 机型：").append(model.trim()).append('\n')
-            append("- 安卓版本：").append(d.androidRelease).append("（SDK ").append(d.sdk).append("）\n")
-            append("- Mika 版本：").append(d.versionName).append("（构建 ").append(d.build).append("）\n")
-            append("\n### 遇到了什么问题\n\n\n")
-            append("### 做了哪几步\n\n\n")
-            append("### 期望是什么样\n\n")
+            append(tr(R.string.issue_body, model.trim(), d.androidRelease, d.sdk, d.versionName, d.build))
         }
     }
 

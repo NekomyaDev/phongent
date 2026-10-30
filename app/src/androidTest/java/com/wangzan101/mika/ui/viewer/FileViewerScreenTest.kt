@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui.viewer
 
+import com.wangzan101.mika.ChineseUi
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -17,6 +18,8 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class FileViewerScreenTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createComposeRule()
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext

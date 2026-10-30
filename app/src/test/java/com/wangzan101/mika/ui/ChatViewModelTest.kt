@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.task.TaskGate
 
 import com.wangzan101.mika.chat.ConversationStore
@@ -35,6 +36,8 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
 
     private val state = MutableStateFlow<TaskState>(TaskState.Idle)

@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.core.assembly.legacyNames
 import com.wangzan101.mika.core.tool.LegacyNames
 import com.wangzan101.mika.chat.ConversationStore
@@ -105,9 +108,9 @@ sealed interface ExchangeStatus {
         val unconfirmed: List<String> = emptyList(), val reviewed: Boolean = true,
     ) : ExchangeStatus {
         val unverifiedLine: String? get() = when {
-            unconfirmed.isNotEmpty() -> "这几处没能确认:" + unconfirmed.joinToString("、")
+            unconfirmed.isNotEmpty() -> tr(R.string.chat_unconfirmed, unconfirmed.joinToString(tr(R.string.list_sep)))
             verified || !reviewed -> null
-            else -> "办完了,但没能核实" + note?.let { ":$it" }.orEmpty()
+            else -> note?.let { tr(R.string.chat_unverified_because, it) } ?: tr(R.string.chat_unverified)
         }
     }
     data class Failed(val reason: String) : ExchangeStatus
@@ -157,27 +160,27 @@ data class Exchange(
 /** 在跑时的一行进展:等你时说等什么;模型请求在途时只给中性状态;否则是这一步的话,没有就是最近做的事。 */
 fun liveLine(ex: Exchange): String? {
     when (ex.status) {
-        is ExchangeStatus.NeedsTakeover -> return "需要你处理"
-        is ExchangeStatus.NeedsInput -> return "等你回答"
-        is ExchangeStatus.NeedsConfirmation -> return "等你同意"
+        is ExchangeStatus.NeedsTakeover -> return tr(R.string.takeover_title)
+        is ExchangeStatus.NeedsInput -> return tr(R.string.chat_wait_answer)
+        is ExchangeStatus.NeedsConfirmation -> return tr(R.string.chat_wait_approval)
         else -> Unit
     }
-    if (ex.waitingForModel) return "正在处理"
+    if (ex.waitingForModel) return tr(R.string.chat_working)
     return ex.line.ifEmpty { null } ?: ex.steps.lastOrNull()?.text
 }
 
 /** 插话下面那行小字;还没有去向时不写。 */
 fun steerLabel(state: SteerState): String? = when (state) {
     SteerState.Pending -> null
-    SteerState.Received -> "已收到，下一步处理"
-    SteerState.Joined -> "已加入当前任务"
-    SteerState.Next -> "将作为下一件事"
-    SteerState.Cancelled -> "已取消"
+    SteerState.Received -> tr(R.string.steer_received)
+    SteerState.Joined -> tr(R.string.steer_joined)
+    SteerState.Next -> tr(R.string.steer_next)
+    SteerState.Cancelled -> tr(R.string.steer_cancelled)
 }
 
 /** 结束后收起的那一行:「做了 12 步 · 1 分 20 秒」;不知道用时就只说步数。 */
 fun stepsSummary(ex: Exchange): String =
-    "做了 ${ex.steps.size} 步" + ex.elapsedMs?.let { " · " + RunTimelineViewModel.duration(it) }.orEmpty()
+    trPlural(R.plurals.chat_steps_done, ex.steps.size) + ex.elapsedMs?.let { " · " + RunTimelineViewModel.duration(it) }.orEmpty()
 
 /** 结果卡片上记忆与技能提示的按钮;真机上由记忆存储与个人技能实现(读写在后台线程),测试里换成记录调用。 */
 interface LearningActions {
@@ -1006,14 +1009,14 @@ class ChatViewModel(
                     // 读成功了却不知道读的是哪里:不列;没读成的照样列出来
                     if (where == null && !a.failed) continue
                     val text = if (where == null) toolLabel(a.label)
-                        else "看了$where" + a.title?.takeIf(String::isNotBlank)?.let { "的$it" }.orEmpty()
-                    val subtitle = if (a.failed) "没成功" else ""
+                        else a.title?.takeIf(String::isNotBlank)?.let { tr(R.string.step_viewed_part, where, it) } ?: tr(R.string.step_viewed, where)
+                    val subtitle = if (a.failed) tr(R.string.step_failed) else ""
                     val last = out.lastOrNull()
                     if (last?.title != text || last.subtitle != subtitle) out += StepRow(a.step, text, subtitle, StepState.Ok)
                 } else {
                     val reason = if (said.add(a.step)) ex.notes[a.step].orEmpty() else ""
                     val title = listOfNotNull(toolLabel(a.label), where).joinToString(" · ")
-                    out += StepRow(a.step, title, if (a.failed) "没成功" else "", StepState.Ok, reason)
+                    out += StepRow(a.step, title, if (a.failed) tr(R.string.step_failed) else "", StepState.Ok, reason)
                 }
             }
             if (out.isEmpty()) return out
@@ -1077,7 +1080,7 @@ data class EvidenceSource(val place: String?, val screenshots: List<Int>, val it
 fun evidenceSource(events: List<RunEvent>, appLabel: (String) -> String = { it }): EvidenceSource {
     events.filterIsInstance<RunEvent.Sources>().lastOrNull()?.items?.takeIf { it.isNotEmpty() }?.let { list ->
         fun where(p: String?) = p?.let { placeLabel(it, appLabel) }
-        val items = list.map { s -> listOfNotNull("第 ${s.step} 步", where(s.place), s.title).joinToString(" · ") }
+        val items = list.map { s -> listOfNotNull(tr(R.string.step_number, s.step), where(s.place), s.title).joinToString(" · ") }
         return EvidenceSource(list.asReversed().firstNotNullOfOrNull { where(it.place) }, list.flatMap { it.mediaIds }.distinct(), items)
     }
     val shots = events.filterIsInstance<RunEvent.Media>()
@@ -1100,7 +1103,7 @@ private fun placeLabel(place: String, appLabel: (String) -> String): String = wh
 
 /** 「来源」那一行:「来源 · 12306 · 2 张截图」;没有地方、没有截图时省掉那一段。 */
 fun sourceLabel(source: EvidenceSource?): String = listOfNotNull(
-    "来源", source?.place, source?.screenshots?.size?.takeIf { it > 0 }?.let { "$it 张截图" },
+    tr(R.string.source_label), source?.place, source?.screenshots?.size?.takeIf { it > 0 }?.let { trPlural(R.plurals.screenshots, it) },
 ).joinToString(" · ")
 
 /**

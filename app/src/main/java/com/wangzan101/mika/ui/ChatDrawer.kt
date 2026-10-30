@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
@@ -68,6 +71,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+import com.wangzan101.mika.i18n.uiLocale
 
 /** 侧栏里的一条对话。[id] 为 null 是还没存进对话列表的当前对话。 */
 data class DrawerConversation(
@@ -102,10 +106,10 @@ fun drawerSections(
     val byId = all.associateBy { it.id }
     fun timeOf(id: String?) = byId[id]?.let { conversationTime(it.updatedAt, now, zone) }.orEmpty()
     val running = buildList {
-        if (current.running) add(DrawerConversation(current.id, current.title.ifBlank { "新对话" }, current.subtitle, true, true, true, time = timeOf(current.id)))
+        if (current.running) add(DrawerConversation(current.id, current.title.ifBlank { tr(R.string.chat_new) }, current.subtitle, true, true, true, time = timeOf(current.id)))
         others.filter { it != current.id }.distinct().forEach { id ->
-            val title = (byId[id]?.title ?: otherTitle(id))?.let(ChatCopy::plainTitle)?.ifBlank { null } ?: "进行中的任务"
-            add(DrawerConversation(id, title, "进行中", running = true, current = false, enabled = canSwitch, time = timeOf(id)))
+            val title = (byId[id]?.title ?: otherTitle(id))?.let(ChatCopy::plainTitle)?.ifBlank { null } ?: tr(R.string.drawer_running_task)
+            add(DrawerConversation(id, title, tr(R.string.drawer_running), running = true, current = false, enabled = canSwitch, time = timeOf(id)))
         }
     }
     val runningIds = running.mapNotNull { it.id }.toSet()
@@ -124,18 +128,18 @@ fun conversationTime(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault())
     val days = today.toEpochDay() - day.toEpochDay()
     return when {
         days <= 0L -> "%d:%02d".format(t.hour, t.minute)
-        days == 1L -> "昨天"
-        days < 7L -> t.dayOfWeek.getDisplayName(DateTextStyle.SHORT, Locale.CHINA)
-        day.year == today.year -> "${day.monthValue} 月 ${day.dayOfMonth} 日"
-        else -> "${day.year} 年 ${day.monthValue} 月 ${day.dayOfMonth} 日"
+        days == 1L -> tr(R.string.drawer_yesterday)
+        days < 7L -> t.dayOfWeek.getDisplayName(DateTextStyle.SHORT, uiLocale())
+        day.year == today.year -> tr(R.string.date_month_day, day.monthValue, day.month.getDisplayName(DateTextStyle.SHORT, uiLocale()), day.dayOfMonth)
+        else -> tr(R.string.date_year_month_day, day.year, day.monthValue, day.month.getDisplayName(DateTextStyle.SHORT, uiLocale()), day.dayOfMonth)
     }
 }
 
 /** 侧栏顶上 Mika 名字下面那行状态,和它是不是好的(绿点)还是要处理(橙点)。 */
 fun readiness(check: Prerequisites.Check): Pair<String, Boolean> = when {
-    !check.canStartTask -> "还不能开始任务" to false
-    !check.phoneReady -> "手机操作还没准备好" to false
-    else -> "一切就绪" to true
+    !check.canStartTask -> tr(R.string.chat_cannot_start) to false
+    !check.phoneReady -> tr(R.string.drawer_phone_not_ready) to false
+    else -> tr(R.string.all_ready) to true
 }
 
 private const val MAX_RECENT = 50
@@ -182,10 +186,10 @@ fun ChatDrawer(
             }
         }
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            NavEntry(MikaIcons.New, "新对话", enabled = canSwitch, onClick = onNew)
-            NavEntry(MikaIcons.Clock, "定时任务", onClick = onPlans)
-            NavEntry(MikaIcons.Heart, "记忆与技能", onClick = onMemory)
-            NavEntry(MikaIcons.Globe, "浏览器", onClick = onBrowser)
+            NavEntry(MikaIcons.New, stringResource(R.string.chat_new), enabled = canSwitch, onClick = onNew)
+            NavEntry(MikaIcons.Clock, stringResource(R.string.drawer_plans), onClick = onPlans)
+            NavEntry(MikaIcons.Heart, stringResource(R.string.memory_and_skills), onClick = onMemory)
+            NavEntry(MikaIcons.Globe, stringResource(R.string.drawer_browser), onClick = onBrowser)
         }
         // 侧栏关着时列表只剩末尾那一项;打开时对话插在它前面,列表会按原来那一项停在最底下。最上面一项变了就回到顶上
         val list = rememberLazyListState()
@@ -197,15 +201,15 @@ fun ChatDrawer(
         LaunchedEffect(first) { list.scrollToItem(0) }
         LazyColumn(Modifier.fillMaxWidth().weight(1f).lazyListScrollbar(list), state = list) {
             if (sections.running.isNotEmpty()) {
-                item("h-running") { SectionLabel("进行中") }
+                item("h-running") { SectionLabel(stringResource(R.string.drawer_running)) }
                 items(sections.running, key = { "r-${it.id}" }) { ConversationEntry(it, onOpen) }
             }
             if (sections.recent.isNotEmpty()) {
-                item("h-recent") { SectionLabel("最近") }
+                item("h-recent") { SectionLabel(stringResource(R.string.drawer_recent)) }
                 if (!canSwitch) {
                     item("busy") {
                         Text(
-                            "任务进行中,结束后才能切换对话", Modifier.padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
+                            stringResource(R.string.drawer_busy), Modifier.padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
                             style = MikaType.Hint, color = c.ink3,
                         )
                     }
@@ -220,7 +224,7 @@ fun ChatDrawer(
                 .padding(horizontal = 12.dp, vertical = 6.dp).testTag("drawer-footer"),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            NavEntry(MikaIcons.Gear, "设置", Modifier, onClick = onSettings)
+            NavEntry(MikaIcons.Gear, stringResource(R.string.settings_title), Modifier, onClick = onSettings)
             NavEntry(MikaIcons.Info, AboutCopy.TITLE, Modifier, dot = aboutDot, onClick = onAbout)
         }
     }

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import android.view.Display
 import android.util.DisplayMetrics
@@ -266,7 +268,7 @@ private fun PipWindow(
             Box(Modifier.fillMaxSize().clip(inner).background(MikaTheme.colors.surface)) {
                 if (frame != null) {
                     val image = remember(frame) { frame.asImageBitmap() }
-                    Image(image, "Mika 的虚拟屏", Modifier.fillMaxSize(), alignment = Alignment.TopCenter,
+                    Image(image, stringResource(R.string.pip_screen), Modifier.fillMaxSize(), alignment = Alignment.TopCenter,
                         contentScale = if (webContent) ContentScale.Fit else ContentScale.Crop)
                 }
             }
@@ -274,9 +276,9 @@ private fun PipWindow(
                 Box(
                     Modifier.align(Alignment.TopEnd).padding(6.dp).size(26.dp)
                         .floatShadow(MikaTheme.colors, CircleShape).background(MikaTheme.colors.glass, CircleShape).clip(CircleShape)
-                        .clickable(onClickLabel = "收起", onClick = onCollapse),
+                        .clickable(onClickLabel = stringResource(R.string.collapse), onClick = onCollapse),
                     contentAlignment = Alignment.Center,
-                ) { Icon(MikaIcons.Close, "收起", Modifier.size(12.dp), tint = MikaTheme.colors.ink) }
+                ) { Icon(MikaIcons.Close, stringResource(R.string.collapse), Modifier.size(12.dp), tint = MikaTheme.colors.ink) }
             }
         }
         // 边框光画在玻璃框外沿

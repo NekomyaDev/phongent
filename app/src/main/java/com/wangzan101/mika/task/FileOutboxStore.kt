@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.util.Log
 import com.wangzan101.mika.core.run.ChannelPeer
 import com.wangzan101.mika.core.run.Delivery
@@ -34,7 +36,7 @@ class FileOutboxStore(private val file: File) : OutboxStore {
                     "ask" -> Delivery.Ask(id, threadId, o.getValue("askId").jsonPrimitive.content,
                         Delivery.Ask.Kind.valueOf(o.getValue("askKind").jsonPrimitive.content), text)
                     "result" -> Delivery.Result(id, threadId, text,
-                        o["restored"]?.jsonPrimitive?.content == "true", o["title"]?.jsonPrimitive?.contentOrNull ?: "Mika 任务结果")
+                        o["restored"]?.jsonPrimitive?.content == "true", o["title"]?.jsonPrimitive?.contentOrNull ?: tr(R.string.notif_result_title))
                     "progress" -> Delivery.Progress(id, threadId, text)
                     else -> Delivery.Notice(id, threadId, text)
                 }

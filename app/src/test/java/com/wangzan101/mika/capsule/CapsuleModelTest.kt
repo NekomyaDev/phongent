@@ -1,5 +1,7 @@
 package com.wangzan101.mika.capsule
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.GateReason
 import com.wangzan101.mika.core.agent.RunProgress
@@ -14,6 +16,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CapsuleModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val model = CapsuleModel(reasonLabel = { if (it == "payment") "付款" else null })
 
     private fun inputs(

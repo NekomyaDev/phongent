@@ -1,5 +1,6 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.ChineseUi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,6 +24,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CapsuleContentTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createComposeRule()
 
     private val clicks = mutableListOf<String>()

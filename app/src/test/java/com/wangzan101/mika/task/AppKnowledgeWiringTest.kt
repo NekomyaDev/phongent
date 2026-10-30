@@ -1,5 +1,6 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.core.knowledge.AppKnowledgeDrafter
@@ -18,6 +19,8 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class AppKnowledgeWiringTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
     private val knowledge = KnowledgeStore(KnowledgeStore.loadBundled())
     private val md = "---\nname: xianyu\npackages: [com.taobao.idlefish]\n---\n" +

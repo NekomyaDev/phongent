@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.model.ListFailure
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.ModelListResult
@@ -45,8 +47,8 @@ data class AddForm(
 
     val urlProblem: String?
         get() = when {
-            baseUrl.isBlank() -> "请填写接口地址"
-            !baseUrl.trim().startsWith("http://") && !baseUrl.trim().startsWith("https://") -> "接口地址要以 http:// 或 https:// 开头"
+            baseUrl.isBlank() -> tr(R.string.model_need_url)
+            !baseUrl.trim().startsWith("http://") && !baseUrl.trim().startsWith("https://") -> tr(R.string.model_url_scheme)
             else -> null
         }
 

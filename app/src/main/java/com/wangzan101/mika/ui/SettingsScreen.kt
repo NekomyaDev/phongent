@@ -1,5 +1,9 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
+import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.settings.ProviderConnection
 import android.app.ActivityManager
 import androidx.activity.compose.BackHandler
@@ -52,6 +56,7 @@ import com.wangzan101.mika.ui.components.TileTone
 import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.core.usage.UsageQuery
 import com.wangzan101.mika.core.usage.UsageRange
+import com.wangzan101.mika.i18n.AppLanguage
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import java.time.ZoneId
@@ -59,7 +64,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** 设置里能进入的子页面;[Home] 是设置首页。 */
-private enum class SettingsPage { Home, Usage, PhoneOps, DuringWork, Capsule, Notifications, WebSites, Sandbox, Routes, Recovery, Developer, RunStats }
+private enum class SettingsPage { Home, Usage, PhoneOps, DuringWork, Capsule, Language, Notifications, WebSites, Sandbox, Routes, Recovery, Developer, RunStats }
 
 /**
  * 设置页:总状态卡 + 基本 / 隐私与数据 / 高级 / 关于四组。各子页面在这里切换(返回键先回首页),
@@ -99,6 +104,8 @@ fun SettingsScreen(
     var keepScreenOn by remember { mutableStateOf(flags.keepScreenOn()) }
     var muteTarget by remember { mutableStateOf(flags.muteTarget()) }
     var capsuleMode by remember { mutableStateOf(flags.capsuleMode()) }
+    // 换语言时界面会重建,这里每次进来读一次即可
+    val language = remember { AppLanguage.current(context) }
     val runtimeLimit by (context.applicationContext as com.wangzan101.mika.MikaApp).taskState.parallelLimit.collectAsState()
     var speed by remember { mutableStateOf(flags.speedFlags()) }
     val routeStore = remember { FileRouteStore.shared(context) }
@@ -147,6 +154,7 @@ fun SettingsScreen(
             onOpenDuringWork = { page = SettingsPage.DuringWork },
             capsuleMode = capsuleMode, onOpenCapsule = { page = SettingsPage.Capsule },
             onOpenNotifications = { notificationsFrom = SettingsPage.Home; page = SettingsPage.Notifications },
+            language = language, onOpenLanguage = { page = SettingsPage.Language },
             onOpenMemory = onOpenMemory,
             webSitesCount = webSites?.sites?.size, onOpenWebSites = { page = SettingsPage.WebSites },
             sandbox = sandboxStatus, onOpenSandbox = { page = SettingsPage.Sandbox },
@@ -167,6 +175,7 @@ fun SettingsScreen(
             muteTarget, onMuteTarget = { flags.setMuteTarget(it); muteTarget = it },
             parallel, onParallelMax = { flags.setParallelMax(it); parallelMax = it }, onBack = toHome,
         )
+        SettingsPage.Language -> LanguageScreen(language, onLanguage = { AppLanguage.set(context, it) }, onBack = toHome)
         SettingsPage.Capsule -> CapsuleScreen(capsuleMode, onMode = { flags.setCapsuleMode(it); capsuleMode = it }, onBack = toHome)
         // 没有数据时首页不显示入口,走不到这一页
         SettingsPage.WebSites -> webSites?.let { WebSitesScreen(it, onBack = toHome) }
@@ -197,10 +206,10 @@ fun SettingsScreen(
                 if (e.action != null && e.fix != null) {
                     TextButton({ explaining = null; fix(e.fix) }) { Text(e.action) }
                 } else {
-                    TextButton({ explaining = null }) { Text("知道了") }
+                    TextButton({ explaining = null }) { Text(stringResource(R.string.ok_got_it)) }
                 }
             },
-            dismissButton = if (e.fix != null) ({ TextButton({ explaining = null }) { Text("取消") } }) else null,
+            dismissButton = if (e.fix != null) ({ TextButton({ explaining = null }) { Text(stringResource(R.string.cancel)) } }) else null,
         )
     }
 }
@@ -227,6 +236,9 @@ fun SettingsContent(
     capsuleMode: CapsuleMode = CapsuleMode.DEFAULT,
     onOpenCapsule: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
+    /** 此刻选的界面语言,写在「语言」一行的右边。 */
+    language: AppLanguage = AppLanguage.System,
+    onOpenLanguage: () -> Unit = {},
     onOpenMemory: (() -> Unit)? = null,
     webSitesCount: Int? = null,
     onOpenWebSites: () -> Unit = {},
@@ -243,13 +255,13 @@ fun SettingsContent(
     onOpenAbout: () -> Unit = {},
 ) {
     val check = Prerequisites.check(status, hasMainModel = mainModel != null)
-    PageScaffold("设置", onBack) {
+    PageScaffold(stringResource(R.string.settings_title), onBack) {
         StatusSummary(check, onProblem)
 
-        GroupLabel("基本")
+        GroupLabel(stringResource(R.string.settings_basic))
         GroupCard {
-            ListRow(MikaIcons.Spark, "模型", first = true, onClick = onOpenModels) {
-                RowValue(mainModel ?: "未设置")
+            ListRow(MikaIcons.Spark, stringResource(R.string.settings_model), first = true, onClick = onOpenModels) {
+                RowValue(mainModel ?: stringResource(R.string.settings_not_set))
                 RowChevron()
             }
             usageTokens?.let {
@@ -258,17 +270,21 @@ fun SettingsContent(
                     RowChevron()
                 }
             }
-            ListRow(MikaIcons.Phone, "手机操作", onClick = onOpenPhoneOps) {
+            ListRow(MikaIcons.Phone, stringResource(R.string.settings_phone_ops), onClick = onOpenPhoneOps) {
                 PhoneOpsPill(status)
                 RowChevron()
             }
-            ListRow(MikaIcons.Moon, "干活时", "屏幕常亮，被操作的 App 静音", onClick = onOpenDuringWork) { RowChevron() }
+            ListRow(MikaIcons.Moon, stringResource(R.string.settings_during_work), stringResource(R.string.settings_during_work_sub), onClick = onOpenDuringWork) { RowChevron() }
             ListRow(MikaIcons.Message, CapsuleSettingsCopy.TITLE, CapsuleSettingsCopy.SUBTITLE, onClick = onOpenCapsule) {
                 RowValue(CapsuleSettingsCopy.label(capsuleMode))
                 RowChevron()
             }
+            ListRow(MikaIcons.Globe, stringResource(R.string.language_title), onClick = onOpenLanguage) {
+                RowValue(languageLabel(language))
+                RowChevron()
+            }
             val (notifText, notifTone) = StatusCopy.notificationSummary(status.notificationOverview().summary)
-            ListRow(MikaIcons.Bell, StatusCopy.NOTIFICATIONS, "什么时候弹出、去系统里改", onClick = onOpenNotifications) {
+            ListRow(MikaIcons.Bell, StatusCopy.NOTIFICATIONS, stringResource(R.string.settings_notif_sub), onClick = onOpenNotifications) {
                 RowValue(notifText, notifTone)
                 RowChevron()
             }
@@ -276,15 +292,15 @@ fun SettingsContent(
 
         val privacyRows = onOpenMemory != null || webSitesCount != null
         if (privacyRows) {
-            GroupLabel("隐私与数据")
+            GroupLabel(stringResource(R.string.settings_privacy))
             GroupCard {
                 var first = true
                 fun take(): Boolean = first.also { first = false }
                 onOpenMemory?.let {
-                    ListRow(MikaIcons.Heart, "记忆与技能", "Mika 记住的事、学到的技能", first = take(), onClick = it) { RowChevron() }
+                    ListRow(MikaIcons.Heart, stringResource(R.string.memory_and_skills), stringResource(R.string.settings_memory_sub), first = take(), onClick = it) { RowChevron() }
                 }
                 webSitesCount?.let {
-                    ListRow(MikaIcons.Globe, "网站登录", first = take(), onClick = onOpenWebSites) { RowValue("$it 个"); RowChevron() }
+                    ListRow(MikaIcons.Globe, stringResource(R.string.settings_web_logins), first = take(), onClick = onOpenWebSites) { RowValue(trPlural(R.plurals.settings_count_sites, it)); RowChevron() }
                 }
             }
         }
@@ -292,29 +308,29 @@ fun SettingsContent(
         val sandboxRow = sandbox?.takeIf { it !is SandboxStatus.Unsupported }
         val recoveryRow = status.sdkInt >= Prerequisites.MIN_SDK
         if (sandboxRow != null || routes != null || recoveryRow || showDeveloper) {
-            GroupLabel("高级")
+            GroupLabel(stringResource(R.string.settings_advanced))
             GroupCard {
                 var first = true
                 fun take(): Boolean = first.also { first = false }
                 if (sandboxRow != null) {
-                    ListRow(MikaIcons.Terminal, "文件与计算环境", first = take(), onClick = onOpenSandbox) {
+                    ListRow(MikaIcons.Terminal, stringResource(R.string.settings_sandbox), first = take(), onClick = onOpenSandbox) {
                         RowValue(sandboxValue(sandboxRow)); RowChevron()
                     }
                 }
                 routes?.let {
-                    ListRow(MikaIcons.Route, "记住的操作路线", first = take(), onClick = onOpenRoutes) { RowValue("$it 条"); RowChevron() }
+                    ListRow(MikaIcons.Route, stringResource(R.string.settings_routes), first = take(), onClick = onOpenRoutes) { RowValue(trPlural(R.plurals.settings_count_routes, it)); RowChevron() }
                 }
                 if (recoveryRow) {
-                    ListRow(MikaIcons.Wrench, "恢复与修复", first = take(), onClick = onOpenRecovery) { RowChevron() }
+                    ListRow(MikaIcons.Wrench, stringResource(R.string.settings_recovery), first = take(), onClick = onOpenRecovery) { RowChevron() }
                 }
                 if (showDeveloper) {
-                    ListRow(MikaIcons.Code, "开发者选项", first = take(), onClick = onOpenDeveloper) { RowChevron() }
+                    ListRow(MikaIcons.Code, stringResource(R.string.settings_developer), first = take(), onClick = onOpenDeveloper) { RowChevron() }
                 }
             }
         }
 
         GroupCard {
-            ListRow(MikaIcons.Info, "关于 Mika", first = true, onClick = onOpenAbout) {
+            ListRow(MikaIcons.Info, stringResource(R.string.settings_about), first = true, onClick = onOpenAbout) {
                 TrailingValue(AboutCopy.settingsValue(updateVersion, versionName))
                 RowChevron()
             }
@@ -326,17 +342,17 @@ fun SettingsContent(
 @Composable
 private fun PhoneOpsPill(status: SystemStatus) {
     when {
-        status.sdkInt < Prerequisites.MIN_SDK -> StatusPill("不支持", PillTone.Neutral)
-        status.builtinShell == BuiltinShellStatus.Running && status.accessibility == AccessibilityState.On -> StatusPill("可用", PillTone.Ok)
-        else -> StatusPill("需要处理", PillTone.Warn)
+        status.sdkInt < Prerequisites.MIN_SDK -> StatusPill(stringResource(R.string.pill_unsupported), PillTone.Neutral)
+        status.builtinShell == BuiltinShellStatus.Running && status.accessibility == AccessibilityState.On -> StatusPill(stringResource(R.string.pill_available), PillTone.Ok)
+        else -> StatusPill(stringResource(R.string.pill_needs_attention), PillTone.Warn)
     }
 }
 
 private fun sandboxValue(s: SandboxStatus): String = when (s) {
-    is SandboxStatus.Ready -> "已就绪"
-    is SandboxStatus.Installing -> "准备中"
-    is SandboxStatus.Broken -> "需要处理"
-    else -> "未准备"
+    is SandboxStatus.Ready -> tr(R.string.sandbox_ready)
+    is SandboxStatus.Installing -> tr(R.string.sandbox_preparing)
+    is SandboxStatus.Broken -> tr(R.string.pill_needs_attention)
+    else -> tr(R.string.sandbox_not_prepared)
 }
 
 /**
@@ -347,7 +363,7 @@ private fun sandboxValue(s: SandboxStatus): String = when (s) {
 private fun StatusSummary(check: Prerequisites.Check, onProblem: (Problem) -> Unit) {
     val problem = check.problems.firstOrNull { it != Problem.FocusMayLeak }
     if (problem == null) {
-        StateCard(MikaIcons.Check, "一切就绪", "模型已配置 · 手机操作可用", TileTone.Ok, Modifier.testTag("settings-status"))
+        StateCard(MikaIcons.Check, stringResource(R.string.all_ready), stringResource(R.string.settings_all_ready_detail), TileTone.Ok, Modifier.testTag("settings-status"))
     } else {
         val copy = StatusCopy.banner(problem)
         StateCard(

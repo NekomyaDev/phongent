@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.ChineseUi
 import com.wangzan101.mika.DeviceTaskState
 import android.content.Context
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -36,6 +37,8 @@ import com.wangzan101.mika.task.TaskEnvironment
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class RunTimelineDeviceTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext

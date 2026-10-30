@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.RunOutcome
 import com.wangzan101.mika.core.agent.TaskState
@@ -21,6 +23,8 @@ import com.wangzan101.mika.core.assembly.knownTools
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SedimentationWiringTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val catalog = GuideCatalog.loadBundled()
     private val tools = setOf("phone_launch_app", "phone_observe", "phone_tap", "phone_type_text", "hand_to_user", "finish")
     private val draftMd = "---\nname: send-wechat-message\ndisplay: 发微信消息\ndescription: 给指定联系人发一条微信消息\napps: [com.tencent.mm]\nsource: learned\n---\n" +

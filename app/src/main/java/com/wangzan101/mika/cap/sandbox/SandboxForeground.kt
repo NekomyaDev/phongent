@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.sandbox
 
+import com.wangzan101.mika.i18n.tr
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,7 +32,7 @@ open class SandboxForeground : Service() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel(CHANNEL, "后台准备", NotificationManager.IMPORTANCE_MIN))
+            .createNotificationChannel(NotificationChannel(CHANNEL, tr(R.string.notif_channel_prepare), NotificationManager.IMPORTANCE_MIN))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -60,7 +61,7 @@ open class SandboxForeground : Service() {
 
     private fun notification(percent: Int?): Notification = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle("Mika 正在准备")
+        .setContentTitle(tr(R.string.notif_preparing))
         .apply { if (percent != null) setProgress(100, percent, false) }
         .setOngoing(true)
         .setOnlyAlertOnce(true)

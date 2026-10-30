@@ -250,11 +250,11 @@ fun ChatScreen(
             ui.blocked?.let { problems ->
                 item("blocked") {
                     NeedCard(
-                        "还不能开始任务",
-                        "还缺:" + problems.joinToString("、") { StatusCopy.banner(it).title },
+                        stringResource(R.string.chat_cannot_start),
+                        stringResource(R.string.chat_missing, problems.joinToString(stringResource(R.string.list_sep)) { StatusCopy.banner(it).title }),
                     ) {
-                        CardButton("知道了", onClick = vm::dismissBlocked)
-                        CardButton("去设置", primary = true, onClick = { vm.dismissBlocked(); openSettings() })
+                        CardButton(stringResource(R.string.ok_got_it), onClick = vm::dismissBlocked)
+                        CardButton(stringResource(R.string.chat_go_settings), primary = true, onClick = { vm.dismissBlocked(); openSettings() })
                     }
                 }
             }
@@ -264,10 +264,10 @@ fun ChatScreen(
         Column(Modifier.onSizeChanged { topHeight = it.height }) {
             TopBar(
                 ChatCopy.APP_TITLE,
-                left = MikaIcons.Menu, leftLabel = "菜单", onLeft = onOpenDrawer,
+                left = MikaIcons.Menu, leftLabel = stringResource(R.string.chat_menu), onLeft = onOpenDrawer,
                 // 别的对话里还有任务在跑(并行时):菜单上一个小圆点,侧栏「进行中」里能切过去
                 leftBadge = others.isNotEmpty(),
-                right = { BarIconButton(MikaIcons.New, "新对话", { vm.newConversation() }, enabled = vm.canSwitch()) },
+                right = { BarIconButton(MikaIcons.New, stringResource(R.string.chat_new), { vm.newConversation() }, enabled = vm.canSwitch()) },
                 subtitle = sub?.first,
                 subtitleColor = when (sub?.second) {
                     ChatCopy.Tone.Accent -> c.accent
@@ -542,7 +542,7 @@ private fun StepItem(text: String, subtitle: String, dot: Dot, current: Boolean,
     val c = MikaTheme.colors
     Row(
         Modifier.fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClickLabel = "展开步骤", onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(onClickLabel = stringResource(R.string.chat_expand_steps), onClick = onClick) else Modifier)
             .heightIn(min = 28.dp).padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -620,14 +620,14 @@ private fun DoneLine(ex: Exchange, reduceMotion: Boolean, openRun: (String) -> U
             if (ex.steps.isNotEmpty()) {
                 Text(
                     stepsSummary(ex),
-                    Modifier.clickable(onClickLabel = if (open) "收起步骤" else "展开步骤") { open = !open },
+                    Modifier.clickable(onClickLabel = if (open) stringResource(R.string.chat_collapse_steps) else stringResource(R.string.chat_expand_steps)) { open = !open },
                     style = DoneText, color = c.ink3,
                 )
             }
             ex.runId?.let { id ->
                 Text(
                     // 灰色斜体加下划线:和回答融在一起,又看得出能点
-                    "查看过程", Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { openRun(id) }.padding(horizontal = 4.dp, vertical = 4.dp),
+                    stringResource(R.string.chat_view_process), Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { openRun(id) }.padding(horizontal = 4.dp, vertical = 4.dp),
                     style = DoneText.copy(fontStyle = FontStyle.Italic, textDecoration = TextDecoration.Underline), color = c.ink3,
                 )
             }
@@ -666,7 +666,7 @@ private fun StatusCard(
 ) {
     when (status) {
         ExchangeStatus.Working -> Unit
-        ExchangeStatus.WaitingUnlock -> NeedCard("等你解锁手机", "手机锁屏了,解锁后会自动继续。")
+        ExchangeStatus.WaitingUnlock -> NeedCard(stringResource(R.string.chat_wait_unlock), stringResource(R.string.chat_unlock_body))
         is ExchangeStatus.NeedsTakeover -> {
             val label = takeoverReasonLabel(status.reason)
             val title = if (label != null) stringResource(R.string.takeover_title_reason, stringResource(label)) else stringResource(R.string.takeover_title)
@@ -688,7 +688,7 @@ private fun StatusCard(
             val options = status.options.orEmpty()
             val note = stringResource(R.string.no_answer_note, TaskService.INPUT_TIMEOUT_MINUTES)
             NeedCard(
-                stringResource(R.string.input_title), status.prompt + "\n可以点选项,也可以在下面输入。$note",
+                stringResource(R.string.input_title), stringResource(R.string.chat_input_body, status.prompt, note),
                 options = if (options.isEmpty()) null else ({
                     options.forEach { o -> MikaButton(o, { vm.answer(o) }, Modifier.fillMaxWidth(), kind = ButtonKind.Tonal, size = ButtonSize.Medium) }
                 }),
@@ -698,12 +698,12 @@ private fun StatusCard(
         }
         // 只有花钱的操作要你同意,每次只同意这一次
         is ExchangeStatus.NeedsConfirmation -> NeedCard(status.title, status.body + "\n" + ConfirmationCopy.NOTE) {
-            CardButton("拒绝", onClick = { vm.decline(status.key) })
-            CardButton("允许这一次", primary = true, onClick = { vm.approve(status.key) })
+            CardButton(stringResource(R.string.chat_refuse), onClick = { vm.decline(status.key) })
+            CardButton(stringResource(R.string.chat_allow_once), primary = true, onClick = { vm.approve(status.key) })
         }
-        is ExchangeStatus.Paused -> NeedCard("已暂停", status.why) {
+        is ExchangeStatus.Paused -> NeedCard(stringResource(R.string.chat_paused), status.why) {
             CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
-            CardButton("继续", primary = true, onClick = vm::resume)
+            CardButton(stringResource(R.string.chat_continue), primary = true, onClick = vm::resume)
         }
         is ExchangeStatus.Done -> Column(Modifier.fillMaxWidth().padding(bottom = 12.dp).answerSurface()) {
             status.unverifiedLine?.let { line ->
@@ -721,13 +721,13 @@ private fun StatusCard(
         is ExchangeStatus.Failed -> Column(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(8.dp).background(MikaTheme.colors.bad, CircleShape))
-                Text("没有完成", style = MikaType.BodyStrong, color = MikaTheme.colors.ink)
+                Text(stringResource(R.string.chat_not_done), style = MikaType.BodyStrong, color = MikaTheme.colors.ink)
             }
             Text(status.reason, Modifier.padding(top = 4.dp), style = CardBody, color = MikaTheme.colors.ink2)
         }
         // 停止后补上的交代当作这一轮的回答,排在「已停止」下面;还在写时一行小字
         is ExchangeStatus.Cancelled -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-            Text("已停止。", Modifier.padding(start = 2.dp), style = MikaType.Body, color = MikaTheme.colors.ink2)
+            Text(stringResource(R.string.chat_stopped), Modifier.padding(start = 2.dp), style = MikaType.Body, color = MikaTheme.colors.ink2)
             if (status.summarizing) Text(
                 StatusCopy.STOP_SUMMARIZING, Modifier.padding(start = 2.dp, top = 4.dp), style = MikaType.Caption, color = MikaTheme.colors.ink3,
             )
@@ -749,7 +749,7 @@ private fun SourceChip(text: String?, runId: String?, loadSource: suspend (Strin
     Row(
         Modifier.padding(top = 12.dp).heightIn(min = 30.dp)
             .cardSurface(c, MikaShapes.Pill).clip(MikaShapes.Pill)
-            .clickable(onClickLabel = "查看来源") { openSource(runId, text) }
+            .clickable(onClickLabel = stringResource(R.string.chat_view_source)) { openSource(runId, text) }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -812,7 +812,7 @@ private fun FileCards(files: List<SharedFile>) {
         for (f in files) {
             Row(
                 Modifier.fillMaxWidth().cardSurface(c, MikaShapes.Card).clip(MikaShapes.Card)
-                    .clickable(onClickLabel = "打开", role = Role.Button) { openShared(context, f) }
+                    .clickable(onClickLabel = stringResource(R.string.chat_open), role = Role.Button) { openShared(context, f) }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -920,12 +920,12 @@ internal fun Composer(
                     if (importing) Text(AttachCopy.IMPORTING, style = MikaType.Caption, color = c.ink3)
                     if (rejected.isNotEmpty() || overLimit > 0) {
                         val why = listOfNotNull(
-                            rejected.takeIf { it.isNotEmpty() }?.let { "没能添加:${it.joinToString("、")}(单个文件不超过 200 MB)" },
+                            rejected.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.chat_attach_rejected, it.joinToString(stringResource(R.string.list_sep))) },
                             overLimit.takeIf { it > 0 }?.let(AttachCopy::overLimit),
                         ).joinToString("\n")
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(why, Modifier.weight(1f), style = MikaType.Caption, color = c.warn)
-                            TextLink("知道了", onDismissRejected)
+                            TextLink(stringResource(R.string.ok_got_it), onDismissRejected)
                         }
                     }
                 }
@@ -958,10 +958,10 @@ internal fun Composer(
                 if (busy) {
                     Box(
                         Modifier.size(MikaSize.IconButton).background(c.ink, CircleShape).clip(CircleShape)
-                            .clickable(onClickLabel = "停止", onClick = onStop),
+                            .clickable(onClickLabel = stringResource(R.string.chat_stop), onClick = onStop),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(MikaIcons.Stop, "停止", Modifier.size(26.dp), tint = c.bg)
+                        Icon(MikaIcons.Stop, stringResource(R.string.chat_stop), Modifier.size(26.dp), tint = c.bg)
                     }
                 }
                 if (!busy || canSend) {
@@ -969,10 +969,10 @@ internal fun Composer(
                         Modifier.size(MikaSize.IconButton)
                             .background(if (canSend) c.accent else c.greySoft, CircleShape)
                             .clip(CircleShape)
-                            .clickable(enabled = canSend, onClickLabel = "发送") { panel = Panel.Closed; onSend() },
+                            .clickable(enabled = canSend, onClickLabel = stringResource(R.string.chat_send)) { panel = Panel.Closed; onSend() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(MikaIcons.Up, "发送", Modifier.size(20.dp), tint = if (canSend) c.onAccent else c.ink3)
+                        Icon(MikaIcons.Up, stringResource(R.string.chat_send), Modifier.size(20.dp), tint = if (canSend) c.onAccent else c.ink3)
                     }
                 }
             }

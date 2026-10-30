@@ -1,5 +1,7 @@
 package com.wangzan101.mika.about
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -8,6 +10,8 @@ import java.net.URI
 import java.net.URLDecoder
 
 class MikaLinksTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val device = MikaLinks.Device("Google", "Pixel 8", "14", 34, "0.1.0", "65fcf92")
 
     @Test

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.confirm
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.gate.ConfirmationRequest
 import com.wangzan101.mika.core.risk.IrrevAction
 import org.junit.Assert.assertEquals
@@ -8,6 +10,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConfirmationCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     private fun req(content: String = "明天见", amount: String? = null, action: IrrevAction = IrrevAction.send, target: String = "张三") =
         ConfirmationRequest(action, target, content, amount, "com.chat")
 

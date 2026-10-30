@@ -1,5 +1,8 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.confirm.ConfirmationCopy
 import com.wangzan101.mika.core.agent.RunProgress
 import com.wangzan101.mika.core.agent.TaskState
@@ -184,12 +187,12 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         val text = when {
             line.kind == CapsuleKind.HandedOver -> {
                 val behind = spot(top)?.second ?: described.count { it.first !== top && it.second.kind == CapsuleKind.NeedTakeover }
-                detail = if (behind > 0) "处理好这件后，还有 $behind 件等你"
-                    else listOfNotNull(line.reason, "弄好后点右边").joinToString(" · ")
+                detail = if (behind > 0) trPlural(R.plurals.capsule_behind, behind)
+                    else listOfNotNull(line.reason, tr(R.string.capsule_then_tap_right)).joinToString(" · ")
                 line.text
             }
-            count >= 2 && needCount > 0 -> "$needCount 件要你处理 · 共 $count 件"
-            count >= 2 -> "${line.text} · 共 $count 件"
+            count >= 2 && needCount > 0 -> tr(R.string.capsule_need_of_total, needCount, count)
+            count >= 2 -> tr(R.string.capsule_of_total, line.text, count)
             else -> line.text
         }
         // 有还没在卡片里看过的要你处理:展开成胶囊,一直停着
@@ -208,9 +211,9 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
     }
 
     private fun endedLine(s: TaskState): Pair<CapsuleKind, String> = when (s) {
-        is TaskState.Succeeded -> CapsuleKind.Done to "办好了 · 点开看结果"
-        is TaskState.Failed -> CapsuleKind.Failed to "没办成 · 点开看原因"
-        else -> CapsuleKind.Cancelled to "已停止"
+        is TaskState.Succeeded -> CapsuleKind.Done to tr(R.string.capsule_done_tap)
+        is TaskState.Failed -> CapsuleKind.Failed to tr(R.string.capsule_failed_tap)
+        else -> CapsuleKind.Cancelled to tr(R.string.capsule_stopped)
     }
 
     /**
@@ -283,15 +286,15 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
             Takeover.Stage.HandedOver -> Line(CapsuleKind.HandedOver, HANDED_OVER, reasonLabel(s.reason))
             Takeover.Stage.Waiting -> Line(
                 CapsuleKind.NeedTakeover,
-                "需要你：" + (reasonLabel(s.reason) ?: oneLine(s.message).ifEmpty { "处理一下" }),
+                tr(R.string.capsule_needs_you, reasonLabel(s.reason) ?: oneLine(s.message).ifEmpty { tr(R.string.capsule_handle_it) }),
             )
             // 已交还、循环还没往下走的那一小段
             Takeover.Stage.None -> Line(CapsuleKind.Running, CONTINUING)
         }
-        is TaskState.WaitingConfirmation -> Line(CapsuleKind.NeedConfirm, "要你同意：" + ConfirmationCopy.actionLabel(s.request.action))
-        is TaskState.WaitingInput -> Line(CapsuleKind.NeedAnswer, "Mika 问你：" + oneLine(s.prompt))
-        is TaskState.Held -> if (s.reason.needsYou) Line(CapsuleKind.NeedStep, "需要你：" + oneLine(s.reason.why).ifEmpty { "处理一下" })
-        else Line(CapsuleKind.Held, oneLine(s.reason.why).let { if (it.isEmpty()) "先等等" else "先等等：$it" })
+        is TaskState.WaitingConfirmation -> Line(CapsuleKind.NeedConfirm, tr(R.string.capsule_needs_ok, ConfirmationCopy.actionLabel(s.request.action)))
+        is TaskState.WaitingInput -> Line(CapsuleKind.NeedAnswer, tr(R.string.capsule_asks, oneLine(s.prompt)))
+        is TaskState.Held -> if (s.reason.needsYou) Line(CapsuleKind.NeedStep, tr(R.string.capsule_needs_you, oneLine(s.reason.why).ifEmpty { tr(R.string.capsule_handle_it) }))
+        else Line(CapsuleKind.Held, oneLine(s.reason.why).let { if (it.isEmpty()) tr(R.string.capsule_hold) else tr(R.string.capsule_hold_why, it) })
         is TaskState.Running -> Line(CapsuleKind.Running, runningText(s))
         else -> Line(CapsuleKind.Running, THINKING)
     }
@@ -302,10 +305,10 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         const val PILL_MS = 4_000L
         /** 办完后一共停多久(展开的那段加上缩回一颗带角标的那段)。 */
         const val LINGER_MS = 10_000L
-        const val HANDED_OVER = "你来处理"
-        const val THINKING = "在想下一步"
-        const val PREPARING = "正在准备"
-        const val CONTINUING = "接着往下做"
+        val HANDED_OVER: String get() = tr(R.string.capsule_you_handle)
+        val THINKING: String get() = tr(R.string.capsule_thinking)
+        val PREPARING: String get() = tr(R.string.runtime_preparing)
+        val CONTINUING: String get() = tr(R.string.capsule_continuing)
 
         /** 此刻在做什么:回放、批量执行写进度;否则先用模型随调用写的话,再用调用里的用意,都没有用固定说法。 */
         fun runningText(s: TaskState.Running): String {
@@ -315,8 +318,8 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         }
 
         fun progressText(p: RunProgress): String = when (p) {
-            is RunProgress.Replay -> "照着路线做 ${p.step}/${p.total}"
-            is RunProgress.Batch -> "一次做 ${p.steps} 步"
+            is RunProgress.Replay -> tr(R.string.capsule_replay, p.step, p.total)
+            is RunProgress.Batch -> trPlural(R.plurals.capsule_batch, p.steps)
         }
 
         /** 模型写的字压成一行。 */

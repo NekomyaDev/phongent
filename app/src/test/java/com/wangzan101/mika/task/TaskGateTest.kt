@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.TaskState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +16,8 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskGateTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val locked = MutableStateFlow(false)
     private val shellUp = MutableStateFlow(true)
     private var moveBackCalls = 0

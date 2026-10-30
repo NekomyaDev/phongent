@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.RunProgress
 import com.wangzan101.mika.core.agent.TaskState
 import org.junit.Assert.assertEquals
@@ -10,6 +12,8 @@ import com.wangzan101.mika.settings.Problem
 import org.junit.Test
 
 class StatusCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test
     fun paymentLinesOnePerField() {
         assertEquals("商品:拿铁 大杯\n金额:¥18\n地址:公司前台", StatusCopy.paymentLines("拿铁 大杯", "¥18", "公司前台"))

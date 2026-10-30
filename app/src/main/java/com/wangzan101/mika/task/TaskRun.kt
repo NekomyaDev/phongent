@@ -1,5 +1,8 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.core.cap.web.IdleScroll
 import com.wangzan101.mika.core.cap.web.PagePacing
 import com.wangzan101.mika.core.cap.web.SitePace
@@ -348,7 +351,7 @@ class TaskRun(
     }
 
     /** 超出并行上限在排队;放出来开跑时 [dequeue]。 */
-    fun queue(position: Int) { setState(TaskState.Held(TaskGate.paused("排队中:前面还有 $position 个任务"))) }
+    fun queue(position: Int) { setState(TaskState.Held(TaskGate.paused(trPlural(R.plurals.queue_ahead, position)))) }
     fun dequeue() { setState(TaskState.Running(0, TaskService.PREPARING)) }
 
     /** 本任务的沙箱:一个任务一份(导出额度按任务算),工作区是本对话的。 */
@@ -393,7 +396,7 @@ class TaskRun(
         )
         sideScope = side
         try {
-            val model = env.modelFactory(service) ?: return TaskState.Failed("还没有能用的主模型:请在设置里添加一个支持工具调用的模型。", FailKind.Environment)
+            val model = env.modelFactory(service) ?: return TaskState.Failed(tr(R.string.fail_no_main_model), FailKind.Environment)
             val light = env.lightModelFactory(service)
             val vision = env.visionModelFactory(service)
 
@@ -531,7 +534,7 @@ class TaskRun(
                 }
                 stack.screen
             }
-            if (conditionCheck && !webInstalled) return TaskState.Failed("设备没有可用的网页能力，条件检查无法运行", FailKind.Environment)
+            if (conditionCheck && !webInstalled) return TaskState.Failed(tr(R.string.fail_no_web), FailKind.Environment)
             // 这个对话里用户发来的屏幕(跟着对话存在工作区里)
             val userScreens = (service.application as MikaApp).userScreens.source(conversationId)
             val runSpec = RunSpec(RunId(key), goal, conversationId,
@@ -941,9 +944,9 @@ class TaskRun(
         val w = state as? TaskState.WaitingTakeover ?: return null
         return listOfNotNull(
             w.message.takeIf { it.isNotBlank() },
-            w.item?.let { "商品:$it" },
-            w.amount?.let { "金额:$it" },
-            w.address?.let { "地址:$it" },
+            w.item?.let { tr(R.string.payment_item, it) },
+            w.amount?.let { tr(R.string.payment_amount, it) },
+            w.address?.let { tr(R.string.payment_address, it) },
         ).joinToString("\n").ifEmpty { null }
     }
 
@@ -952,10 +955,10 @@ class TaskRun(
         const val WEB_FRAME_MS = 500L
         const val SHELL_WAIT_MS = 15_000L
         const val DISPLAY_RETRY_MS = 1_000L
-        const val WAITING_DISPLAY = "排队中:等另一个任务做完再开始"
+        val WAITING_DISPLAY: String get() = tr(R.string.task_waiting_display)
         const val A11Y_WAIT_MS = 5_000L
-        const val NO_PHONE_HELPER = "手机操作还没准备好:请在 Mika 里完成「设置手机操作」(打开无线调试并配对一次)。网页和文件类的事不受影响。"
-        const val NO_ACCESSIBILITY = "Mika 的无障碍服务没有开启:请在系统设置的无障碍里打开 Mika。"
+        val NO_PHONE_HELPER: String get() = tr(R.string.task_no_phone_helper)
+        val NO_ACCESSIBILITY: String get() = tr(R.string.task_no_a11y)
         const val TAG = "MikaTask"
     }
 }

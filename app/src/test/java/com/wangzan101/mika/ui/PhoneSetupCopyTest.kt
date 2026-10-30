@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
@@ -13,6 +15,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhoneSetupCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     /** 给用户看的字里不出现这些技术说法(系统设置里本来就有的选项名除外,见下)。 */
     private val jargon = listOf("shell", "端口", "mDNS", "TLS", "Binder", "uid", "进程")
 

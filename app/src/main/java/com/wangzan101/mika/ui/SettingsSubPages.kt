@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import com.wangzan101.mika.ui.components.MikaSwitch
 import androidx.compose.foundation.clickable
@@ -8,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.wangzan101.mika.i18n.AppLanguage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -254,6 +257,31 @@ fun CapsuleScreen(mode: CapsuleMode, onMode: (CapsuleMode) -> Unit, onBack: () -
         FooterNote(CapsuleSettingsCopy.FOOTNOTE)
     }
 }
+
+/** 设置 › 语言:跟随系统、中文、English;选了马上换,界面跟着重建。 */
+@Composable
+fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onBack: () -> Unit) {
+    PageScaffold(stringResource(R.string.language_title), onBack) {
+        GroupCard {
+            AppLanguage.entries.forEachIndexed { i, l ->
+                RadioRow(
+                    languageLabel(l), selected = l == language, onClick = { if (l != language) onLanguage(l) },
+                    subtitle = if (l == AppLanguage.System) stringResource(R.string.language_system_detail) else null, first = i == 0,
+                )
+            }
+        }
+    }
+}
+
+/** 语言的名字:中文、English 总用它自己的写法,「跟随系统」按当前语言写。 */
+@Composable
+fun languageLabel(l: AppLanguage): String = stringResource(
+    when (l) {
+        AppLanguage.System -> R.string.language_system
+        AppLanguage.Chinese -> R.string.language_chinese
+        AppLanguage.English -> R.string.language_english
+    },
+)
 
 // ---------- 隐私与数据 ----------
 

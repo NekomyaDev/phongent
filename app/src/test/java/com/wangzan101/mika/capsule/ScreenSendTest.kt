@@ -1,5 +1,7 @@
 package com.wangzan101.mika.capsule
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.ui.ScreenCopy
 import org.junit.Assert.assertEquals
@@ -10,6 +12,8 @@ import org.junit.Test
 
 /** 双击还是单击、截下的屏幕发进哪个对话、带屏幕的话在列表里怎么称呼。 */
 class ScreenSendTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test fun secondTapWithinTimeoutIsDouble() {
         val t = DoubleTap(300)
         assertEquals(DoubleTap.Tap.First, t.tap(1_000))

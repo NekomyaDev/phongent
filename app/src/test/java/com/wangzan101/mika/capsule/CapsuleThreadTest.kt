@@ -1,5 +1,7 @@
 package com.wangzan101.mika.capsule
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.agent.Turn
@@ -13,6 +15,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CapsuleThreadTest {
+    @get:Rule val texts = ChineseTexts()
+
     private fun turn(user: String, outcome: String, status: String = "succeeded", runId: String? = null, steers: List<String> = emptyList()) =
         Turn(user, outcome, status, runId = runId, steers = steers)
 

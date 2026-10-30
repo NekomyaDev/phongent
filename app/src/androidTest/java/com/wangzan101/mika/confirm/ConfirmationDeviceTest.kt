@@ -1,5 +1,7 @@
 package com.wangzan101.mika.confirm
 
+import org.junit.Rule
+import com.wangzan101.mika.ChineseUi
 import com.wangzan101.mika.DeviceTaskState
 import android.app.Notification
 import android.app.NotificationManager
@@ -35,6 +37,8 @@ import com.wangzan101.mika.task.TaskEnvironment
  */
 @RunWith(AndroidJUnit4::class)
 class ConfirmationDeviceTest {
+    @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
+
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var shell: IMikaShell
     private val model = ScriptedModel()

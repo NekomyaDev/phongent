@@ -1,5 +1,6 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.i18n.tr
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
@@ -198,23 +199,23 @@ object TriggerRuntime {
         if (conversations.turns(trigger.threadId).none { it.runId == runId }) {
             conversations.append(trigger.threadId, Turn(trigger.goal, text, "succeeded", runId = runId))
         }
-        notifyLocal(context, trigger.threadId, key, "Mika 提醒", text)
+        notifyLocal(context, trigger.threadId, key, tr(R.string.trigger_reminder), text)
         store.mark(key, TriggerWindowState.Delivered)
         store.retireDeliveredOneShots()
     }
 
     private fun reportStartFailure(context: Context, store: FileTriggerStore, trigger: TriggerDefinition,
         key: String, error: Exception, resetCondition: Boolean = false) {
-        val message = "定时任务未能启动。请在定时任务页查看并重新执行。"
+        val message = tr(R.string.trigger_not_started_body)
         Log.w("MikaTrigger", "scheduled task could not start", error)
-        store.mark(key, TriggerWindowState.Failed, "启动失败")
+        store.mark(key, TriggerWindowState.Failed, tr(R.string.trigger_start_failed))
         if (resetCondition) store.get(trigger.id)?.let { store.upsert(it.copy(lastConditionMet = false)) }
         val conversations = ConversationStore.shared(context)
         val runId = "schedule-failed:$key"
         if (conversations.turns(trigger.threadId).none { it.runId == runId }) {
             conversations.append(trigger.threadId, Turn(trigger.goal, message, "failed", runId = runId))
         }
-        notifyLocal(context, trigger.threadId, key, "定时任务未启动", message)
+        notifyLocal(context, trigger.threadId, key, tr(R.string.trigger_not_started), message)
     }
 
     private fun hasSavedResult(context: Context, key: String): Boolean =
@@ -223,13 +224,13 @@ object TriggerRuntime {
         }
 
     private fun reportUncertain(context: Context, trigger: TriggerDefinition, key: String) {
-        val message = "定时任务运行中断，结果还不能确认。请先查看实际情况；Mika 不会自动重复操作。"
+        val message = tr(R.string.trigger_interrupted_body)
         val conversations = ConversationStore.shared(context)
         val runId = "schedule-uncertain:$key"
         if (conversations.turns(trigger.threadId).none { it.runId == runId }) {
             conversations.append(trigger.threadId, Turn(trigger.goal, message, "unverified", runId = runId))
         }
-        notifyLocal(context, trigger.threadId, key, "定时任务结果待确认", message)
+        notifyLocal(context, trigger.threadId, key, tr(R.string.trigger_unconfirmed), message)
     }
 
     private fun notifyLocal(context: Context, threadId: String, key: String, title: String, text: String) {
@@ -267,8 +268,8 @@ object TriggerRuntime {
 
 /** 准时闹钟权限的引导:没开时只主动提醒一次,之后在定时任务页一直写明。 */
 object ExactAlarmGuide {
-    const val TITLE = "定时任务需要「闹钟和提醒」权限"
-    const val BODY = "没有这个权限,定时任务到点可能不准时,甚至不会启动。点这里去开启。"
+    val TITLE: String get() = tr(R.string.trigger_alarm_title)
+    val BODY: String get() = tr(R.string.trigger_alarm_body)
 
     fun shouldPrompt(granted: Boolean, prompted: Boolean): Boolean = !granted && !prompted
 }

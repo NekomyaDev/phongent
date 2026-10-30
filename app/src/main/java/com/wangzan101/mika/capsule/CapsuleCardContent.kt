@@ -1,5 +1,7 @@
 package com.wangzan101.mika.capsule
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.graphics.Bitmap
 import android.graphics.Rect
 import androidx.compose.animation.core.Animatable
@@ -112,21 +114,21 @@ private val Step = TextStyle(fontSize = 13.sp, lineHeight = 18.sp)
 
 /** 卡片上的固定说法(按钮、链接、读屏描述)。 */
 object CardCopy {
-    const val STOP = "停止"
-    const val TAKE_OVER = "我来处理"
-    const val RESUME = "继续"
-    const val APPROVE_ONCE_ONLY = "只同意这一次"
-    const val DECLINE = "不同意"
-    const val SEE_PROCESS = "回到 Mika 看完整过程"
-    const val BACK_TO_MIKA = "回到 Mika"
-    const val SEND = "发送"
-    const val NEW_CHAT = "新对话"
-    const val CONTINUE_LAST = "接着上次聊"
-    const val COLLAPSE = "收起"
-    const val SCREEN = "后台画面，点一下放大"
-    const val SCREEN_LABEL = "后台"
-    const val ZOOMED = "放大的后台画面，点一下关闭"
-    const val ZOOM_HINT = "Mika 正在后台操作 · 点一下关闭"
+    val STOP: String get() = tr(R.string.chat_stop)
+    val TAKE_OVER: String get() = tr(R.string.action_take_over)
+    val RESUME: String get() = tr(R.string.chat_continue)
+    val APPROVE_ONCE_ONLY: String get() = tr(R.string.card_approve_once)
+    val DECLINE: String get() = tr(R.string.action_decline)
+    val SEE_PROCESS: String get() = tr(R.string.card_see_process)
+    val BACK_TO_MIKA: String get() = tr(R.string.card_back_to_mika)
+    val SEND: String get() = tr(R.string.chat_send)
+    val NEW_CHAT: String get() = tr(R.string.chat_new)
+    val CONTINUE_LAST: String get() = tr(R.string.card_continue_last)
+    val COLLAPSE: String get() = tr(R.string.collapse)
+    val SCREEN: String get() = tr(R.string.card_screen)
+    val SCREEN_LABEL: String get() = tr(R.string.card_screen_label)
+    val ZOOMED: String get() = tr(R.string.card_zoomed)
+    val ZOOM_HINT: String get() = tr(R.string.card_zoom_hint)
 }
 
 /** 卡片上的按钮;都转成任务服务现有的动作(见 [CapsuleController])。[runKey] 是按下时那件事的编号。 */
@@ -439,7 +441,7 @@ private fun IdleHeader(card: CardView.Chat, actions: CardActions, handle: Modifi
         MikaLogo(28.dp, corner = 14.dp)
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (continuing) "接着「${card.title.orEmpty().let(ScreenCopy::plain).let { if (it.length > TITLE_MAX) it.take(TITLE_MAX) + "…" else it }}」聊" else CardCopy.NEW_CHAT,
+                if (continuing) tr(R.string.card_continuing, card.title.orEmpty().let(ScreenCopy::plain).let { if (it.length > TITLE_MAX) it.take(TITLE_MAX) + "…" else it }) else CardCopy.NEW_CHAT,
                 Modifier.weight(1f, fill = false), style = Title, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             if (card.conversationId != null) {

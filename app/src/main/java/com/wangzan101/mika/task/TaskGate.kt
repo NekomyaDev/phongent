@@ -1,5 +1,7 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.agent.GateReason
 import com.wangzan101.mika.core.agent.TaskState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,13 +87,13 @@ class TaskGate(
         fun userStep(why: String) = GateReason("waiting_user", why, needsYou = true)
 
         /** 系统在用户屏上问打开 [app] 的哪一个时请用户选的那句;名字读不到时不说名字。 */
-        fun pickCopy(app: String?) = (app?.let { "「$it」" } ?: "系统") + "在问用哪个，请在屏幕上选一下"
+        fun pickCopy(app: String?) = app?.let { tr(R.string.gate_pick_app, it) } ?: tr(R.string.gate_pick_system)
 
         /** 选出来的 [app] 要用户亲手处理时的那句。 */
-        fun finishCopy(app: String?) = (app?.let { "「$it」" } ?: "刚打开的 App ") + "要你在屏幕上处理，处理好了点继续"
+        fun finishCopy(app: String?) = app?.let { tr(R.string.gate_finish_app, it) } ?: tr(R.string.gate_finish_unknown)
 
-        const val MOVED_AWAY = "你打开了这个 App,用完点继续"
-        const val MOVE_BACK_FAILED = "没能把 App 挪回 Mika 的屏幕,点继续再试一次"
-        const val SHELL_DOWN = "手机操作断开了,等它重新连上(或到设置里处理)后点继续"
+        val MOVED_AWAY: String get() = tr(R.string.gate_moved_away)
+        val MOVE_BACK_FAILED: String get() = tr(R.string.gate_move_back_failed)
+        val SHELL_DOWN: String get() = tr(R.string.gate_shell_down)
     }
 }

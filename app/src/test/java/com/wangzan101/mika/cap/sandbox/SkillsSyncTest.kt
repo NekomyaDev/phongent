@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.sandbox
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.workspace.SandboxTree
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import kotlinx.coroutines.runBlocking
@@ -11,6 +13,8 @@ import java.io.File
 import java.nio.file.Files
 
 class SkillsSyncTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val tmp: File = Files.createTempDirectory("skills-sync").toFile()
     private val dirs = SandboxDirs(File(tmp, "files/sandbox"), File(tmp, "cache"), File(tmp, "lib"), JVM_GATE, SandboxTree())
 

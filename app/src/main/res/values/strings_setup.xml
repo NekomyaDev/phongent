@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="welcome_title">Hi, I’m Mika</string>
+    <string name="welcome_lead">Your personal assistant on your phone.\nTell me what to do and I’ll get it done in the background.</string>
+    <string name="welcome_note">Before you start: set up a model and turn on phone control. About 3 minutes.</string>
+    <string name="welcome_start">Get started</string>
+    <string name="welcome_apps">Use apps</string>
+    <string name="welcome_apps_body">Taps, types and scrolls on a background screen, leaving yours free</string>
+    <string name="welcome_web">Browse the web</string>
+    <string name="welcome_web_body">Built-in browser to read pages, compare prices and look things up</string>
+    <string name="welcome_files">Work with files</string>
+    <string name="welcome_files_body">Spreadsheets, PDFs and data, computed and organized in a separate environment</string>
+    <string name="welcome_schedule">Do it on schedule</string>
+    <string name="welcome_schedule_body">Daily, weekly, or automatically when a condition is met</string>
+    <string name="back">Back</string>
+    <string name="hide">Hide</string>
+    <string name="show">Show</string>
+    <string name="model_setup_title">Set up a model</string>
+    <string name="model_setup_lead">Mika thinks with your own model service. Connect a provider first, then pick a model for each job.</string>
+    <string name="model_setup_onboarding_note">Only the main model is required; the other two can wait.</string>
+    <string name="model_kind">API type</string>
+    <string name="model_base_url">Base URL</string>
+    <string name="model_key_hint">Paste the key from your provider</string>
+    <string name="model_key_optional">Optional for local services</string>
+    <string name="model_test_save">Test and save</string>
+    <string name="model_testing">Testing…</string>
+    <string name="model_test_note">Mika lists this provider’s models once; if that works, it’s saved.</string>
+    <string name="next">Next</string>
+    <string name="model_failed">Connection failed: %1$s</string>
+    <string name="cap_vision">Vision</string>
+    <string name="cap_vision_unconfirmed">Vision · unconfirmed</string>
+    <string name="cap_no_tools">No tool calling</string>
+    <string name="cap_tools">Tool calling</string>
+    <string name="cap_tools_unconfirmed">Tool calling · unconfirmed</string>
+    <string name="cap_reasoning">Reasoning</string>
+    <string name="model_need_url">Enter the base URL</string>
+    <string name="model_url_scheme">The base URL must start with http:// or https://</string>
+</resources>
