@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
 import com.wangzan101.mika.core.shell.PairingCode
+import com.wangzan101.mika.core.shell.PairingNotifyIssue
 import com.wangzan101.mika.core.shell.PhoneSetupFlow
 import com.wangzan101.mika.core.shell.SetupInputs
 import com.wangzan101.mika.core.shell.SetupPhase
@@ -106,7 +107,8 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
 
     val inputs = SetupInputs(
         developerOptions = status.developerOptions, wirelessDebugging = status.wirelessDebugging,
-        status = shell, discovery = discovery, notificationsAllowed = status.notificationsAllowed, repair = repairing,
+        status = shell, discovery = discovery, notificationsAllowed = status.notificationsAllowed,
+        pairingChannel = status.pairingChannel, repair = repairing,
         usbDebugging = status.usbDebugging, accessibility = status.accessibility == AccessibilityState.On,
         accessibilitySkipped = accessibilitySkipped, restrictedSettings = status.restrictedSettings,
         confirmed = confirmed, revisit = revisit,
@@ -121,12 +123,14 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
     }
     // 开始连接或已经成功:以助手为准,不再停在回头的那一步
     LaunchedEffect(view.phase) { if (view.phase == SetupPhase.Working || view.phase == SetupPhase.Success) revisit = null }
-    // 到了配对一步:开始找配对窗口;通知没允许就在这时请求(配对码要填在通知里)
+    // 到了配对一步:开始找配对窗口;通知没允许就在这时请求(配对码要填在通知里)。
+    // 「配对」通知被关掉要去系统设置里开,不自动跳过去,页面上给按钮
     LaunchedEffect(view.current) {
         if (view.current == SetupStep.PairingCode) pairing.begin()
     }
-    LaunchedEffect(view.needsNotifications) {
-        if (view.needsNotifications && !askedNotifications) {
+    val notificationsOff = view.notifyIssue == PairingNotifyIssue.NotificationsOff
+    LaunchedEffect(notificationsOff) {
+        if (notificationsOff && !askedNotifications) {
             askedNotifications = true
             onFix(Fix.AllowNotifications)
         }
@@ -156,6 +160,7 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
             }
         },
         onAllowNotifications = { onFix(Fix.AllowNotifications) },
+        onOpenPairingChannel = { onFix(Fix.OpenPairingChannel) },
         headsUpLowered = status.notificationsAllowed && (status.attentionLowered || status.resultLowered),
         onOpenHeadsUp = { onFix(if (status.attentionLowered) Fix.OpenAttentionChannel else Fix.OpenResultChannel) },
         onConfirmStep = { step -> confirmed = confirmed + step; revisit = null },
@@ -172,6 +177,7 @@ fun PhoneSetupScreen(status: SystemStatus, repair: Boolean, onFix: (Fix) -> Unit
  * 不带状态的引导页,便于测试。步骤是一张编号清单:做完的打勾,当前一步亮起并带按钮,后面的变灰。
  * 读开关的几步都有 [onConfirmStep](「我已经打开了,下一步」);做完的步骤可以点,[onRevisit] 回去重做,传 null 是回到原来的步骤。
  * [onboarding] 为真时是首次上手的最后一步,底部多一排分页点。[onSubmit] 收到的码已经校验过是 6 位数字。
+ * 配对一步通知发不出来时([SetupView.needsNotifications]),先修通知是主按钮:[onAllowNotifications] 或 [onOpenPairingChannel]。
  */
 @Composable
 fun PhoneSetupContent(
@@ -188,6 +194,7 @@ fun PhoneSetupContent(
     onSkipAccessibility: () -> Unit = {},
     onRevisit: (SetupStep?) -> Unit = {},
     onboarding: Boolean = false,
+    onOpenPairingChannel: () -> Unit = {},
 ) {
     val canRevisit = view.phase == SetupPhase.Guide || view.phase == SetupPhase.Failed
     fun revisitable(step: SetupStep) = canRevisit && step != view.current && step in PhoneSetupFlow.REVISITABLE &&
@@ -215,8 +222,8 @@ fun PhoneSetupContent(
                             onClick = if (revisitable(step)) ({ onRevisit(step) }) else null,
                         ) {
                             if (step == view.current) CurrentStepBody(
-                                step, view, onStepAction, onFailureFix, onAllowNotifications, headsUpLowered, onOpenHeadsUp, onConfirmStep, onSubmit,
-                                onAppInfo, onSkipAccessibility, onRevisit,
+                                step, view, onStepAction, onFailureFix, onAllowNotifications, onOpenPairingChannel, headsUpLowered, onOpenHeadsUp,
+                                onConfirmStep, onSubmit, onAppInfo, onSkipAccessibility, onRevisit,
                             )
                             if (step == SetupStep.Connect && view.phase == SetupPhase.Working) WorkingLine()
                         }
@@ -299,6 +306,7 @@ private fun CurrentStepBody(
     onStepAction: (SetupStep) -> Unit,
     onFailureFix: (BuiltinShellFix) -> Unit,
     onAllowNotifications: () -> Unit,
+    onOpenPairingChannel: () -> Unit,
     headsUpLowered: Boolean,
     onOpenHeadsUp: () -> Unit,
     onConfirmStep: (SetupStep) -> Unit,
@@ -329,10 +337,29 @@ private fun CurrentStepBody(
         )
         PillButton(PhoneSetupCopy.goBackTo(s.step), primary = view.failure == null, tag = "setup-suspect-back") { onRevisit(s.step) }
     }
+    // 没有无障碍时配对码只能填在通知里:通知发不出来就先修它,这是这一步的主按钮
+    val fixNotificationsFirst = step == SetupStep.PairingCode && view.needsNotifications && !view.autoRead
     if (step == SetupStep.PairingCode) {
-        if (view.needsNotifications) {
-            Text(PhoneSetupCopy.NEED_NOTIFICATIONS, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.warn)
-            PillButton(PhoneSetupCopy.ALLOW_NOTIFICATIONS, primary = false) { onAllowNotifications() }
+        when (view.notifyIssue) {
+            PairingNotifyIssue.NotificationsOff -> {
+                Text(PhoneSetupCopy.NEED_NOTIFICATIONS, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.warn)
+                PillButton(PhoneSetupCopy.ALLOW_NOTIFICATIONS, primary = fixNotificationsFirst, tag = "setup-notify-fix") { onAllowNotifications() }
+            }
+            PairingNotifyIssue.ChannelOff -> {
+                Text(PhoneSetupCopy.PAIRING_CHANNEL_OFF, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.warn)
+                PillButton(PhoneSetupCopy.OPEN_PAIRING_CHANNEL, primary = fixNotificationsFirst, tag = "setup-notify-fix") { onOpenPairingChannel() }
+            }
+            // 不弹出也能下拉去填:只提醒,不抢主按钮;无障碍开着时用不上通知,不提
+            PairingNotifyIssue.NotHeadsUp -> if (!view.autoRead) {
+                Text(
+                    PhoneSetupCopy.PAIRING_LOWERED,
+                    Modifier.padding(top = 10.dp).fillMaxWidth().background(MikaTheme.colors.warnSoft, RoundedCornerShape(12.dp)).padding(12.dp)
+                        .testTag("setup-pairing-lowered"),
+                    fontSize = 13.sp, lineHeight = 18.sp, color = MikaTheme.colors.ink,
+                )
+                PillButton(PhoneSetupCopy.OPEN_HEADS_UP, primary = false, tag = "setup-pairing-lowered-open") { onOpenPairingChannel() }
+            }
+            null -> Unit
         }
         if (headsUpLowered && !view.needsNotifications) {
             Column(
@@ -343,13 +370,15 @@ private fun CurrentStepBody(
             }
             PillButton(PhoneSetupCopy.OPEN_HEADS_UP, primary = false, tag = "setup-heads-up-open") { onOpenHeadsUp() }
         }
-        PairingHint(view.autoRead)
+        if (view.autoRead) AutoReadHint() else NotifyGuide()
         if (view.portFound && !view.autoRead) Text(PhoneSetupCopy.PORT_FOUND, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = MikaTheme.colors.ok)
     }
     // 无障碍一步推荐跳过:配对后 Mika 自己打开,也不会被「受限制的设置」拦住
     val a11y = step == SetupStep.Accessibility
     if (a11y) PillButton(PhoneSetupCopy.ACCESSIBILITY_SKIP, primary = true, tag = "setup-skip-a11y", onClick = onSkipAccessibility)
-    if (view.failure == null && copy.action != null) PillButton(copy.action, primary = !a11y, tag = "setup-action") { onStepAction(step) }
+    if (view.failure == null && copy.action != null) {
+        PillButton(copy.action, primary = !a11y && !fixNotificationsFirst, tag = "setup-action") { onStepAction(step) }
+    }
     if (a11y && view.showAppInfo) PillButton(PhoneSetupCopy.APP_INFO, primary = false, tag = "setup-app-info", onClick = onAppInfo)
     // 读到的开关只是参考:用户说打开了就往下走,哪一步都不会卡死
     if (step in PhoneSetupFlow.CONFIRMABLE) PillButton(PhoneSetupCopy.TURNED_ON_NEXT, primary = false, tag = "setup-confirm") { onConfirmStep(step) }
@@ -365,21 +394,39 @@ private fun LinkText(text: String, tag: String?, onClick: () -> Unit) {
     )
 }
 
-/** 去系统设置前先说清楚配对码怎么交给 Mika:自己读,或者从顶部下拉到通知里填。 */
+/** 无障碍开着:去系统设置前说一句,Mika 会自己读配对码。 */
 @Composable
-private fun PairingHint(autoRead: Boolean) {
+private fun AutoReadHint() {
     val c = MikaTheme.colors
-    val tint = if (autoRead) c.ok else c.accent
     Row(
-        Modifier.padding(top = 10.dp).fillMaxWidth().background(if (autoRead) c.okSoft else c.accentSoft, RoundedCornerShape(12.dp))
+        Modifier.padding(top = 10.dp).fillMaxWidth().background(c.okSoft, RoundedCornerShape(12.dp))
             .padding(12.dp).testTag("setup-pairing-hint"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(if (autoRead) MikaIcons.Check else MikaIcons.Bell, null, Modifier.size(20.dp), tint = tint)
-        Text(
-            if (autoRead) PhoneSetupCopy.AUTO_READ_HINT else PhoneSetupCopy.PULL_DOWN_HINT,
-            fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = MikaTheme.colors.ink,
-        )
+        Icon(MikaIcons.Check, null, Modifier.size(20.dp), tint = c.ok)
+        Text(PhoneSetupCopy.AUTO_READ_HINT, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+    }
+}
+
+/** 无障碍没开:用三行编号小图示说清楚配对码怎么填进通知,不用离开配对窗口。 */
+@Composable
+private fun NotifyGuide() {
+    val c = MikaTheme.colors
+    val icons = listOf(MikaIcons.Phone, MikaIcons.Bell, MikaIcons.Key)
+    Column(
+        Modifier.padding(top = 10.dp).fillMaxWidth().background(c.accentSoft, RoundedCornerShape(12.dp))
+            .padding(12.dp).testTag("setup-pairing-guide"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PhoneSetupCopy.NOTIFY_GUIDE.forEachIndexed { i, line ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(22.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c.onAccent)
+                }
+                Icon(icons[i], null, Modifier.size(18.dp), tint = c.accent)
+                Text(line, Modifier.weight(1f), fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = c.ink)
+            }
+        }
     }
 }
 

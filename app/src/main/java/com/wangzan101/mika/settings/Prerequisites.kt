@@ -1,6 +1,7 @@
 package com.wangzan101.mika.settings
 
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
+import com.wangzan101.mika.core.shell.PairingChannelHealth
 
 enum class AccessibilityState {
     Off,
@@ -19,6 +20,8 @@ data class SystemStatus(
     val attentionLowered: Boolean = false,
     /** 「任务结果」通知频道同理。 */
     val resultLowered: Boolean = false,
+    /** 「配对」通知频道:配对码填在这里,被关掉或调成不弹出时引导页要说。 */
+    val pairingChannel: PairingChannelHealth = PairingChannelHealth.Ready,
     /** 三个任务通知频道现在的重要程度;为空表示频道还没建。通知页据此显示。 */
     val attentionImportance: Int? = null,
     val resultImportance: Int? = null,

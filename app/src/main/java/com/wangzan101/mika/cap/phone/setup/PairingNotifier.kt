@@ -7,8 +7,10 @@ import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import com.wangzan101.mika.R
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
+import com.wangzan101.mika.core.shell.PairingChannelHealth
 import com.wangzan101.mika.core.shell.PairingDiscovery
 import com.wangzan101.mika.ui.MainActivity
 import com.wangzan101.mika.ui.PhoneSetupCopy
@@ -16,7 +18,7 @@ import com.wangzan101.mika.setup.PairingCodeReceiver
 
 /** 配对通知此刻该显示什么。 */
 sealed interface PairingNotice {
-    /** 带输入框的「填写配对码」;[error] 是上一次没成功的原因。 */
+    /** 带输入框的「输入配对码」;[error] 是上一次没成功的原因和怎么办,输入框照样留着。 */
     data class EnterCode(val port: Int?, val error: String? = null) : PairingNotice
     data object Working : PairingNotice
     data object Done : PairingNotice
@@ -26,7 +28,7 @@ sealed interface PairingNotice {
     companion object {
         /**
          * 只在用户正在配对的这段时间里用([PairingCoordinator] 开着时)。找到配对窗口才弹输入框;
-         * 配对阶段的失败(码不对、窗口关了)留在通知里重填,别的失败请用户回 Mika。
+         * 配对阶段的失败(码不对、过期、窗口关了)留在通知里重填,别的失败请用户回 Mika。
          */
         fun of(status: BuiltinShellStatus, discovery: PairingDiscovery): PairingNotice? {
             val port = (discovery as? PairingDiscovery.Found)?.port
@@ -34,7 +36,7 @@ sealed interface PairingNotice {
                 BuiltinShellStatus.Running -> Done
                 BuiltinShellStatus.Connecting -> Working
                 is BuiltinShellStatus.Failed ->
-                    if (status.reason.duringPairing) EnterCode(port, PhoneSetupCopy.failure(status.reason).title)
+                    if (status.reason.duringPairing) EnterCode(port, PhoneSetupCopy.notifyRetry(status.reason))
                     else Problem(PhoneSetupCopy.failure(status.reason).title)
                 BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff -> port?.let { EnterCode(it) }
             }
@@ -42,60 +44,127 @@ sealed interface PairingNotice {
 
         /** 无障碍在读配对码时,填码通知晚这么久再弹,多半已经配上了,不打扰。 */
         const val AUTO_READ_GRACE_MS = 5_000L
-        /** 填码通知弹出后没人填,过这么久再提醒一次(只一次)。 */
-        const val REALERT_MS = 8_000L
+        /** 填码通知弹出后没人填,依次隔这么久再弹一次;最多 [MAX_REALERTS] 次,不刷屏。 */
+        val REALERT_MS = listOf(8_000L, 20_000L, 40_000L)
+        val MAX_REALERTS = REALERT_MS.size
 
-        /** 发出 [notice] 前等多久。 */
+        /** 发出 [notice] 前等多久。无障碍没开时找到配对窗口就弹,不等。 */
         fun delayBefore(notice: PairingNotice, autoRead: Boolean): Long =
             if (notice is EnterCode && autoRead) AUTO_READ_GRACE_MS else 0L
 
-        /** 发出后多久再提醒一次;null 表示不再提醒。 */
-        fun realertAfter(notice: PairingNotice): Long? = if (notice is EnterCode) REALERT_MS else null
+        /** 已经再提醒过 [sent] 次,下一次隔多久;null 表示不再提醒。 */
+        fun realertAfter(notice: PairingNotice, sent: Int): Long? = if (notice is EnterCode) REALERT_MS.getOrNull(sent) else null
+    }
+}
+
+/** 系统里已有的一个配对频道;[userSet] 是用户自己改过它的重要程度。 */
+data class ChannelSnapshot(val id: String, val importance: Int, val userSet: Boolean)
+
+/** 配对频道怎么处理:[Create] 新建 [id](高优先级);[Use] 用已有的 [id],[health] 是它现在的样子。 */
+sealed interface ChannelPlan {
+    val id: String
+    val health: PairingChannelHealth
+
+    data class Create(override val id: String) : ChannelPlan {
+        override val health: PairingChannelHealth get() = PairingChannelHealth.Ready
+    }
+
+    data class Use(override val id: String, override val health: PairingChannelHealth) : ChannelPlan
+}
+
+/**
+ * 配对频道的选择(纯函数,便于测试)。频道的重要程度建好后 App 改不了:
+ * 旧版本建得不够高、用户也没动过,就换一个新 id 重建;用户自己调低或关掉的不改回去,交给引导页提示。
+ */
+object PairingChannel {
+    /** 用过的频道 id,越往后越新;新装的直接用最后一个。 */
+    val IDS = listOf("pairing_code", "pairing_alert")
+    /** 更早版本的频道,见到就删,免得设置里多一项。 */
+    const val LEGACY = "pairing"
+
+    fun plan(existing: List<ChannelSnapshot>): ChannelPlan {
+        val current = existing.filter { it.id in IDS }.maxByOrNull { IDS.indexOf(it.id) }
+            ?: return ChannelPlan.Create(IDS.last())
+        val newer = IDS.getOrNull(IDS.indexOf(current.id) + 1)
+        return when {
+            current.importance == NotificationManager.IMPORTANCE_NONE -> ChannelPlan.Use(current.id, PairingChannelHealth.Off)
+            current.importance >= NotificationManager.IMPORTANCE_HIGH -> ChannelPlan.Use(current.id, PairingChannelHealth.Ready)
+            current.userSet -> ChannelPlan.Use(current.id, PairingChannelHealth.Lowered)
+            newer != null -> ChannelPlan.Create(newer)
+            else -> ChannelPlan.Use(current.id, PairingChannelHealth.Lowered)
+        }
     }
 }
 
 /**
- * 配对通知:高优先级、带声音和振动(勿扰时听系统的),能在系统设置的配对窗口上方弹出来;
+ * 配对通知:高优先级、带声音和振动(勿扰时听系统的),在系统设置的配对窗口上方弹出来;
  * 输入框用 RemoteInput,用户不用离开配对窗口。输入的码交给 [PairingCodeInput]。
  */
 object PairingNotifier {
-    /** 频道的振动建好后改不了,换了新 id;[OLD_CHANNEL] 是之前的,删掉免得设置里多一项。 */
-    const val CHANNEL = "pairing_code"
-    private const val OLD_CHANNEL = "pairing"
     const val KEY_CODE = "pairing_code"
     const val EXTRA_PORT = "pairing_port"
     private const val ID = 4401
-    private const val DONE_TIMEOUT_MS = 15_000L
+    private const val DONE_TIMEOUT_MS = 8_000L
+    /** 填码通知最多留这么久(和找配对窗口的时长一样),App 被杀了也不会一直挂着。 */
+    private const val INPUT_TIMEOUT_MS = 10 * 60_000L
+
+    /** 确保有一个配对频道,返回要用的那个(引导页据此提示、打开它的设置页)。 */
+    fun ensureChannel(context: Context): ChannelPlan {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val existing = PairingChannel.IDS.mapNotNull { id ->
+            nm.getNotificationChannel(id)?.let { ChannelSnapshot(id, it.importance, it.hasUserSetImportance()) }
+        }
+        val plan = PairingChannel.plan(existing)
+        if (plan is ChannelPlan.Create) {
+            nm.createNotificationChannel(
+                NotificationChannel(plan.id, PhoneSetupCopy.CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                    enableVibration(true)
+                    setShowBadge(false)
+                },
+            )
+        }
+        (PairingChannel.IDS + PairingChannel.LEGACY).filter { it != plan.id }.forEach { id ->
+            if (nm.getNotificationChannel(id) != null) nm.deleteNotificationChannel(id)
+        }
+        return plan
+    }
 
     fun show(context: Context, notice: PairingNotice) {
         val nm = context.getSystemService(NotificationManager::class.java)
-        nm.deleteNotificationChannel(OLD_CHANNEL)
-        nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, PhoneSetupCopy.CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) },
-        )
+        val channel = ensureChannel(context).id
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val b = Notification.Builder(context, CHANNEL)
+        val b = Notification.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setCategory(Notification.CATEGORY_STATUS)
             .setContentIntent(open)
         when (notice) {
             is PairingNotice.EnterCode -> {
-                val input = RemoteInput.Builder(KEY_CODE).setLabel(PhoneSetupCopy.NOTIFY_INPUT_LABEL).build()
+                val input = RemoteInput.Builder(KEY_CODE).setLabel(PhoneSetupCopy.NOTIFY_INPUT_LABEL).setAllowFreeFormInput(true).build()
                 // RemoteInput 要往 Intent 里填结果,必须是可变的
                 val reply = PendingIntent.getBroadcast(
                     context, 1,
                     Intent(context, PairingCodeReceiver::class.java).apply { notice.port?.let { putExtra(EXTRA_PORT, it) } },
                     PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 )
+                val action = Notification.Action.Builder(null, PhoneSetupCopy.NOTIFY_ACTION, reply)
+                    .addRemoteInput(input)
+                    .setAllowGeneratedReplies(false)
+                    .setSemanticAction(Notification.Action.SEMANTIC_ACTION_REPLY)
+                // 锁着屏也能直接填,不先要求解锁
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.setAuthenticationRequired(false)
+                val text = notice.error ?: PhoneSetupCopy.NOTIFY_ENTER_TEXT
                 b.setContentTitle(PhoneSetupCopy.NOTIFY_ENTER_TITLE)
-                    .setContentText(notice.error ?: PhoneSetupCopy.NOTIFY_ENTER_TEXT)
+                    .setContentText(text)
+                    .setStyle(Notification.BigTextStyle().bigText(text))
                     .setOngoing(true)
-                    // 每次发都要响铃、弹出,包括没人填时的再次提醒
+                    // 每次发都要响铃、弹出,包括没人填时的再次提醒和填错后的提示
                     .setOnlyAlertOnce(false)
-                    .addAction(Notification.Action.Builder(null, PhoneSetupCopy.NOTIFY_ACTION, reply).addRemoteInput(input).build())
+                    .setTimeoutAfter(INPUT_TIMEOUT_MS)
+                    .addAction(action.build())
+                if (notice.port != null) b.setSubText(PhoneSetupCopy.NOTIFY_WINDOW_FOUND)
             }
             PairingNotice.Working -> b.setContentTitle(PhoneSetupCopy.NOTIFY_WORKING).setOngoing(true).setOnlyAlertOnce(true)
                 .setProgress(0, 0, true)
@@ -103,7 +172,7 @@ object PairingNotifier {
                 .setAutoCancel(true).setOnlyAlertOnce(true).setTimeoutAfter(DONE_TIMEOUT_MS)
             is PairingNotice.Problem -> b.setContentTitle(notice.title).setContentText(PhoneSetupCopy.NOTIFY_PROBLEM_TEXT).setAutoCancel(true)
         }
-        // 没允许通知时系统会丢掉它;引导页在配对这一步之前就请求了权限
+        // 没允许通知时系统会丢掉它;引导页在配对这一步先请用户允许
         runCatching { nm.notify(ID, b.build()) }
     }
 

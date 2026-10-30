@@ -16,6 +16,19 @@ enum class SetupPhase {
     Failed,
 }
 
+/** 配对通知频道的样子:[Off] 被关掉,通知发不出来;[Lowered] 被用户调成不在屏幕顶部弹出,还能下拉通知栏去填。 */
+enum class PairingChannelHealth { Ready, Lowered, Off }
+
+/** 配对码要填在通知里,通知这边没准备好的地方。 */
+enum class PairingNotifyIssue {
+    /** 没允许 Mika 发通知(权限或整个 App 的通知开关)。 */
+    NotificationsOff,
+    /** 「配对」这一类通知被关掉了。 */
+    ChannelOff,
+    /** 「配对」通知不会弹出:不挡,只提醒。 */
+    NotHeadsUp,
+}
+
 /**
  * 引导页的输入:系统设置里读到的开关、用户自己的确认和助手的状态。
  * 读到的开关只用来自动打勾和给提示,不拦死:有的手机读不到或读不准,用户点了「我已经打开了,下一步」([confirmed])就往下走。
@@ -25,6 +38,7 @@ enum class SetupPhase {
  * [usbDebugging] 开着时,Wi-Fi 断开、无线调试被系统关掉后助手也不会停。
  * [accessibility] 是 Mika 的无障碍服务在运行:配对时由它读出配对码;用户可以跳过([accessibilitySkipped]),退回在通知里填。
  * [restrictedSettings] 是系统可能拦着不让打开无障碍(没从应用商店装的 App 要先在应用信息里允许受限制的设置)。
+ * [notificationsAllowed]、[pairingChannel] 决定配对码能不能填在通知里。
  */
 data class SetupInputs(
     val developerOptions: Boolean,
@@ -32,6 +46,7 @@ data class SetupInputs(
     val status: BuiltinShellStatus,
     val discovery: PairingDiscovery = PairingDiscovery.Idle,
     val notificationsAllowed: Boolean = true,
+    val pairingChannel: PairingChannelHealth = PairingChannelHealth.Ready,
     val repair: Boolean = false,
     val usbDebugging: Boolean = true,
     val accessibility: Boolean = true,
@@ -52,8 +67,8 @@ data class SetupView(
     val failure: BuiltinShellStatus.Failed? = null,
     /** 配对窗口已经找到:提示用户去通知里填码。 */
     val portFound: Boolean = false,
-    /** 停在配对一步但通知没允许:配对码要填在通知里,先请求通知权限。 */
-    val needsNotifications: Boolean = false,
+    /** 停在配对一步时通知这边的问题;[needsNotifications] 为真时要先修好才能在通知里填码。 */
+    val notifyIssue: PairingNotifyIssue? = null,
     /** 配对一步时无障碍开着:Mika 自己读配对码,不用去通知里填。 */
     val autoRead: Boolean = false,
     /** 无障碍一步时给出「去应用信息允许受限制的设置」的入口。 */
@@ -62,7 +77,11 @@ data class SetupView(
     val suspect: SetupSuspect? = null,
     /** 当前这一步是用户点回来重做的:界面给「回到原来的步骤」。 */
     val revisiting: Boolean = false,
-)
+) {
+    /** 通知发不出来(没允许,或「配对」通知被关):配对码要填在通知里,先修好。 */
+    val needsNotifications: Boolean
+        get() = notifyIssue == PairingNotifyIssue.NotificationsOff || notifyIssue == PairingNotifyIssue.ChannelOff
+}
 
 /**
  * 引导页的状态机:每次输入变化(系统设置开关、用户确认、助手状态、找配对窗口的进度)都重新算一遍,不存中间状态。
@@ -121,7 +140,7 @@ object PhoneSetupFlow {
                 SetupView(
                     SetupPhase.Failed, marks(step.ordinal, i, current = step, mark = StepMark.Failed), step, failure = status,
                     portFound = step == SetupStep.PairingCode && i.discovery is PairingDiscovery.Found,
-                    needsNotifications = step == SetupStep.PairingCode && !i.notificationsAllowed,
+                    notifyIssue = notifyIssue(step, i),
                     autoRead = step == SetupStep.PairingCode && i.accessibility,
                     suspect = if (status.reason in SWITCH_RELATED) suspect(i) else null,
                 )
@@ -152,10 +171,18 @@ object PhoneSetupFlow {
     private fun guide(step: SetupStep, i: SetupInputs) = SetupView(
         SetupPhase.Guide, marks(step.ordinal, i, current = step), step,
         portFound = step == SetupStep.PairingCode && i.discovery is PairingDiscovery.Found,
-        needsNotifications = step == SetupStep.PairingCode && !i.notificationsAllowed,
+        notifyIssue = notifyIssue(step, i),
         autoRead = step == SetupStep.PairingCode && i.accessibility,
         showAppInfo = step == SetupStep.Accessibility && i.restrictedSettings,
     )
+
+    private fun notifyIssue(step: SetupStep, i: SetupInputs): PairingNotifyIssue? = when {
+        step != SetupStep.PairingCode -> null
+        !i.notificationsAllowed -> PairingNotifyIssue.NotificationsOff
+        i.pairingChannel == PairingChannelHealth.Off -> PairingNotifyIssue.ChannelOff
+        i.pairingChannel == PairingChannelHealth.Lowered -> PairingNotifyIssue.NotHeadsUp
+        else -> null
+    }
 
     /** 前 [done] 步做完(跳过的无障碍记成跳过),[current] 这一步打 [mark],其余待做。 */
     private fun marks(done: Int, i: SetupInputs, current: SetupStep? = null, mark: StepMark = StepMark.Current): Map<SetupStep, StepMark> =

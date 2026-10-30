@@ -14,6 +14,7 @@ import android.provider.Settings
 import com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility
 import com.wangzan101.mika.core.shell.BuiltinShellControl
 import com.wangzan101.mika.cap.phone.setup.DeveloperSettings
+import com.wangzan101.mika.cap.phone.setup.PairingNotifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,6 +75,8 @@ class SystemStatusMonitor(context: Context, private val shell: BuiltinShellContr
         notificationsAllowed = app.getSystemService(NotificationManager::class.java).areNotificationsEnabled(),
         attentionLowered = channelLowered(TaskService.CHANNEL_ATTENTION),
         resultLowered = channelLowered(TaskService.CHANNEL_RESULT),
+        // 先建好频道:配对前就能看出它是不是被关了或调低了,也能直接打开它的设置页
+        pairingChannel = PairingNotifier.ensureChannel(app).health,
         attentionImportance = channelImportance(TaskService.CHANNEL_ATTENTION),
         resultImportance = channelImportance(TaskService.CHANNEL_RESULT),
         progressImportance = channelImportance(TaskService.CHANNEL_PROGRESS),

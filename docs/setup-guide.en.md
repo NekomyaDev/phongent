@@ -122,7 +122,11 @@ The only cost of skipping: in the next steps you type the 6-digit pairing code y
 
 **The one thing that trips people up**: the pairing code only works while the system's pairing dialog is open. **As soon as the dialog closes (switching apps, pressing Back, locking the screen), the code is no longer valid.** So stay on the pairing dialog while you enter the code; don't switch apps.
 
-**Before you start**: at this step Mika asks for permission to send notifications. Please tap "Allow": without accessibility, the pairing code is entered in Mika's notification.
+**Before you start**: at this step Mika asks for permission to send notifications. Please tap "Allow": without accessibility, the pairing code is entered in Mika's notification. If notifications are off, the main button on this step is to turn them on first:
+
+- Mika isn't allowed to send notifications: the wizard says "The pairing code goes into a notification, so allow Mika’s notifications first." Tap "Allow notifications".
+- Allowed, but Mika's "Pairing" notifications are turned off: tap "Turn on “Pairing” notifications" and turn them on in the system notification settings.
+- "Pairing" notifications are set not to pop up: the wizard mentions it; tap "Turn on" and turn on "Pop on screen". You can also skip that and enter the code from the notification shade.
 
 **In Mika**: tap "Open Wireless debugging".
 
@@ -143,12 +147,14 @@ The wizard shows a green hint: "When the code appears, wait a few seconds — Mi
 
 ### Case B: accessibility is off (you skipped step 3) — enter the code in the notification
 
+The wizard shows this as three small steps: ① Tap “Pair device with pairing code” ② Mika’s notification pops up at the top of the screen; if not, swipe down to open the notification shade ③ Tap “Enter code” and type the 6 digits. In detail:
+
 1. **Don't leave the pairing dialog.** Note the 6 digits.
-2. Within a few seconds, Mika's notification "Mika: pull down here to enter the pairing code" pops up at the top of the screen.
+2. As soon as the pairing dialog opens, Mika's notification "Enter pairing code" pops up at the top of the screen, saying "Type the 6 digits shown on screen here — no need to leave the pairing window". If nobody answers it, it pops up again a little later, at most three more times.
    - If it doesn't pop up, or disappears quickly: **swipe down from the top of the screen** to open the notification shade, and you'll find it there. Pulling down the shade doesn't close the pairing dialog.
-3. Tap "Enter pairing code" on the notification. An input box appears.
-4. Type the 6 digits and tap send (the arrow next to the box).
-5. The notification changes to "Pairing…", then a few seconds later to "Phone control is set up".
+3. Tap "Enter code" on the notification. An input box labelled "6 digits" appears.
+4. Type the 6 digits and tap send (the arrow next to the box). Spaces, dashes or full-width digits are fine.
+5. The notification changes to "Pairing…", then a few seconds later to "Paired", and goes away by itself.
 
 <!-- Screenshot: Mika's "Enter pairing code" notification with the input box in the notification shade -->
 
@@ -156,7 +162,8 @@ The wizard shows a green hint: "When the code appears, wait a few seconds — Mi
 
 - Allow Mika's notifications first. If you haven't, the wizard shows a note and an "Allow notifications" button.
 - If the wizard shows an orange note saying "Needs you" and "Task results" notifications won't pop up: that's about notifications during later tasks, not pairing. You can tap "Turn on", or ignore it for now.
-- If the code was wrong or expired, the notification says so; just enter it again. If the pairing dialog has already closed, go back to "Wireless debugging" and tap "Pair device with pairing code" again to get a **new** code, then enter the new one.
+- If what you typed isn't 6 digits, the notification says "Enter 6 digits, then try again" right away and keeps the input box; nothing is sent.
+- If the code was wrong or expired, the notification says "Wrong or expired code: in the pairing window, tap “Pair device with pairing code” again to get a new code, then enter it again" and keeps the input box. The same goes if the pairing dialog has already closed: go back to "Wireless debugging" and tap "Pair device with pairing code" again to get a **new** code, then enter the new one.
 - Still no notification? The wizard has "No notification? Enter it here". But going back to Mika closes the pairing dialog, so use **split screen**: the pairing dialog on one side, Mika on the other. If Mika hasn't found the pairing dialog yet, it asks for one more number: the digits after the colon in "IP address & port" in the pairing dialog.
 
 **How to tell it worked**: back in Mika, step 5 shows "Paired".
@@ -190,7 +197,8 @@ If pairing or connecting fails, Mika uses what it could read to say which earlie
 | Can't find "Developer options" | Do step 1 first (tap "Build number" 7 times in "About phone"). Once on, stock Android has it under Settings › System › Developer options; other phones may put it under "Additional settings" or similar. Search Settings for "Developer options". |
 | Can't find "Build number" | Scroll down in "About phone"; on some phones it's inside "Software information" or "Version". Or search Settings for "Build number". |
 | The Wireless debugging switch turns itself off | Make sure you're on Wi-Fi; in the dialog that appears when you turn it on, tap "Allow" and tick "Always allow on this network". After changing Wi-Fi, allow it once more on the new network. |
-| No pairing notification from Mika | Check that Mika is allowed to send notifications (the wizard reminds you); swipe down from the top to open the notification shade; if it's still not there, use "No notification? Enter it here" in the wizard together with split screen. |
+| No pairing notification from Mika | Check that Mika is allowed to send notifications and that "Pairing" notifications aren't turned off (the wizard reminds you and gives a button); swipe down from the top to open the notification shade; if it's still not there, use "No notification? Enter it here" in the wizard together with split screen. |
+| The pairing notification only shows in the shade and doesn't pop up | "Pairing" notifications are set not to pop up. Tap "Turn on" in the wizard and turn on "Pop on screen" in system settings; or just swipe down to the shade to enter the code. |
 | "Wrong or expired pairing code" | The code changes each time the pairing dialog opens. Go back to "Wireless debugging", tap "Pair device with pairing code" again and enter the new 6 digits. |
 | "The pairing window closed" | Keep the pairing dialog open while entering the code: don't switch apps, press Back or lock the screen. Open the dialog again and enter the code. |
 | Pairing worked, but "Connect automatically" fails | Make sure "Wireless debugging" is still on and the phone is on Wi-Fi, then tap "Retry". If that doesn't help, tap "Pair again". If the wizard points at an earlier step, tap "Back to “…”" to redo it. |

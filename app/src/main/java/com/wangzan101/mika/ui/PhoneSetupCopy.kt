@@ -62,9 +62,12 @@ object PhoneSetupCopy {
     /** 系统拦着不让打开无障碍时(没从应用商店装的 App 常见)的去处。 */
     val APP_INFO: String get() = tr(R.string.phone_app_info)
 
-    /** 配对一步:无障碍开着时 Mika 自己读码;没开时教用户去通知里填。 */
+    /** 配对一步:无障碍开着时 Mika 自己读码。 */
     val AUTO_READ_HINT: String get() = tr(R.string.phone_auto_read)
-    val PULL_DOWN_HINT: String get() = tr(R.string.phone_pull_down)
+    /** 无障碍没开时的三步图示:点系统的配对按钮、看顶部弹出的通知、在通知里填码。 */
+    val NOTIFY_GUIDE: List<String> get() = listOf(
+        tr(R.string.phone_guide_1), tr(R.string.phone_guide_2), tr(R.string.phone_guide_3, NOTIFY_ACTION),
+    )
 
     /** 读开关的几步的兜底:有的手机读不到或读不准,用户确认打开了就往下走。 */
     val TURNED_ON_NEXT: String get() = tr(R.string.phone_turned_on_next)
@@ -83,6 +86,11 @@ object PhoneSetupCopy {
     val PORT_FOUND: String get() = tr(R.string.phone_port_found)
     val NEED_NOTIFICATIONS: String get() = tr(R.string.phone_need_notif)
     val ALLOW_NOTIFICATIONS: String get() = tr(R.string.explain_notif)
+    /** 「配对」通知被关掉:配对码填不了,先打开它。 */
+    val PAIRING_CHANNEL_OFF: String get() = tr(R.string.phone_pairing_channel_off, CHANNEL_NAME)
+    val OPEN_PAIRING_CHANNEL: String get() = tr(R.string.phone_open_pairing_channel, CHANNEL_NAME)
+    /** 「配对」通知被用户调成不弹出:还能下拉去填,只提醒一句并给入口。 */
+    val PAIRING_LOWERED: String get() = tr(R.string.phone_pairing_lowered, CHANNEL_NAME)
     /** 通知允许了,但「需要你处理」「任务结果」被调成不弹出:不挡后面的步骤,但要说清楚。 */
     val HEADS_UP_LOWERED: String get() = tr(R.string.phone_heads_up_lowered)
     val OPEN_HEADS_UP: String get() = tr(R.string.heads_up_action)
@@ -202,6 +210,16 @@ object PhoneSetupCopy {
     val CHANNEL_NAME: String get() = tr(R.string.phone_channel)
     val NOTIFY_ENTER_TITLE: String get() = tr(R.string.phone_notify_enter_title)
     val NOTIFY_ENTER_TEXT: String get() = tr(R.string.phone_notify_enter_text)
+    val NOTIFY_WINDOW_FOUND: String get() = tr(R.string.phone_notify_window_found)
+    /** 填的不是 6 位数字:当场在通知里说,不去试。 */
+    val NOTIFY_CODE_INVALID: String get() = tr(R.string.phone_notify_code_invalid)
+
+    /** 配对阶段没成功时通知里怎么说:码不对、过期、窗口关了都要去拿新码再填。 */
+    fun notifyRetry(f: BuiltinShellFailure): String = when (f) {
+        BuiltinShellFailure.WrongCode -> tr(R.string.phone_notify_retry_code)
+        BuiltinShellFailure.PairingWindowClosed -> tr(R.string.phone_notify_retry_window)
+        else -> failure(f).title
+    }
     val NOTIFY_ACTION: String get() = tr(R.string.phone_notify_action)
     val NOTIFY_INPUT_LABEL: String get() = tr(R.string.phone_notify_input)
     val NOTIFY_WORKING: String get() = tr(R.string.phone_notify_working)

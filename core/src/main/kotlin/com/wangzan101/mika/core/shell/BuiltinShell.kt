@@ -85,8 +85,11 @@ interface BuiltinShellControl {
 object PairingCode {
     const val LENGTH = 6
 
+    /** 输入法可能打出的各种横线:半角、全角、连字号、短横、长横。 */
+    private const val DASHES = "-－‐‑–—"
+
     fun normalize(input: String): String? {
-        val digits = input.filterNot { it.isWhitespace() || it == '-' }
+        val digits = input.filterNot { it.isWhitespace() || it in DASHES }
             .map { c -> if (c in '０'..'９') '0' + (c - '０') else c }
             .joinToString("")
         return digits.takeIf { it.length == LENGTH && it.all { c -> c in '0'..'9' } }

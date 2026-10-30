@@ -32,12 +32,16 @@ class PhoneSetupCopyTest {
                 PhoneSetupCopy.SUCCESS_LINE, PhoneSetupCopy.SUCCESS_NOTE, PhoneSetupCopy.USAGE_NOTE, PhoneSetupCopy.UNPAIR_BODY, PhoneSetupCopy.SKIP_NOTE, PhoneSetupCopy.DEGRADED_LINE, PhoneSetupCopy.PORT_FOUND,
                 PhoneSetupCopy.NEED_NOTIFICATIONS, PhoneSetupCopy.MANUAL_HINT, PhoneSetupCopy.NOTIFY_ENTER_TEXT,
                 PhoneSetupCopy.NOTIFY_ENTER_TITLE, PhoneSetupCopy.NOTIFY_ACTION, PhoneSetupCopy.NOTIFY_INPUT_LABEL,
-                PhoneSetupCopy.AUTO_READ_HINT, PhoneSetupCopy.PULL_DOWN_HINT, PhoneSetupCopy.ACCESSIBILITY_SKIP,
+                PhoneSetupCopy.AUTO_READ_HINT, PhoneSetupCopy.ACCESSIBILITY_SKIP, PhoneSetupCopy.NOTIFY_WINDOW_FOUND,
+                PhoneSetupCopy.NOTIFY_CODE_INVALID, PhoneSetupCopy.PAIRING_CHANNEL_OFF, PhoneSetupCopy.OPEN_PAIRING_CHANNEL,
+                PhoneSetupCopy.PAIRING_LOWERED, PhoneSetupCopy.NOTIFY_DONE_TITLE, PhoneSetupCopy.NOTIFY_DONE_TEXT,
                 PhoneSetupCopy.ACCESSIBILITY_SKIPPED, PhoneSetupCopy.APP_INFO, PhoneSetupCopy.TURNED_ON_NEXT,
                 PhoneSetupCopy.REVISIT_BACK, PhoneSetupCopy.REVISIT_NOTE,
             ),
         )
         suspects.forEach { add(PhoneSetupCopy.suspect(it)); add(PhoneSetupCopy.goBackTo(it.step)) }
+        addAll(PhoneSetupCopy.NOTIFY_GUIDE)
+        BuiltinShellFailure.entries.forEach { add(PhoneSetupCopy.notifyRetry(it)) }
     }
 
     private val suspects = listOf(
@@ -66,9 +70,12 @@ class PhoneSetupCopyTest {
         assertTrue(PhoneSetupCopy.step(SetupStep.DeveloperOptions).body.contains("版本号"))
         assertTrue(PhoneSetupCopy.step(SetupStep.WirelessDebugging).body.contains("无线调试"))
         assertTrue(PhoneSetupCopy.step(SetupStep.PairingCode).body.contains("使用配对码配对设备"))
-        // 配对码怎么交给 Mika:无障碍开着时自己读,没开时从顶部下拉到通知里填
-        assertTrue(PhoneSetupCopy.PULL_DOWN_HINT.contains("下拉"))
-        assertTrue(PhoneSetupCopy.PULL_DOWN_HINT.contains("「${PhoneSetupCopy.NOTIFY_ACTION}」"))
+        // 配对码怎么交给 Mika:无障碍开着时自己读,没开时按三步在通知里填
+        assertEquals(
+            listOf("点「使用配对码配对设备」", "屏幕顶部弹出 Mika 的通知；没看到就下拉通知栏", "点「填配对码」，输入 6 位数字"),
+            PhoneSetupCopy.NOTIFY_GUIDE,
+        )
+        assertTrue(PhoneSetupCopy.NOTIFY_GUIDE[2].contains("「${PhoneSetupCopy.NOTIFY_ACTION}」"))
         assertTrue(PhoneSetupCopy.AUTO_READ_HINT.contains("自己读"))
         assertNull(PhoneSetupCopy.step(SetupStep.Connect).action)
         // USB 调试一步讲清好处:不插线、断开 Wi-Fi 也能用
@@ -112,9 +119,26 @@ class PhoneSetupCopyTest {
 
     @Test
     fun notificationReadsAsAnInstruction() {
-        assertEquals("Mika:下拉这里,输入配对码", PhoneSetupCopy.NOTIFY_ENTER_TITLE)
-        assertEquals("输入配对码", PhoneSetupCopy.NOTIFY_ACTION)
-        assertEquals("填写 6 位数字", PhoneSetupCopy.NOTIFY_INPUT_LABEL)
+        assertEquals("输入配对码", PhoneSetupCopy.NOTIFY_ENTER_TITLE)
+        assertEquals("把屏幕上的 6 位数字填在这里，不用离开配对窗口", PhoneSetupCopy.NOTIFY_ENTER_TEXT)
+        assertEquals("填配对码", PhoneSetupCopy.NOTIFY_ACTION)
+        assertEquals("6 位数字", PhoneSetupCopy.NOTIFY_INPUT_LABEL)
+        assertEquals("正在配对…", PhoneSetupCopy.NOTIFY_WORKING)
+        assertEquals("配对成功", PhoneSetupCopy.NOTIFY_DONE_TITLE)
+    }
+
+    @Test
+    fun notificationErrorsSayHowToGetANewCode() {
+        assertEquals(
+            "配对码不对或已失效：在配对窗口重新点「使用配对码配对设备」拿新的码，再填一次",
+            PhoneSetupCopy.notifyRetry(BuiltinShellFailure.WrongCode),
+        )
+        assertTrue(PhoneSetupCopy.notifyRetry(BuiltinShellFailure.PairingWindowClosed).contains("「使用配对码配对设备」拿新的码，再填一次"))
+        assertEquals("要填 6 位数字，再填一次", PhoneSetupCopy.NOTIFY_CODE_INVALID)
+        // 配对码要在通知里填:通知没开时一句话说清为什么
+        assertTrue(PhoneSetupCopy.NEED_NOTIFICATIONS.startsWith("配对码要在通知里填"))
+        assertTrue(PhoneSetupCopy.PAIRING_CHANNEL_OFF.contains("「${PhoneSetupCopy.CHANNEL_NAME}」"))
+        assertTrue(PhoneSetupCopy.PAIRING_LOWERED.contains("「在屏幕上弹出」"))
     }
 
     @Test

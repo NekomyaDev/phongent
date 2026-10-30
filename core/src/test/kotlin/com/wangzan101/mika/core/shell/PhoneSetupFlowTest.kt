@@ -255,11 +255,38 @@ class PhoneSetupFlowTest {
     }
 
     @Test
+    fun pairingStepSaysWhatIsWrongWithTheNotification() {
+        val pairing = fresh.copy(developerOptions = true, usbDebugging = true, accessibility = false, accessibilitySkipped = true, wirelessDebugging = true)
+        assertEquals(SetupStep.PairingCode, PhoneSetupFlow.view(pairing).current)
+        assertNull(PhoneSetupFlow.view(pairing).notifyIssue)
+        // 没允许通知最要紧;其次「配对」通知被关;被调成不弹出只提醒,不算发不出来
+        val off = PhoneSetupFlow.view(pairing.copy(notificationsAllowed = false, pairingChannel = PairingChannelHealth.Off))
+        assertEquals(PairingNotifyIssue.NotificationsOff, off.notifyIssue)
+        val channelOff = PhoneSetupFlow.view(pairing.copy(pairingChannel = PairingChannelHealth.Off))
+        assertEquals(PairingNotifyIssue.ChannelOff, channelOff.notifyIssue)
+        assertTrue(channelOff.needsNotifications)
+        val lowered = PhoneSetupFlow.view(pairing.copy(pairingChannel = PairingChannelHealth.Lowered))
+        assertEquals(PairingNotifyIssue.NotHeadsUp, lowered.notifyIssue)
+        assertFalse(lowered.needsNotifications)
+        // 别的步骤不管通知
+        assertNull(PhoneSetupFlow.view(fresh.copy(pairingChannel = PairingChannelHealth.Off)).notifyIssue)
+        // 配对失败停在配对一步时照样提醒
+        val failed = PhoneSetupFlow.view(pairing.copy(status = BuiltinShellStatus.Failed(BuiltinShellFailure.WrongCode), pairingChannel = PairingChannelHealth.Off))
+        assertEquals(PairingNotifyIssue.ChannelOff, failed.notifyIssue)
+    }
+
+    @Test
     fun pairingCodeNormalization() {
         assertEquals("123456", PairingCode.normalize("123456"))
         assertEquals("123456", PairingCode.normalize(" 123 456 "))
         assertEquals("123456", PairingCode.normalize("123-456"))
         assertEquals("123456", PairingCode.normalize("１２３４５６"))
+        // 全角空格、全角横线、输入法的长短横线
+        assertEquals("123456", PairingCode.normalize("１２３\u3000４５６"))
+        assertEquals("123456", PairingCode.normalize("123－456"))
+        assertEquals("123456", PairingCode.normalize("12–34—56"))
+        assertNull(PairingCode.normalize(""))
+        assertNull(PairingCode.normalize("123 45"))
         assertNull(PairingCode.normalize("12345"))
         assertNull(PairingCode.normalize("1234567"))
         assertNull(PairingCode.normalize("12a456"))

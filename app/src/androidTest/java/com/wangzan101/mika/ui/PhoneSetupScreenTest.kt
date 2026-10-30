@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.wangzan101.mika.core.shell.BuiltinShellFailure
 import com.wangzan101.mika.core.shell.BuiltinShellFix
 import com.wangzan101.mika.core.shell.BuiltinShellStatus
+import com.wangzan101.mika.core.shell.PairingChannelHealth
 import com.wangzan101.mika.core.shell.PairingDiscovery
 import com.wangzan101.mika.core.shell.PhoneSetupFlow
 import com.wangzan101.mika.core.shell.SetupInputs
@@ -41,8 +42,12 @@ class PhoneSetupScreenTest {
             onAppInfo = { calls += "appInfo" },
             onSkipAccessibility = { calls += "skipA11y" },
             onRevisit = { calls += "revisit $it" },
+            onOpenPairingChannel = { calls += "pairingChannel" },
         )
     }
+
+    /** 走到配对一步、无障碍跳过了:配对码只能填在通知里。 */
+    private val pairingWithoutA11y = SetupInputs(true, true, BuiltinShellStatus.NotPaired, accessibility = false, accessibilitySkipped = true)
 
     @Test
     fun firstStepOpensAboutPhone() {
@@ -110,9 +115,47 @@ class PhoneSetupScreenTest {
     }
 
     @Test
-    fun pairingHintDependsOnAutoRead() {
-        show(SetupInputs(true, true, BuiltinShellStatus.NotPaired, accessibility = false, accessibilitySkipped = true))
-        compose.onNodeWithText(PhoneSetupCopy.PULL_DOWN_HINT).assertIsDisplayed()
+    fun pairingWithoutAccessibilityShowsTheThreeStepGuide() {
+        show(pairingWithoutA11y)
+        compose.onNodeWithTag("setup-pairing-guide").performScrollTo().assertIsDisplayed()
+        PhoneSetupCopy.NOTIFY_GUIDE.forEach { compose.onNodeWithText(it).assertExists() }
+        compose.onNodeWithTag("setup-pairing-hint").assertDoesNotExist()
+        // 通知好好的:主按钮还是去无线调试,也没有修通知的按钮
+        compose.onNodeWithTag("setup-notify-fix").assertDoesNotExist()
+        compose.onNodeWithTag("setup-action").performScrollTo().performClick()
+        assertEquals(listOf("step PairingCode"), calls)
+    }
+
+    @Test
+    fun pairingWithAccessibilityShowsTheAutoReadHint() {
+        show(SetupInputs(true, true, BuiltinShellStatus.NotPaired))
+        compose.onNodeWithText(PhoneSetupCopy.AUTO_READ_HINT).assertIsDisplayed()
+        compose.onNodeWithTag("setup-pairing-guide").assertDoesNotExist()
+    }
+
+    @Test
+    fun pairingAsksToAllowNotificationsFirstWhenTheyAreOff() {
+        show(pairingWithoutA11y.copy(notificationsAllowed = false))
+        compose.onNodeWithText(PhoneSetupCopy.NEED_NOTIFICATIONS).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-notify-fix").performScrollTo().assertIsDisplayed().performClick()
+        assertEquals(listOf("notify"), calls)
+    }
+
+    @Test
+    fun pairingOpensTheChannelSettingsWhenPairingNotificationsAreOff() {
+        show(pairingWithoutA11y.copy(pairingChannel = PairingChannelHealth.Off))
+        compose.onNodeWithText(PhoneSetupCopy.PAIRING_CHANNEL_OFF).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(PhoneSetupCopy.OPEN_PAIRING_CHANNEL).performScrollTo().performClick()
+        assertEquals(listOf("pairingChannel"), calls)
+    }
+
+    @Test
+    fun pairingWarnsWhenPairingNotificationsDoNotPopUp() {
+        show(pairingWithoutA11y.copy(pairingChannel = PairingChannelHealth.Lowered))
+        compose.onNodeWithTag("setup-pairing-lowered").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("setup-notify-fix").assertDoesNotExist()
+        compose.onNodeWithTag("setup-pairing-lowered-open").performScrollTo().performClick()
+        assertEquals(listOf("pairingChannel"), calls)
     }
 
     @Test

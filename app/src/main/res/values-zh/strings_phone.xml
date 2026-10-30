@@ -34,7 +34,6 @@
     <string name="phone_a11y_skipped">已跳过</string>
     <string name="phone_app_info">打不开?先去应用信息里允许受限制的设置</string>
     <string name="phone_auto_read">看到配对码后稍等几秒,Mika 会自己读出来并完成配对,不用离开那个页面。</string>
-    <string name="phone_pull_down">看到 6 位数字后,从屏幕顶部下拉,点 Mika 通知里的「输入配对码」</string>
     <string name="phone_turned_on_next">我已经打开了,下一步</string>
     <string name="phone_revisit_back">回到原来的步骤</string>
     <string name="phone_revisit_note">点上面任一步,可以回去重做。</string>
@@ -43,7 +42,7 @@
     <string name="phone_suspect_wireless_unreadable">这台手机读不到「无线调试」的开关。请回去确认已经打开,并且连着 Wi-Fi。</string>
     <string name="phone_suspect_go_back">回到「%1$s」</string>
     <string name="phone_port_found">已找到配对窗口,请在通知里填写配对码。</string>
-    <string name="phone_need_notif">配对码要填在 Mika 的通知里,请先允许 Mika 发通知。</string>
+    <string name="phone_need_notif">配对码要在通知里填，先允许 Mika 发通知。</string>
     <string name="phone_heads_up_lowered">「需要你处理」和「任务结果」的通知现在不会弹出，要你接手时容易错过。可以先继续，也可以现在就去打开。</string>
     <string name="phone_manual_toggle">通知没出来?在这里填</string>
     <string name="phone_manual_hint">离开配对窗口它就会关掉。可以用分屏,一边看配对码一边在这里填。</string>
@@ -99,12 +98,22 @@
     <string name="phone_unpair_confirm">解除</string>
     <string name="phone_degraded">手机操作还没准备好,这次没法操作手机 App;网页和文件照常。</string>
     <string name="phone_channel">配对</string>
-    <string name="phone_notify_enter_title">Mika:下拉这里,输入配对码</string>
-    <string name="phone_notify_enter_text">点「输入配对码」,填上屏幕上显示的 6 位数字</string>
-    <string name="phone_notify_action">输入配对码</string>
-    <string name="phone_notify_input">填写 6 位数字</string>
+    <string name="phone_notify_enter_title">输入配对码</string>
+    <string name="phone_notify_enter_text">把屏幕上的 6 位数字填在这里，不用离开配对窗口</string>
+    <string name="phone_notify_action">填配对码</string>
+    <string name="phone_notify_input">6 位数字</string>
     <string name="phone_notify_working">正在配对…</string>
-    <string name="phone_notify_done_title">手机操作设置好了</string>
-    <string name="phone_notify_done_text">可以回到 Mika 了</string>
+    <string name="phone_notify_done_title">配对成功</string>
+    <string name="phone_notify_done_text">手机操作设置好了，可以回到 Mika 了</string>
     <string name="phone_notify_problem">回到 Mika 查看怎么处理</string>
+    <string name="phone_notify_window_found">已找到配对窗口</string>
+    <string name="phone_notify_retry_code">配对码不对或已失效：在配对窗口重新点「使用配对码配对设备」拿新的码，再填一次</string>
+    <string name="phone_notify_retry_window">配对窗口关了或配对码已失效：在配对窗口重新点「使用配对码配对设备」拿新的码，再填一次</string>
+    <string name="phone_notify_code_invalid">要填 6 位数字，再填一次</string>
+    <string name="phone_guide_1">点「使用配对码配对设备」</string>
+    <string name="phone_guide_2">屏幕顶部弹出 Mika 的通知；没看到就下拉通知栏</string>
+    <string name="phone_guide_3">点「%1$s」，输入 6 位数字</string>
+    <string name="phone_pairing_channel_off">配对码要在通知里填，先打开 Mika 的「%1$s」通知。</string>
+    <string name="phone_open_pairing_channel">打开「%1$s」通知</string>
+    <string name="phone_pairing_lowered">Mika 的「%1$s」通知现在不会在屏幕顶部弹出。去打开「在屏幕上弹出」，配对码就能直接填在配对窗口上方；不打开也可以下拉通知栏去填。</string>
 </resources>
