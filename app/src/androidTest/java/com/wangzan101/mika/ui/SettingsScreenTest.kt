@@ -72,8 +72,9 @@ class SettingsScreenTest {
         home()
         compose.onNodeWithText("一切就绪").assertIsDisplayed()
         compose.onNodeWithText("基本").assertIsDisplayed()
-        // 首页一屏放不下(多了「语言」一行后更长):每个值先滚进视口再看
-        for (v in listOf("DeepSeek", "可用", "3 个", "2 项", "8 条", "已就绪", "0.1.0")) {
+        // 首页一屏放不下(多了「语言」一行后更长):每个值先滚进视口再看。
+        // 依次是模型、手机操作、通知、网站登录、操作路线、计算环境、关于
+        for (v in listOf("DeepSeek", "可用", "正常", "3 个", "8 条", "已就绪", "0.1.0")) {
             scrollTo(v)
             compose.onNodeWithText(v).assertIsDisplayed()
         }

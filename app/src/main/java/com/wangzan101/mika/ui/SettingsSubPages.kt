@@ -232,7 +232,7 @@ object CapsuleSettingsCopy {
     val FOOTNOTE: String get() = tr(R.string.capsule_settings_foot)
 
     fun label(mode: CapsuleMode): String = when (mode) {
-        CapsuleMode.Off -> tr(R.string.state_turned_off)
+        CapsuleMode.Off -> tr(R.string.capsule_mode_off)
         CapsuleMode.DuringTasks -> tr(R.string.capsule_mode_tasks)
         CapsuleMode.Always -> tr(R.string.capsule_mode_always)
     }

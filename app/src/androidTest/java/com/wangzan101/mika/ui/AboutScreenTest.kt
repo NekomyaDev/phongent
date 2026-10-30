@@ -247,8 +247,9 @@ class AboutScreenTest {
         compose.onNodeWithText("关于 Mika").assertIsDisplayed()
         compose.onNodeWithTag("update-dot", useUnmergedTree = true).assertExists()
         val footer = compose.onNodeWithTag("drawer-footer").getUnclippedBoundsInRoot()
-        val settings = compose.onNodeWithText("设置").getUnclippedBoundsInRoot()
-        val about = compose.onNodeWithText("关于 Mika").getUnclippedBoundsInRoot()
+        // 量文字本身(未合并的树):合并后的可点行节点比文字宽,量它判断不了左右半边
+        val settings = compose.onNodeWithText("设置", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val about = compose.onNodeWithText("关于 Mika", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val dot = compose.onNodeWithTag("update-dot", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val mid = (footer.left + footer.right) / 2
         assertTrue(settings.right < mid)
