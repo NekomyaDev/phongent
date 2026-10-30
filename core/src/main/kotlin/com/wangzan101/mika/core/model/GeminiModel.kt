@@ -96,7 +96,7 @@ class GeminiModel(
             status == 401 || status == 403 -> ModelError.Auth()
             // Gemini 的 429 一律按可重试限流处理(其限流与额度文案混用,无法可靠区分)
             status == 429 || st == "RESOURCE_EXHAUSTED" -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))
-            status == 404 -> ModelError.ModelNotFound()
+            status == 404 -> ModelError.ModelNotFound(model)
             status == 413 || (status == 400 && lower.contains("token") &&
                 (lower.contains("exceed") || lower.contains("too long") || lower.contains("maximum"))) -> ModelError.ContextTooLong()
             status in 500..599 -> ModelError.Server(status)

@@ -28,6 +28,7 @@
     <string name="reply_hint">输入你的回答</string>
     <string name="ui_locale">zh-CN</string>
     <string name="list_sep">、</string>
+    <string name="sentence_sep">""</string>
     <string name="date_month_day">%1$d 月 %3$d 日</string>
     <string name="date_year_month_day">%1$d 年 %2$d 月 %4$d 日</string>
     <string name="ok_got_it">知道了</string>

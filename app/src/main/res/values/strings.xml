@@ -29,6 +29,7 @@
     <string name="reply_hint">Type your answer</string>
     <string name="ui_locale">en</string>
     <string name="list_sep">", "</string>
+    <string name="sentence_sep">" "</string>
     <string name="date_month_day">%2$s %3$d</string>
     <string name="date_year_month_day">%3$s %4$d, %1$d</string>
     <string name="ok_got_it">Got it</string>

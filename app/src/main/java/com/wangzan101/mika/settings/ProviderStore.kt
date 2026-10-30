@@ -98,6 +98,8 @@ data class ProviderConfig(
  * [models] 是最近一次列出的模型(「测试并保存」或刷新时记下,和配置存在同一个文件里);
  * 为 null 表示还没列过,空列表表示列过但服务不提供列表(或一个也没有)。
  * [sessionHeader] 是它要求放对话会话号的请求头名(来自预设,见 [ProviderPreset.sessionHeader]);不要的为 null。
+ * [verifiedModels] 是在这家试调用(见 [ProviderStore.probe])得到过回复的模型名:不提供列表的服务商,模型名是手填的,
+ * 没在这里的就没核实过(旧版本存下的都没有,那时不提供列表的服务商不试调用)。
  */
 data class Provider(
     val id: String,
@@ -106,6 +108,7 @@ data class Provider(
     val baseUrl: String,
     val models: List<ListedModel>? = null,
     val sessionHeader: String? = null,
+    val verifiedModels: Set<String> = emptySet(),
 ) {
     val key: String get() = ProviderConnection.keyOf(kind, baseUrl, name)
 }
@@ -273,14 +276,16 @@ class ProviderStore(
     /**
      * 「测试并保存」连上了一个服务商:存下它(名字、接口类型、地址、Key)和列出的模型。
      * 接口类型、地址和名字都相同的服务商已经有了,就更新那一个(换 Key、换列表),不重复添加。
-     * [apiKey] 为 null 时不改已存的 Key。
+     * [apiKey] 为 null 时不改已存的 Key。[verified] 是这次试调用得到回复的模型名,记进 [Provider.verifiedModels]。
      */
     @Synchronized
     fun connect(
         name: String, kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, models: List<ListedModel>,
         sessionHeader: String? = ProviderPresets.forBaseUrl(baseUrl)?.sessionHeader,
+        verified: Set<String> = emptySet(),
     ): Provider {
-        val p = findOrAddProvider(name, kind, baseUrl).copy(models = models, sessionHeader = sessionHeader)
+        val found = findOrAddProvider(name, kind, baseUrl)
+        val p = found.copy(models = models, sessionHeader = sessionHeader, verifiedModels = found.verifiedModels + verified)
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
         if (apiKey != null) setKey(p.id, apiKey)
         writeConfig()
@@ -292,6 +297,15 @@ class ProviderStore(
     fun rememberModels(providerId: String, models: List<ListedModel>) {
         if (provider(providerId) == null) return
         _providers.value = _providers.value.map { if (it.id == providerId) it.copy(models = models) else it }
+        writeConfig()
+    }
+
+    /** 记下 [model] 在这家试调用得到了回复(见 [Provider.verifiedModels])。 */
+    @Synchronized
+    fun markVerified(providerId: String, model: String) {
+        val p = provider(providerId) ?: return
+        if (model in p.verifiedModels) return
+        _providers.value = _providers.value.map { if (it.id == providerId) it.copy(verifiedModels = it.verifiedModels + model) else it }
         writeConfig()
     }
 
@@ -610,6 +624,7 @@ class ProviderStore(
         baseUrl = o.str("baseUrl"),
         // 旧版本存下的没有这一项:按地址对得上的预设补上(读入后写回文件时记进去)
         sessionHeader = o["sessionHeader"]?.jsonPrimitive?.content ?: ProviderPresets.forBaseUrl(o.str("baseUrl"))?.sessionHeader,
+        verifiedModels = o["verifiedModels"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty(),
         models = o["models"]?.jsonArray?.map { e ->
             val m = e.jsonObject
             ListedModel(
@@ -673,6 +688,7 @@ class ProviderStore(
                     addJsonObject {
                         put("id", p.id); put("name", p.name); put("kind", p.kind.name); put("baseUrl", p.baseUrl)
                         p.sessionHeader?.let { put("sessionHeader", it) }
+                        if (p.verifiedModels.isNotEmpty()) putJsonArray("verifiedModels") { p.verifiedModels.forEach { add(it) } }
                         p.models?.let { models ->
                             putJsonArray("models") {
                                 models.forEach { m ->

@@ -3,7 +3,10 @@ package com.wangzan101.mika.ui
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.model.ListFailure
+import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ListedModel
+import com.wangzan101.mika.core.model.ModelEndpoint
+import com.wangzan101.mika.core.model.ModelError
 import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.settings.LocalHosts
@@ -58,13 +61,17 @@ interface ChatGptBrowser {
     fun page(params: Map<String, String>): String
 }
 
-/** 「添加服务商」表单。 */
+/**
+ * 「添加服务商」表单。[noList] 为真时上次测试没列出模型:要先填 [model](手填的模型名),再测试就用它试调用。
+ */
 data class AddForm(
     val preset: String,
     val kind: ProviderConfig.Kind,
     val baseUrl: String,
     val apiKey: String,
     val test: ListState = ListState.Idle,
+    val model: String = "",
+    val noList: Boolean = false,
 ) {
     val isCustom: Boolean get() = preset == ProviderPresets.custom.label
 
@@ -88,7 +95,18 @@ data class AddForm(
     /** 自己跑的服务和自定义的 OpenAI 兼容接口(多半是本地服务)可以不填 Key,其余都要。 */
     val keyRequired: Boolean get() = !isSelfHosted && !(isCustom && kind == ProviderConfig.Kind.OpenAiCompat)
 
-    val canTest: Boolean get() = urlProblem == null && (!keyRequired || apiKey.isNotBlank()) && test != ListState.Running
+    val canTest: Boolean get() =
+        urlProblem == null && (!keyRequired || apiKey.isNotBlank()) && test != ListState.Running && (!noList || model.isNotBlank())
+
+    /** 自定义填的是某家服务商的官方地址(主机名对得上,见 [ProviderPresets.forHost]):建议改用那个预设。 */
+    val suggestedPreset: ProviderPreset? get() = if (isCustom && urlProblem == null) ProviderPresets.forHost(baseUrl) else null
+
+    /** 地址就是 [suggestedPreset] 的那个地址,选的接口类型却和它的不一样:照这样一定调不通。 */
+    val presetKindMismatch: Boolean
+        get() = suggestedPreset?.let { s -> ProviderPresets.forBaseUrl(baseUrl.trim()) == s && kind != s.kind } == true
+
+    /** 举模型名的例子按哪一类接口:地址对得上某个预设的按那个预设,否则按选的接口类型。 */
+    val exampleKind: ProviderConfig.Kind get() = suggestedPreset?.kind ?: kind
 
     /** 存成服务商时用的名字:预设用预设名,自定义用地址的主机名。 */
     val providerName: String get() = if (isCustom) ProviderConnection.nameForUrl(baseUrl) else preset
@@ -125,6 +143,10 @@ data class ModelSetupUi(
     val chatGptRevokeUnconfirmed: Boolean = false,
     /** 刚存下的服务商,试调用的模型没调用工具(见 [ModelSetupViewModel.testAndSave]);再测试、选了主模型时清掉。 */
     val toolWarning: String? = null,
+    /** 选择页里手填模型名后试调用的进度(按服务商 id)。 */
+    val manualPick: Map<String, ListState> = emptyMap(),
+    /** 服务商页「重新测试」的进度(按服务商 id)。 */
+    val retest: Map<String, ListState> = emptyMap(),
 ) {
     /** 还没有服务商时表单总是展开。 */
     val showForm: Boolean get() = formOpen || providers.isEmpty()
@@ -149,6 +171,15 @@ data class ModelSetupUi(
 
     /** 实际在用这个服务商的用途。 */
     fun rolesOf(p: Provider): List<ModelRole> = ModelRole.entries.filter { configFor(it)?.providerId == p.id }
+
+    /**
+     * 不提供列表的服务商里,在用、却没试调用通过过的模型名(见 [Provider.verifiedModels]):这些是手填的,填错了任务就会失败。
+     * 有列表的服务商,模型是从列表里选的,不算。
+     */
+    fun unverified(p: Provider): List<String> =
+        if (p.kind == ProviderConfig.Kind.ChatGpt || p.models?.isEmpty() != true) emptyList()
+        else roles.referenced.mapNotNull { id -> configs.firstOrNull { it.id == id && it.providerId == p.id }?.model }
+            .distinct().filter { it !in p.verifiedModels }
 
     /** 这个用途明确选的是不是这个模型(「用主模型」不算)。 */
     fun picked(role: ModelRole, providerId: String, model: String): Boolean {
@@ -210,9 +241,11 @@ class ModelSetupViewModel(
         edit { AddForm.of(p).copy(apiKey = key) }
     }
 
-    fun setKind(kind: ProviderConfig.Kind) = edit { it.copy(kind = kind) }
-    fun setBaseUrl(url: String) = edit { it.copy(baseUrl = url) }
+    // 换了接口类型或地址,上次「没列出模型」就不作数了,要重新列
+    fun setKind(kind: ProviderConfig.Kind) = edit { it.copy(kind = kind, noList = false) }
+    fun setBaseUrl(url: String) = edit { it.copy(baseUrl = url, noList = false) }
     fun setApiKey(key: String) = edit { it.copy(apiKey = key) }
+    fun setModel(model: String) = edit { it.copy(model = model) }
 
     /** 连接信息变了:进行中的测试和上次的失败原因作废。 */
     private fun edit(change: (AddForm) -> AddForm) {
@@ -221,9 +254,13 @@ class ModelSetupViewModel(
     }
 
     /**
-     * 测试并保存:列得出模型(或服务不提供列表),再让一个模型调用一次工具(见 [probe])也成了,就存下这家服务商,表单清空收起;
+     * 测试并保存:列得出模型,再让一个模型调用一次工具(见 [probe])也成了,就存下这家服务商,表单清空收起;
      * 哪一步不成就说原因、不存。接口通、模型却只回了话不调用工具:照样存下服务商,但不拿那个模型当主模型,
      * 提醒一句([ModelSetupUi.toolWarning])。
+     *
+     * 没列出模型(列表接口不存在,或列出来是空的):可能这家真不提供列表,也可能地址、接口类型填错了,单看列表分不出来。
+     * 所以不直接存,要用户填一个模型名([AddForm.noList]),再测试时用它试调用:通了才存成不提供列表的服务商,
+     * 不通说原因、不存。Key 不对等别的列表错误照旧直接说原因。
      */
     fun testAndSave() {
         val f = _state.value.form
@@ -243,17 +280,28 @@ class ModelSetupViewModel(
                     emptyList()
                 }
             }
-            val outcome = probe(f, baseUrl, key.ifEmpty { null }, models)
+            val typed = f.model.trim()
+            if (models.isEmpty() && typed.isEmpty()) {
+                _state.update { it.copy(form = it.form.copy(test = ListState.Idle, noList = true)) }
+                return@launch
+            }
+            val outcome = if (models.isEmpty()) {
+                val caps = (ProviderPresets.forBaseUrl(baseUrl) ?: ProviderPresets.custom).capabilities
+                probeModel(f.kind, baseUrl, key.ifEmpty { null }, f.sessionHeader, typed, null, caps, f.exampleKind, listMissing = f.isCustom)
+            } else {
+                probe(f, baseUrl, key.ifEmpty { null }, models)
+            }
             if (outcome is ProbeOutcome.Failed) {
                 _state.update { it.copy(form = it.form.copy(test = ListState.Failed(outcome.message))) }
                 return@launch
             }
             val noTools = (outcome as? ProbeOutcome.NoToolCall)?.model
             withContext(io) {
-                val p = store.connect(f.providerName, f.kind, baseUrl, key, models, f.sessionHeader)
+                val tried = if (models.isEmpty()) typed else null
+                val p = store.connect(f.providerName, f.kind, baseUrl, key, models, f.sessionHeader, setOfNotNull(tried))
                 if (noTools == null && store.roles.value.main == null) {
                     val options = ModelOptions.ofProvider(p, store.list())
-                    (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
+                    (tried ?: ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
                 }
             }
             val warning = noTools?.let { tr(R.string.model_probe_no_tools, it) }
@@ -261,7 +309,7 @@ class ModelSetupViewModel(
         }
     }
 
-    /** 试调用的结论:通过(或没有可试的模型)、[model] 没调用工具、失败([message] 是给人看的原因)。 */
+    /** 试调用的结论:通过(或列表里没有可试的模型)、[model] 没调用工具、失败([message] 是给人看的原因)。 */
     private sealed interface ProbeOutcome {
         data object Passed : ProbeOutcome
         data class NoToolCall(val model: String) : ProbeOutcome
@@ -269,9 +317,8 @@ class ModelSetupViewModel(
     }
 
     /**
-     * 列出模型后,让会被选作主模型的那个(没有就第一个)调用一次工具,和真实任务走同一条建模型的路(请求头、会话号都一样):
-     * Key 不对、少了服务商要的请求头、模型不会调用工具,这里就露出来,不等到第一个任务。
-     * 没有可试的模型(服务不提供列表)算通过;超过 [PROBE_TIMEOUT_MS] 没回算失败,服务端的报错原样带上。
+     * 列出模型后,让会被选作主模型的那个(没有就第一个)调用一次工具(见 [probeModel])。
+     * 列表里一个能用的也没有时算通过。
      */
     private suspend fun probe(f: AddForm, baseUrl: String, key: String?, models: List<ListedModel>): ProbeOutcome {
         // 用 ChatGPT 登录不走这张表单(登录本身就核对过了);表单只给 Key 的接口类型,这里再挡一次
@@ -281,16 +328,44 @@ class ModelSetupViewModel(
         val model = ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id ?: return ProbeOutcome.Passed
         val caps = options.first { it.id == model }.capabilities
         val endpoint = models.firstOrNull { it.id == model }?.endpoint
+        return probeModel(f.kind, baseUrl, key, f.sessionHeader, model, endpoint, caps, f.exampleKind, listMissing = false)
+    }
+
+    /**
+     * 让 [model] 调用一次工具,和真实任务走同一条建模型的路(请求头、会话号都一样):Key 不对、少了服务商要的请求头、
+     * 模型名不对、模型不会调用工具,这里就露出来,不等到第一个任务。超过 [PROBE_TIMEOUT_MS] 没回算失败,服务端的报错原样带上;
+     * 找不到模型时说清是哪个、模型名大概长什么样([exampleKind] 那一类的例子)。[listMissing] 为真时列表也没列出来,
+     * 那多半是地址或接口类型填错了,一并说。
+     */
+    private suspend fun probeModel(
+        kind: ProviderConfig.Kind, baseUrl: String, key: String?, sessionHeader: String?,
+        model: String, endpoint: ModelEndpoint?, caps: Capabilities, exampleKind: ProviderConfig.Kind, listMissing: Boolean,
+    ): ProbeOutcome {
         val result = try {
-            withContext(io) { withTimeout(PROBE_TIMEOUT_MS) { store.probe(f.kind, baseUrl, key, f.sessionHeader, model, endpoint, caps) } }
+            withContext(io) { withTimeout(PROBE_TIMEOUT_MS) { store.probe(kind, baseUrl, key, sessionHeader, model, endpoint, caps) } }
         } catch (e: TimeoutCancellationException) {
             return ProbeOutcome.Failed(tr(R.string.model_probe_timeout, model, (PROBE_TIMEOUT_MS / 1000).toInt()))
         }
         return when (result) {
             ProbeResult.ToolCalled -> ProbeOutcome.Passed
             ProbeResult.NoToolCall -> ProbeOutcome.NoToolCall(model)
-            is ProbeResult.Failed -> ProbeOutcome.Failed(tr(R.string.model_probe_failed, model, result.error.message.orEmpty()))
+            is ProbeResult.Failed -> ProbeOutcome.Failed(
+                when {
+                    result.error !is ModelError.ModelNotFound -> tr(R.string.model_probe_failed, model, result.error.message.orEmpty())
+                    listMissing -> tr(R.string.model_probe_not_found_no_list, model, ModelSetupCopy.modelExample(exampleKind))
+                    else -> tr(R.string.model_probe_not_found, model, ModelSetupCopy.modelExample(exampleKind))
+                },
+            )
         }
+    }
+
+    /** 已连上的服务商里试调用 [model]:用存着的 Key、请求头,能力按已有的配置或预设。 */
+    private suspend fun probeSaved(p: Provider, model: String): ProbeOutcome {
+        val options = ModelOptions.ofProvider(p, store.list())
+        val caps = options.firstOrNull { it.id == model }?.capabilities ?: ModelOptions.baseOf(p)
+        val endpoint = p.models?.firstOrNull { it.id == model }?.endpoint
+        val example = ProviderPresets.forHost(p.baseUrl)?.kind ?: p.kind
+        return probeModel(p.kind, p.baseUrl, store.providerKey(p.id), p.sessionHeader, model, endpoint, caps, example, listMissing = false)
     }
 
     // ---------- 用 ChatGPT 登录 ----------
@@ -376,6 +451,60 @@ class ModelSetupViewModel(
         scope.launch {
             withContext(io) { store.choose(role, choice) }
             sync()
+        }
+    }
+
+    /**
+     * 选择页里给不提供列表的服务商手填了模型名:先试调用一次,通了才用作 [role](记为核实过),然后调 [onPicked];
+     * 不通说原因、不选。主模型还要会调用工具。
+     */
+    fun pickManual(role: ModelRole, providerId: String, model: String, onPicked: () -> Unit = {}) {
+        val m = model.trim()
+        if (m.isEmpty() || _state.value.manualPick[providerId] == ListState.Running) return
+        val p = store.provider(providerId) ?: return
+        _state.update { it.copy(manualPick = it.manualPick + (providerId to ListState.Running)) }
+        scope.launch {
+            val outcome = probeSaved(p, m)
+            val problem = when {
+                outcome is ProbeOutcome.Failed -> outcome.message
+                outcome is ProbeOutcome.NoToolCall && role == ModelRole.Main -> tr(R.string.model_probe_no_tools_pick, m)
+                else -> null
+            }
+            if (problem != null) {
+                _state.update { it.copy(manualPick = it.manualPick + (providerId to ListState.Failed(problem))) }
+                return@launch
+            }
+            withContext(io) {
+                store.markVerified(p.id, m)
+                store.provider(p.id)?.let { fresh -> use(role, fresh, m, ModelOptions.ofProvider(fresh, store.list())) }
+            }
+            _state.update { snapshot(it.copy(manualPick = it.manualPick - providerId, toolWarning = if (role == ModelRole.Main) null else it.toolWarning)) }
+            onPicked()
+        }
+    }
+
+    /** 选择页打开时,上次手填试调用的结果作废。 */
+    fun clearManualPick() = _state.update { it.copy(manualPick = emptyMap()) }
+
+    /**
+     * 「重新测试」:这家在用、没核实过的模型(见 [ModelSetupUi.unverified])逐个试调用,通了记为核实过;
+     * 有一个不通就停下说原因。
+     */
+    fun retest(providerId: String) {
+        val p = store.provider(providerId) ?: return
+        val models = _state.value.unverified(p)
+        if (models.isEmpty() || _state.value.retest[providerId] == ListState.Running) return
+        _state.update { it.copy(retest = it.retest + (providerId to ListState.Running)) }
+        scope.launch {
+            for (m in models) {
+                val outcome = probeSaved(p, m)
+                if (outcome is ProbeOutcome.Failed) {
+                    _state.update { snapshot(it.copy(retest = it.retest + (providerId to ListState.Failed(outcome.message)))) }
+                    return@launch
+                }
+                withContext(io) { store.markVerified(p.id, m) }
+            }
+            _state.update { snapshot(it.copy(retest = it.retest - providerId)) }
         }
     }
 

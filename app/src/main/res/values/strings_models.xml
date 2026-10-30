@@ -17,7 +17,6 @@
     <string name="models_filter_hint">Type part of a model name</string>
     <string name="models_no_match">No model names match.</string>
     <string name="models_model_name">Model name</string>
-    <string name="models_model_name_hint">This provider has no list; enter it from the docs</string>
     <string name="models_use">Use</string>
     <string name="models_role_empty">No models to choose from yet. Add a provider first.</string>
     <string name="models_picker_note">Tags come from the provider and are for reference only; the choice is yours.</string>
@@ -103,4 +102,7 @@
     <string name="chatgpt_page_cancelled">Sign-in cancelled. You can return to Mika.</string>
     <string name="chatgpt_page_back">Return to Mika</string>
     <string name="chatgpt_no_browser">No browser found to sign in with ChatGPT.</string>
+    <string name="models_unverified">Not tested; tasks may fail</string>
+    <string name="models_unverified_note">This provider has no model list, and %1$s (in use) hasn’t passed a test, so tasks may fail. Tap “Test again” to make one test call with it.</string>
+    <string name="models_retest">Test again</string>
 </resources>

@@ -101,7 +101,7 @@ class OpenAiCompatModelTest {
         assertEquals(2000L, rl.retryAfterMs)
         assertTrue(errorFor(MockResponse().setResponseCode(400).setBody("context_length_exceeded")) is ModelError.ContextTooLong)
         assertTrue(errorFor(MockResponse().setResponseCode(400).setBody("exceeds the maximum context")) is ModelError.ContextTooLong)
-        assertTrue(errorFor(MockResponse().setResponseCode(404)) is ModelError.ModelNotFound)
+        assertEquals("m", (errorFor(MockResponse().setResponseCode(404)) as ModelError.ModelNotFound).model)
         assertEquals(503, (errorFor(MockResponse().setResponseCode(503)) as ModelError.Server).status)
         assertTrue(errorFor(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)) is ModelError.Network)
     }

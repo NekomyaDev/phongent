@@ -2,6 +2,7 @@ package com.wangzan101.mika.settings
 
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.PromptCaching
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * 添加模型时的常用服务商模板:只预填接口类型、Base URL 和能力的初始勾选,
@@ -24,6 +25,15 @@ object ProviderPresets {
 
     /** Base URL 对得上的模板(添加时选了别的模板、或测试里直接给地址时,按地址补上能力的初始值);没有为 null。 */
     fun forBaseUrl(url: String): ProviderPreset? = all.firstOrNull { it.baseUrl.isNotEmpty() && url.trimEnd('/') == it.baseUrl.trimEnd('/') }
+
+    /**
+     * 主机名和哪个服务商模板的地址一样(路径可以不同):自定义填了某家的官方地址时,建议改用那个模板。
+     * 自己跑的服务(本机地址)不算。认不出地址或没有对得上的为 null。
+     */
+    fun forHost(url: String): ProviderPreset? {
+        val host = url.trim().toHttpUrlOrNull()?.host ?: return null
+        return all.firstOrNull { !it.selfHosted && it.baseUrl.isNotEmpty() && it.baseUrl.toHttpUrlOrNull()?.host == host }
+    }
 
     val all: List<ProviderPreset> = listOf(
         ProviderPreset("DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com", caps()),

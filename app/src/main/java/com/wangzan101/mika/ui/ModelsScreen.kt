@@ -58,9 +58,13 @@ import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.settings.ModelOption
 import com.wangzan101.mika.settings.Provider
 import com.wangzan101.mika.settings.ProviderConfig
+import com.wangzan101.mika.settings.ProviderPresets
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.settings.RoleChoice
 import com.wangzan101.mika.ui.components.BarIconButton
+import com.wangzan101.mika.ui.components.ButtonKind
+import com.wangzan101.mika.ui.components.ButtonSize
+import com.wangzan101.mika.ui.components.MikaButton
 import com.wangzan101.mika.ui.components.FooterNote
 import com.wangzan101.mika.ui.components.GroupCard
 import com.wangzan101.mika.ui.components.GroupLabel
@@ -132,9 +136,9 @@ internal fun RoleCard(icon: ImageVector, label: String, line: ModelsCopy.RoleLin
 
 private val RoleTileShape = RoundedCornerShape(12.dp)
 
-/** 服务商一行:左边是名字首字的图标块。 */
+/** 服务商一行:左边是名字首字的图标块;[warning] 是要提醒的一句(用提醒色另起一行)。 */
 @Composable
-internal fun ProviderRow(p: Provider, line: String, first: Boolean, onClick: () -> Unit) {
+internal fun ProviderRow(p: Provider, line: String, first: Boolean, warning: String? = null, onClick: () -> Unit) {
     val c = MikaTheme.colors
     Column {
         if (!first) Hairline()
@@ -148,6 +152,7 @@ internal fun ProviderRow(p: Provider, line: String, first: Boolean, onClick: () 
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MikaType.Body, color = c.ink, maxLines = 1)
                 Text(line, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
+                warning?.let { Text(it, Modifier.padding(top = 2.dp).testTag("provider-warning-${p.name}"), style = MikaType.Caption, color = c.warn) }
             }
             RowChevron()
         }
@@ -159,6 +164,8 @@ internal fun ProviderRow(p: Provider, line: String, first: Boolean, onClick: () 
 class RolePickerActions(
     /** (服务商 id, 模型名) */
     val pick: (String, String) -> Unit = { _, _ -> },
+    /** 不提供列表的服务商手填的模型名(服务商 id, 模型名):先试调用,通了才选。 */
+    val pickManual: (String, String) -> Unit = { _, _ -> },
     /** 看图、轻量的固定选项(用主模型、不用)。 */
     val choose: (RoleChoice) -> Unit = {},
     val addProvider: () -> Unit = {},
@@ -217,10 +224,12 @@ fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActi
                             titleStyle = ModelIdStyle, below = { Tags(o, forVision = role == ModelRole.Vision) },
                         )
                     }
-                    if (manual) ManualModel(first = shown.isEmpty()) { actions.pick(p.id, it) }
+                    if (manual) ManualModel(p, ui.manualPick[p.id], first = shown.isEmpty()) { actions.pickManual(p.id, it) }
                 }
             }
+            val manualState = ui.manualPick[p.id]
             when {
+                manual && manualState is ListState.Failed -> FooterNote(manualState.message, Modifier.testTag("manual-model-failed"), color = c.bad)
                 state == ListState.Running -> FooterNote(ModelsCopy.LISTING)
                 state is ListState.Failed -> FooterNote(ModelSetupCopy.failed(state.message), color = c.bad)
                 shown.size > PICK_AT_MOST -> FooterNote(ModelsCopy.more(shown.size - PICK_AT_MOST))
@@ -235,14 +244,17 @@ fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActi
     }
 }
 
-/** 服务不提供模型列表时:照服务商文档填模型名。 */
+/** 服务不提供模型列表时:照服务商文档填模型名;点「使用」先试调用一次([state] 是进度),通了才选上。 */
 @Composable
-private fun ManualModel(first: Boolean, onUse: (String) -> Unit) {
+private fun ManualModel(p: Provider, state: ListState?, first: Boolean, onUse: (String) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
-    InputRow(ModelsCopy.MODEL_NAME, name, { name = it }, ModelsCopy.MODEL_NAME_HINT, first = first, modifier = Modifier.testTag("manual-model")) {
+    val running = state == ListState.Running
+    val enabled = name.isNotBlank() && !running
+    val example = ModelSetupCopy.modelExample(ProviderPresets.forHost(p.baseUrl)?.kind ?: p.kind)
+    InputRow(ModelsCopy.MODEL_NAME, name, { name = it }, example, first = first, modifier = Modifier.testTag("manual-model")) {
         Text(
-            ModelsCopy.USE, Modifier.clickable(enabled = name.isNotBlank()) { onUse(name.trim()) },
-            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (name.isNotBlank()) MikaTheme.colors.accent else MikaTheme.colors.ink3,
+            if (running) ModelSetupCopy.TESTING else ModelsCopy.USE, Modifier.clickable(enabled = enabled) { onUse(name.trim()) }.testTag("manual-model-use"),
+            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (enabled) MikaTheme.colors.accent else MikaTheme.colors.ink3,
         )
     }
 }
@@ -262,6 +274,8 @@ class ProviderDetailActions(
     /** 把这家的一个模型用作某个用途(「用作」面板里点的)。 */
     val use: (ModelRole, String) -> Unit = { _, _ -> },
     val showAll: () -> Unit = {},
+    /** 在用、没核实过的手填模型再试调用一次(见 [ModelSetupUi.unverified])。 */
+    val retest: () -> Unit = {},
     /** ChatGPT 服务商:再登录、退出登录、打开 ChatGPT 的用量页。 */
     val signIn: () -> Unit = {},
     val signOut: () -> Unit = {},
@@ -312,6 +326,17 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
                 }
             }
             FooterNote(ModelsCopy.MODELS_NOTE)
+        }
+        val unverified = ui.unverified(p)
+        if (unverified.isNotEmpty()) {
+            val retest = ui.retest[p.id]
+            FooterNote(ModelsCopy.unverifiedNote(unverified), Modifier.testTag("provider-unverified"), color = c.warn)
+            MikaButton(
+                if (retest == ListState.Running) ModelSetupCopy.TESTING else ModelsCopy.RETEST, actions.retest,
+                Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("provider-retest"),
+                kind = ButtonKind.Secondary, size = ButtonSize.Medium, enabled = retest != ListState.Running,
+            )
+            (retest as? ListState.Failed)?.let { FooterNote(it.message, Modifier.testTag("provider-retest-failed"), color = c.bad) }
         }
         when {
             p.models?.isEmpty() == true -> FooterNote(ModelsCopy.NO_LIST_NOTE)
@@ -513,7 +538,6 @@ object ModelsCopy {
     val FILTER_HINT: String get() = tr(R.string.models_filter_hint)
     val NO_MATCH: String get() = tr(R.string.models_no_match)
     val MODEL_NAME: String get() = tr(R.string.models_model_name)
-    val MODEL_NAME_HINT: String get() = tr(R.string.models_model_name_hint)
     val USE: String get() = tr(R.string.models_use)
     val ROLE_EMPTY: String get() = tr(R.string.models_role_empty)
     val PICKER_NOTE: String get() = tr(R.string.models_picker_note)
@@ -534,6 +558,10 @@ object ModelsCopy {
     val MODELS: String get() = tr(R.string.models_models)
     val MODELS_NOTE: String get() = tr(R.string.models_models_note)
     val NO_LIST_NOTE: String get() = tr(R.string.models_no_list_note)
+    val UNVERIFIED: String get() = tr(R.string.models_unverified)
+    val RETEST: String get() = tr(R.string.models_retest)
+
+    fun unverifiedNote(models: List<String>) = tr(R.string.models_unverified_note, models.joinToString(tr(R.string.list_sep)))
     val NOT_LISTED: String get() = tr(R.string.models_not_listed)
     val REFRESH: String get() = tr(R.string.refresh)
     val IN_USE: String get() = tr(R.string.models_in_use)

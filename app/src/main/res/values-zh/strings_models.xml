@@ -17,7 +17,6 @@
     <string name="models_filter_hint">输入模型名的一部分</string>
     <string name="models_no_match">没有名字对得上的模型。</string>
     <string name="models_model_name">模型名</string>
-    <string name="models_model_name_hint">这家不提供列表，照文档填</string>
     <string name="models_use">使用</string>
     <string name="models_role_empty">还没有可选的模型。先添加一个服务商。</string>
     <string name="models_picker_note">标签是服务商给的信息，只作参考；选哪个由你定。</string>
@@ -99,4 +98,7 @@
     <string name="chatgpt_page_cancelled">已取消登录，可以回到 Mika 了。</string>
     <string name="chatgpt_page_back">回到 Mika</string>
     <string name="chatgpt_no_browser">没有找到可以登录 ChatGPT 的浏览器。</string>
+    <string name="models_unverified">没测试通过，任务可能会失败</string>
+    <string name="models_unverified_note">这家不提供模型列表，在用的 %1$s 还没测试通过，任务可能会失败。点「重新测试」用它试调用一次。</string>
+    <string name="models_retest">重新测试</string>
 </resources>

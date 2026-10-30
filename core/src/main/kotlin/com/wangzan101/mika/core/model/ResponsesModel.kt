@@ -184,7 +184,7 @@ class ResponsesModel(
         "context_length_exceeded" -> ModelError.ContextTooLong()
         "insufficient_quota" -> ModelError.QuotaExceeded()
         "rate_limit_exceeded" -> if (chatGptPlan) ModelError.ChatGptLimitReached() else ModelError.RateLimited(null)
-        "model_not_found" -> ModelError.ModelNotFound()
+        "model_not_found" -> ModelError.ModelNotFound(model)
         "server_error" -> ModelError.Server(500)
         else -> null
     }
@@ -196,7 +196,7 @@ class ResponsesModel(
             status == 429 -> if (chatGptPlan) ModelError.ChatGptLimitReached() else ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))
             status == 402 -> ModelError.QuotaExceeded()
             status == 400 && (body.contains("context_length") || body.contains("maximum context")) -> ModelError.ContextTooLong()
-            status == 404 -> ModelError.ModelNotFound()
+            status == 404 -> ModelError.ModelNotFound(model)
             status in 500..599 -> ModelError.Server(status)
             else -> ModelError.BadResponse("HTTP $status ${body.take(200)}")
         }

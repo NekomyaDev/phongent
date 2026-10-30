@@ -98,6 +98,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
             remove = { vm.removeProvider(provider.id); openProvider = null; allModels = false },
             use = { role, model -> vm.pick(role, provider.id, model) },
             showAll = { allModels = true },
+            retest = { vm.retest(provider.id) },
             signIn = vm::signInWithChatGpt, signOut = { vm.signOutChatGpt(provider.id) },
             manageUsage = { openInBrowser(context, ChatGptAuth.USAGE_URL) },
         )
@@ -112,11 +113,12 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
     }
     picking?.let { role ->
         BackHandler { picking = null }
-        LaunchedEffect(role) { vm.ensureListed() }
+        LaunchedEffect(role) { vm.ensureListed(); vm.clearManualPick() }
         RolePickerContent(
             ui, role,
             RolePickerActions(
                 pick = { pid, model -> vm.pick(role, pid, model); picking = null },
+                pickManual = { pid, model -> vm.pickManual(role, pid, model) { picking = null } },
                 choose = { vm.choose(role, it); picking = null },
                 addProvider = { vm.openForm(); picking = null },
             ),
@@ -131,6 +133,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
         ui, onboarding,
         ModelSetupActions(
             selectPreset = vm::selectPreset, setKind = vm::setKind, setBaseUrl = vm::setBaseUrl, setApiKey = vm::setApiKey,
+            setModel = vm::setModel,
             testAndSave = vm::testAndSave, openForm = vm::openForm, closeForm = vm::closeForm,
             openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, next = onDone,
             signInWithChatGpt = vm::signInWithChatGpt, cancelChatGpt = vm::cancelChatGptSignIn,
@@ -145,6 +148,7 @@ class ModelSetupActions(
     val setKind: (ProviderConfig.Kind) -> Unit = {},
     val setBaseUrl: (String) -> Unit = {},
     val setApiKey: (String) -> Unit = {},
+    val setModel: (String) -> Unit = {},
     val testAndSave: () -> Unit = {},
     val openForm: () -> Unit = {},
     val closeForm: () -> Unit = {},
@@ -206,7 +210,8 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
             ui.providers.forEachIndexed { i, p ->
                 val line = if (p.kind == ProviderConfig.Kind.ChatGpt && ui.chatGptAccount?.signedIn != true) ModelsCopy.CHATGPT_SIGNED_OUT
                     else ModelsCopy.providerLine(p, ui.listing[p.id], ui.rolesOf(p))
-                ProviderRow(p, line, first = i == 0) { actions.openProvider(p.id) }
+                val warning = ModelsCopy.UNVERIFIED.takeIf { ui.unverified(p).isNotEmpty() }
+                ProviderRow(p, line, first = i == 0, warning = warning) { actions.openProvider(p.id) }
             }
             if (!ui.showForm) {
                 ListRow(
@@ -272,8 +277,16 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         ) {
             Text(if (showKey) stringResource(R.string.hide) else stringResource(R.string.show), Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent)
         }
+        if (f.noList) {
+            InputRow(
+                ModelSetupCopy.MODEL_NAME, f.model, actions.setModel, ModelSetupCopy.modelExample(f.exampleKind),
+                keyboard = KeyboardType.Uri, modifier = Modifier.testTag("setup-model"),
+            )
+        }
     }
     f.urlProblem?.takeIf { f.urlEditable && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    f.suggestedPreset?.let { preset -> PresetSuggestion(f, preset.label) { actions.selectPreset(preset.label) } }
+    if (f.noList) FooterNote(if (f.isCustom) ModelSetupCopy.NO_LIST_CUSTOM else ModelSetupCopy.NO_LIST_PRESET, Modifier.testTag("setup-no-list"))
     if (f.isSelfHosted) FooterNote(ModelSetupCopy.SELF_HOSTED_NOTE, Modifier.testTag("setup-self-hosted"))
     f.unencryptedWarning?.let { FooterNote(it, Modifier.testTag("setup-url-unencrypted"), color = c.warn) }
     MikaButton(
@@ -288,6 +301,18 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         )
     }
     FooterNote(ModelSetupCopy.TEST_NOTE, Modifier.padding(top = 6.dp))
+}
+
+/** 自定义填的是某家的官方地址:建议改用那家的预设(不拦着),接口类型对不上时一并说;点一下就换过去,Key 留着。 */
+@Composable
+private fun PresetSuggestion(f: AddForm, label: String, onUse: () -> Unit) {
+    val c = MikaTheme.colors
+    FooterNote(ModelSetupCopy.presetSuggestion(f), Modifier.padding(top = 2.dp).testTag("setup-preset-hint"), color = c.warn)
+    Text(
+        ModelSetupCopy.usePreset(label),
+        Modifier.padding(start = 16.dp, bottom = 12.dp).clickable(onClick = onUse).testTag("setup-use-preset").padding(vertical = 4.dp),
+        fontSize = 13.sp, fontWeight = FontWeight.Medium, color = c.accent,
+    )
 }
 
 /**
@@ -413,6 +438,29 @@ object ModelSetupCopy {
     val TESTING: String get() = tr(R.string.model_testing)
     val TEST_NOTE: String get() = tr(R.string.model_test_note)
     val SELF_HOSTED_NOTE: String get() = tr(R.string.model_self_hosted_note)
+    val MODEL_NAME: String get() = tr(R.string.model_manual_name)
+    val NO_LIST_CUSTOM: String get() = tr(R.string.model_no_list_custom)
+    val NO_LIST_PRESET: String get() = tr(R.string.model_no_list_preset)
+
+    /** 手填模型名时举的例子,按接口类型(各家模型名的样子不同)。 */
+    fun modelExample(kind: ProviderConfig.Kind): String = tr(
+        when (kind) {
+            ProviderConfig.Kind.Gemini -> R.string.model_example_gemini
+            ProviderConfig.Kind.Anthropic -> R.string.model_example_anthropic
+            ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> R.string.model_example_openai
+            ProviderConfig.Kind.OpenAiCompat -> R.string.model_example_compat
+        },
+    )
+
+    /** 自定义地址是某家官方地址时的建议;接口类型和那家对不上时补一句。 */
+    fun presetSuggestion(f: AddForm): String {
+        val preset = f.suggestedPreset ?: return ""
+        val match = tr(R.string.model_preset_match, preset.label)
+        return if (!f.presetKindMismatch) match
+        else match + tr(R.string.sentence_sep) + tr(R.string.model_preset_kind_mismatch, preset.label, ModelsCopy.kindLabel(preset.kind), ModelsCopy.kindLabel(f.kind))
+    }
+
+    fun usePreset(label: String) = tr(R.string.model_use_preset, label)
     val NEXT: String get() = tr(R.string.next)
 
     fun failed(reason: String) = tr(R.string.model_failed, reason)

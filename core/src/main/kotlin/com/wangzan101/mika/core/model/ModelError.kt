@@ -5,7 +5,8 @@ sealed class ModelError(message: String, cause: Throwable? = null) : Exception(m
     class QuotaExceeded : ModelError("额度已用完")
     class RateLimited(val retryAfterMs: Long?) : ModelError("请求太频繁,请稍后再试")
     class ContextTooLong : ModelError("对话内容超出模型上下文长度")
-    class ModelNotFound : ModelError("找不到该模型")
+    /** 服务商那里没有这个模型(或地址不对,请求的接口不存在);[model] 是请求的模型名,不知道时为空。 */
+    class ModelNotFound(val model: String = "") : ModelError(if (model.isEmpty()) "找不到该模型" else "找不到模型「$model」")
     class Network(cause: Throwable? = null) : ModelError("网络连接失败", cause)
     class Server(val status: Int) : ModelError("模型服务出错(HTTP $status)")
     class ContentRefused : ModelError("模型拒绝处理该内容")

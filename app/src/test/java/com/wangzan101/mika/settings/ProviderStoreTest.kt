@@ -233,6 +233,21 @@ class ProviderStoreTest {
         assertNull(ProviderStore(tmp.root, AesGcmKeyCipher { otherKey }).apiKey("a"))
     }
 
+    /** 试调用通过的模型名随服务商存下;再连一次同一家时合并;旧文件没有这一项时为空。 */
+    @Test
+    fun verifiedModelsPersist() {
+        val s = store()
+        val p = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", emptyList(), verified = setOf("a"))
+        assertEquals(setOf("a"), p.verifiedModels)
+        s.markVerified(p.id, "b")
+        s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", null, emptyList(), verified = setOf("c"))
+        assertEquals(setOf("a", "b", "c"), store().provider(p.id)?.verifiedModels)
+        val f = File(tmp.root, "providers.json")
+        f.writeText(f.readText().replace(Regex(",\"verifiedModels\":\\[[^\\]]*\\]"), ""))
+        assertFalse(f.readText().contains("verifiedModels"))
+        assertEquals(emptySet<String>(), store().provider(p.id)?.verifiedModels)
+    }
+
     @Test
     fun connectedProviderWithoutModelsPersistsWithItsListAndKey() {
         val s = store()

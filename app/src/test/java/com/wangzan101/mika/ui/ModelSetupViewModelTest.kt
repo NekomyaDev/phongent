@@ -199,15 +199,151 @@ class ModelSetupViewModelTest {
         assertEquals(go.sessionHeader, store.providers.value.single().sessionHeader)
     }
 
-    /** 服务不提供列表(没有可试的模型):不试,照旧存下。 */
-    @Test fun noListedModelsMeansNoTinyRequest() = runTest {
+    /** 没列出模型:先不存、不试,要一个模型名;填了再测试就用它试调用,通了存成不提供列表的服务商,它当主模型、记为核实过。 */
+    @Test fun noListAsksForAModelAndProbesIt() = runTest {
         val url = "http://192.168.1.5:8000/v1"
         listing[url] = ModelListResult.Failed(ListFailure.NotSupported)
         val store = store()
         val vm = vm(store)
         vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.testAndSave(); runCurrent()
         assertTrue(probes.isEmpty())
-        assertEquals(1, store.providers.value.size)
+        assertTrue("没存", store.providers.value.isEmpty())
+        val f = vm.state.value.form
+        assertTrue(f.noList)
+        assertEquals(ListState.Idle, f.test)
+        assertFalse("没填模型名不能测试", f.canTest)
+        vm.setApiKey("k")
+        assertTrue("换 Key 不收起模型名", vm.state.value.form.noList)
+        vm.setModel(" qwen3 ")
+        assertTrue(vm.state.value.form.canTest)
+        vm.testAndSave(); runCurrent()
+        assertEquals("qwen3", built.single().first)
+        val p = store.providers.value.single()
+        assertEquals(emptyList<ListedModel>(), p.models)
+        assertEquals(setOf("qwen3"), p.verifiedModels)
+        assertEquals("qwen3", store.configFor(ModelRole.Main)?.model)
+        assertFalse(vm.state.value.showForm)
+        assertEquals(emptyList<String>(), vm.state.value.unverified(p))
+    }
+
+    /** 没列出模型、手填的模型试调用也说找不到:不存,说清是哪个模型、地址或接口类型可能不对,例子按地址对得上的那家。 */
+    @Test fun noListAndModelNotFoundSavesNothing() = runTest {
+        val url = "https://generativelanguage.googleapis.com"
+        listing[url] = ModelListResult.Failed(ListFailure.NotSupported)
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.setApiKey("k")
+        vm.testAndSave(); runCurrent()
+        vm.setModel("gemini"); vm.testAndSave(); runCurrent()
+        assertEquals(
+            ListState.Failed("列不出模型，用「gemini」试调用也说找不到：地址或接口类型可能填错了，也可能没有这个模型（模型名例如 gemini-2.5-flash）。"),
+            vm.state.value.form.test,
+        )
+        assertTrue(store.providers.value.isEmpty())
+        assertTrue(store.list().isEmpty())
+        // 换了地址:要重新列,模型名先收起
+        vm.setBaseUrl("$url/")
+        assertFalse(vm.state.value.form.noList)
+    }
+
+    /** 预设(列表接口照理有)没列出模型、手填的找不到:只说模型不存在。 */
+    @Test fun presetWithoutListReportsTheMissingModel() = runTest {
+        val ark = ProviderPresets.all.first { it.label == "火山方舟" }
+        listing[ark.baseUrl] = ModelListResult.Failed(ListFailure.NotSupported)
+        reply = { throw ModelError.ModelNotFound("doubao") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ark.label); vm.setApiKey("k"); vm.testAndSave(); runCurrent()
+        assertTrue(vm.state.value.form.noList)
+        vm.setModel("doubao"); vm.testAndSave(); runCurrent()
+        assertEquals(ListState.Failed("模型「doubao」不存在。要填服务商文档里完整的模型 ID（例如 deepseek-chat）。"), vm.state.value.form.test)
+        assertTrue(store.providers.value.isEmpty())
+    }
+
+    /** 自定义填了某家的官方地址:建议改用那家的预设;地址就是预设的、接口类型不同时一并说;改用时 Key 留着。 */
+    @Test fun officialHostSuggestsThePreset() = runTest {
+        val vm = vm()
+        vm.selectPreset(ProviderPresets.custom.label)
+        vm.setBaseUrl("https://models.example.com/v1")
+        assertNull(vm.state.value.form.suggestedPreset)
+        vm.setBaseUrl("https://generativelanguage.googleapis.com")
+        vm.setApiKey("gk")
+        val f = vm.state.value.form
+        assertEquals("Gemini", f.suggestedPreset?.label)
+        assertTrue(f.presetKindMismatch)
+        assertEquals(
+            "这是「Gemini」的官方地址，用它的预设更省事：地址和接口类型都已填好。接口类型也对不上：「Gemini」用的是 Gemini 接口，这里选的是 OpenAI 兼容。",
+            ModelSetupCopy.presetSuggestion(f),
+        )
+        assertEquals(ProviderConfig.Kind.Gemini, f.exampleKind)
+        // 同一主机的别的路径(如它的兼容接口):照样建议,但不说接口类型不对
+        vm.setBaseUrl("https://generativelanguage.googleapis.com/v1beta/openai")
+        assertEquals("Gemini", vm.state.value.form.suggestedPreset?.label)
+        assertFalse(vm.state.value.form.presetKindMismatch)
+        vm.setKind(ProviderConfig.Kind.Gemini)
+        vm.setBaseUrl("https://api.anthropic.com")
+        assertEquals("Anthropic", vm.state.value.form.suggestedPreset?.label)
+        assertTrue(vm.state.value.form.presetKindMismatch)
+        vm.selectPreset("Anthropic")
+        val after = vm.state.value.form
+        assertEquals(ProviderConfig.Kind.Anthropic, after.kind)
+        assertEquals("gk", after.apiKey)
+        assertNull("选了预设就不再建议", after.suggestedPreset)
+    }
+
+    /** 选择页里手填模型名:先试调用,不通不选、说原因;通了才选上、记为核实过。 */
+    @Test fun manualPickProbesFirst() = runTest {
+        val store = store()
+        val p = store.connect("192.168.1.5", ProviderConfig.Kind.OpenAiCompat, "http://192.168.1.5:8000/v1", "", emptyList())
+        val vm = vm(store)
+        runCurrent()
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        var picked = 0
+        vm.pickManual(ModelRole.Main, p.id, "gemini") { picked++ }
+        assertEquals(ListState.Running, vm.state.value.manualPick[p.id])
+        runCurrent()
+        assertEquals(ListState.Failed("模型「gemini」不存在。要填服务商文档里完整的模型 ID（例如 deepseek-chat）。"), vm.state.value.manualPick[p.id])
+        assertEquals(0, picked)
+        assertNull(store.roles.value.main)
+        // 只回话不调用工具的,当不了主模型
+        reply = { ModelReply(listOf(Part.Text("noon")), StopReason.EndTurn, null) }
+        vm.pickManual(ModelRole.Main, p.id, "chatty") { picked++ }; runCurrent()
+        assertEquals(ListState.Failed("chatty 没有调用工具，Mika 干活需要会调用工具的模型，换一个当主模型。"), vm.state.value.manualPick[p.id])
+        assertNull(store.roles.value.main)
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.pickManual(ModelRole.Main, p.id, " qwen3 ") { picked++ }; runCurrent()
+        assertEquals(1, picked)
+        assertNull(vm.state.value.manualPick[p.id])
+        assertEquals("qwen3", store.configFor(ModelRole.Main)?.model)
+        assertEquals(setOf("qwen3"), store.provider(p.id)?.verifiedModels)
+    }
+
+    /** 旧版本存下的不提供列表的服务商(手填的模型从没试过):提醒,「重新测试」通了提醒消失、记下;不通说原因。 */
+    @Test fun unverifiedManualModelsWarnUntilRetested() = runTest {
+        val store = store()
+        val p = store.connect("generativelanguage.googleapis.com", ProviderConfig.Kind.OpenAiCompat, "https://generativelanguage.googleapis.com", "k", emptyList())
+        store.use(ModelRole.Main, p.id, "gemini", ProviderPresets.custom.capabilities)
+        val vm = vm(store)
+        runCurrent()
+        assertEquals(listOf("gemini"), vm.state.value.unverified(vm.state.value.providers.single()))
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        vm.retest(p.id); runCurrent()
+        assertEquals(
+            ListState.Failed("模型「gemini」不存在。要填服务商文档里完整的模型 ID（例如 gemini-2.5-flash）。"),
+            vm.state.value.retest[p.id],
+        )
+        assertEquals(listOf("gemini"), vm.state.value.unverified(vm.state.value.providers.single()))
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.retest(p.id); runCurrent()
+        assertNull(vm.state.value.retest[p.id])
+        assertEquals(emptyList<String>(), vm.state.value.unverified(vm.state.value.providers.single()))
+        // 有列表的服务商不提醒
+        listing[deepseekUrl] = deepseek
+        vm.openForm(); vm.selectPreset("DeepSeek"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        val ds = vm.state.value.providers.first { it.name == "DeepSeek" }
+        vm.pick(ModelRole.Light, ds.id, "deepseek-coder"); runCurrent()
+        assertEquals(emptyList<String>(), vm.state.value.unverified(vm.state.value.providers.first { it.name == "DeepSeek" }))
     }
 
     /** 明文 http:本机、局域网的不提示;别的地址提醒一句,照样能测试。 */
@@ -296,7 +432,12 @@ class ModelSetupViewModelTest {
         assertTrue("自定义的 OpenAI 兼容接口可以不填 Key", vm.state.value.form.canTest)
         listing["http://192.168.1.5:8000/v1"] = ModelListResult.Failed(ListFailure.NotSupported)
         vm.testAndSave(); runCurrent()
-        // 服务不提供列表:照样连上、存下,但没有模型可自动选
+        // 服务不提供列表:先要一个模型名,没存
+        assertTrue(store.providers.value.isEmpty())
+        assertFalse(vm.state.value.canNext)
+        // 模型只回话、不调用工具:存下服务商,但不当主模型
+        reply = { ModelReply(listOf(Part.Text("noon")), StopReason.EndTurn, null) }
+        vm.setModel("chatty"); vm.testAndSave(); runCurrent()
         val p = store.providers.value.single()
         assertEquals("192.168.1.5", p.name)
         assertEquals(emptyList<ListedModel>(), p.models)

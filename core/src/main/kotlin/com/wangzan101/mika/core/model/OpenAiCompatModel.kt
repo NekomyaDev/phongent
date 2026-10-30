@@ -128,7 +128,7 @@ class OpenAiCompatModel(
         status == 402 || body.contains("insufficient_quota") -> ModelError.QuotaExceeded()
         status == 429 -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))
         status == 400 && (body.contains("context_length") || body.contains("maximum context")) -> ModelError.ContextTooLong()
-        status == 404 -> ModelError.ModelNotFound()
+        status == 404 -> ModelError.ModelNotFound(model)
         status in 500..599 -> ModelError.Server(status)
         status == 403 -> ModelError.Auth()
         else -> ModelError.BadResponse("HTTP $status ${body.take(200)}")

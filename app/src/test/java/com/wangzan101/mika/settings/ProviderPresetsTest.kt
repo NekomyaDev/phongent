@@ -4,6 +4,7 @@ import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.ui.AddForm
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -78,5 +79,21 @@ class ProviderPresetsTest {
         assertTrue(openAi.keyRequired)
         assertFalse(openAi.canTest)
         assertTrue(openAi.copy(apiKey = "sk").canTest)
+    }
+
+    /** 主机名对得上就认出是哪家(路径不论);自己跑的服务、认不出的地址不算。 */
+    @Test fun presetByHost() {
+        assertEquals("Gemini", ProviderPresets.forHost("https://generativelanguage.googleapis.com")?.label)
+        assertEquals("Gemini", ProviderPresets.forHost(" https://generativelanguage.googleapis.com/v1beta/openai/ ")?.label)
+        assertEquals("Anthropic", ProviderPresets.forHost("https://api.anthropic.com/v1")?.label)
+        assertEquals("OpenAI", ProviderPresets.forHost("https://api.openai.com")?.label)
+        assertEquals("DeepSeek", ProviderPresets.forHost("https://api.deepseek.com/v1")?.label)
+        assertNull(ProviderPresets.forHost("https://models.example.com/v1"))
+        assertNull(ProviderPresets.forHost("http://127.0.0.1:11434/v1"))
+        assertNull(ProviderPresets.forHost("not a url"))
+        // 每个有地址、不是自己跑的预设都认得出自己
+        ProviderPresets.all.filter { it.baseUrl.isNotEmpty() && !it.selfHosted }.forEach {
+            assertEquals(it.label, ProviderPresets.forHost(it.baseUrl)?.label)
+        }
     }
 }

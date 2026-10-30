@@ -41,4 +41,17 @@
     <string name="model_probe_no_tools">%1$s didn’t call the tool. Mika needs a model that can call tools to get things done. The provider was saved, but this model wasn’t set as the main model.</string>
     <string name="model_self_hosted_note">127.0.0.1 is this phone. If the server runs on your computer, replace it with the computer’s local network address and let the server accept connections from the network, not only from itself.</string>
     <string name="preset_custom">Custom</string>
+    <string name="model_manual_name">Model name</string>
+    <string name="model_no_list_custom">No models could be listed at this address. The provider may not offer a model list, or the address or interface type may be wrong. Enter a model name and tap “Test and save” again; one test call will tell.</string>
+    <string name="model_no_list_preset">This provider didn’t list any models. Enter a model name and tap “Test and save” again; it’s saved only if a test call with it works.</string>
+    <string name="model_example_gemini">e.g. gemini-2.5-flash</string>
+    <string name="model_example_anthropic">e.g. claude-sonnet-4-5</string>
+    <string name="model_example_openai">e.g. gpt-5-mini</string>
+    <string name="model_example_compat">e.g. deepseek-chat</string>
+    <string name="model_probe_not_found">Model “%1$s” doesn’t exist. Enter the full model ID from the provider’s docs (%2$s).</string>
+    <string name="model_probe_not_found_no_list">No models could be listed, and a test call with “%1$s” wasn’t found either: the address or interface type is probably wrong, or there is no such model (model names look like: %2$s).</string>
+    <string name="model_probe_no_tools_pick">%1$s didn’t call the tool. Mika needs a model that can call tools to get things done; pick another main model.</string>
+    <string name="model_preset_match">This is %1$s’s official address. Its preset fills in the address and interface type for you.</string>
+    <string name="model_preset_kind_mismatch">The interface type doesn’t match either: %1$s uses the %2$s interface, but %3$s is selected.</string>
+    <string name="model_use_preset">Use the %1$s preset</string>
 </resources>
