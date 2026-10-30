@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui.viewer
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
@@ -114,13 +116,13 @@ fun FileViewerScreen(uri: Uri, name: String, kind: ViewerKind?, onBack: () -> Un
     val openElsewhere = { FileViewer.openElsewhere(context, uri, name) }
     PageBackground {
         Column(Modifier.fillMaxSize()) {
-            TopBar(name, MikaIcons.Back, onBack, "返回", right = {
-                BarIconButton(MikaIcons.Share, "分享", { FileViewer.share(context, uri, name) })
-                BarIconButton(MikaIcons.External, "用其他应用打开", openElsewhere)
+            TopBar(name, MikaIcons.Back, onBack, stringResource(R.string.back), right = {
+                BarIconButton(MikaIcons.Share, stringResource(R.string.share), { FileViewer.share(context, uri, name) })
+                BarIconButton(MikaIcons.External, stringResource(R.string.viewer_open_elsewhere), openElsewhere)
             })
             Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
                 when (kind) {
-                    null -> Failure("这个文件不能在 Mika 里查看。", openElsewhere, Modifier.testTag("viewer.unsupported"))
+                    null -> Failure(stringResource(R.string.viewer_unsupported), openElsewhere, Modifier.testTag("viewer.unsupported"))
                     ViewerKind.Pdf -> PdfView(uri, openElsewhere)
                     else -> LoadedView(uri, kind, openElsewhere)
                 }
@@ -138,7 +140,7 @@ private fun LoadedView(uri: Uri, kind: ViewerKind, openElsewhere: () -> Unit) {
     val loaded = result
     when {
         loaded == null -> Loading()
-        loaded.isFailure -> Failure("读取这个文件时出错了。", openElsewhere)
+        loaded.isFailure -> Failure(stringResource(R.string.viewer_read_error), openElsewhere)
         else -> when (val l = loaded.getOrThrow()) {
             is Loaded.Html -> HtmlView(l.html)
             is Loaded.Picture -> PictureView(l.bitmap)
@@ -292,7 +294,7 @@ private fun PdfView(uri: Uri, openElsewhere: () -> Unit) {
     val d = doc
     when {
         d == null -> Loading()
-        d.isFailure -> Failure("读取这个文件时出错了。", openElsewhere)
+        d.isFailure -> Failure(stringResource(R.string.viewer_read_error), openElsewhere)
         else -> PdfPages(d.getOrThrow())
     }
 }
@@ -347,7 +349,7 @@ private fun PdfPage(doc: PdfDoc, index: Int, size: IntSize) {
         }
         bitmap?.let { b ->
             val image = remember(b) { b.asImageBitmap() }
-            Image(image, "第 ${index + 1} 页", Modifier.fillMaxSize())
+            Image(image, stringResource(R.string.viewer_page, index + 1), Modifier.fillMaxSize())
         }
     }
 }
@@ -414,11 +416,11 @@ private fun Failure(message: String, openElsewhere: () -> Unit, modifier: Modifi
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(message, style = MikaType.Body, color = MikaTheme.colors.ink2, textAlign = TextAlign.Center)
-        MikaButton("用其他应用打开", openElsewhere, kind = ButtonKind.Secondary, size = ButtonSize.Medium)
+        MikaButton(stringResource(R.string.viewer_open_elsewhere), openElsewhere, kind = ButtonKind.Secondary, size = ButtonSize.Medium)
     }
 }
 
 @Composable
 private fun TruncatedNote(modifier: Modifier = Modifier) {
-    Text("文件较大，只显示前面一部分。", modifier, style = MikaType.Caption, color = MikaTheme.colors.ink3)
+    Text(stringResource(R.string.viewer_truncated), modifier, style = MikaType.Caption, color = MikaTheme.colors.ink3)
 }

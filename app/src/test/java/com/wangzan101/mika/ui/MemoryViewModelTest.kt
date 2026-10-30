@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.memory.MemoryKind
 import com.wangzan101.mika.core.memory.MemorySource
 import com.wangzan101.mika.settings.MemorySettings
@@ -19,6 +20,8 @@ import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MemoryViewModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
     private val said = MemorySource("user_said", "以后点外卖都不要香菜", "c1", 1_761_177_600_000L)
     private val store = memoryStore().apply {

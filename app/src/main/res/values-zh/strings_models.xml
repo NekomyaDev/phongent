@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_lead">每件事用哪个模型，在「用途」里选；模型来自下面连好的服务商。</string>
+    <string name="models_roles">用途</string>
+    <string name="models_providers">服务商</string>
+    <string name="models_add_provider">添加服务商</string>
+    <string name="models_key_note">API Key 只保存在这台手机上，加密存放。</string>
+    <string name="models_main_add_first">先添加一个服务商</string>
+    <string name="models_main_pick">点这里选一个</string>
+    <string name="models_same_as_main">用主模型</string>
+    <string name="models_main_not_picked">主模型还没选</string>
+    <string name="models_off">不用</string>
+    <string name="models_off_note">只靠文字读屏</string>
+    <string name="models_vision_same_note">主模型能看图时选这个</string>
+    <string name="models_light_same_note">和主模型同一个，不用另外选</string>
+    <string name="models_pick_from">从已连接的服务商里选</string>
+    <string name="models_filter_hint">输入模型名的一部分</string>
+    <string name="models_no_match">没有名字对得上的模型。</string>
+    <string name="models_model_name">模型名</string>
+    <string name="models_model_name_hint">这家不提供列表，照文档填</string>
+    <string name="models_use">使用</string>
+    <string name="models_role_empty">还没有可选的模型。先添加一个服务商。</string>
+    <string name="models_picker_note">标签是服务商给的信息，只作参考；选哪个由你定。</string>
+    <string name="models_listing">正在列出模型…</string>
+    <string name="models_connection">连接</string>
+    <string name="models_status">状态</string>
+    <string name="models_list_failed">列模型失败</string>
+    <string name="models_url">地址</string>
+    <string name="models_key_saved">已保存</string>
+    <string name="models_key_none">没有填</string>
+    <string name="models_change">更换</string>
+    <string name="models_change_key">更换 API Key</string>
+    <string name="models_new_key_hint">粘贴新的 Key</string>
+    <string name="save">保存</string>
+    <string name="models_models">模型</string>
+    <string name="models_models_note">点一个模型，可以把它用作主模型、看图或轻量模型。</string>
+    <string name="models_no_list_note">这家不提供模型列表。要用它的模型，在「用途」里照文档填模型名。</string>
+    <string name="models_not_listed">还没列出这家的模型。</string>
+    <string name="refresh">刷新</string>
+    <string name="models_in_use">正在用这个</string>
+    <string name="models_delete">删除这个服务商</string>
+    <string name="role_main">主模型</string>
+    <string name="role_vision">看图模型</string>
+    <string name="role_light">轻量模型</string>
+    <string name="role_main_what">思考和办事</string>
+    <string name="role_vision_what">读屏时看截图</string>
+    <string name="role_light_what">判断、记东西这类小事</string>
+    <string name="role_main_hint">思考和办事都靠它。选支持工具调用的模型，办事才靠得住。</string>
+    <string name="role_vision_hint">读屏时把截图给它看，界面复杂时更准。不选也能用，只靠文字读屏。</string>
+    <string name="role_light_hint">判断任务有没有办完、整理记忆这类小事用它。选便宜、快的更合适。</string>
+    <string name="models_delete_title">删除「%1$s」？</string>
+    <string name="models_delete_body">这家的 API Key 会一起删掉。</string>
+    <string name="models_delete_unused">它没在给任何用途干活。</string>
+    <string name="models_delete_used">%1$s正在用它，删除后要重新选。</string>
+    <plurals name="models_more">
+        <item quantity="other">还有 %1$d 个，输入名字筛选</item>
+    </plurals>
+    <plurals name="models_view_all">
+        <item quantity="other">查看全部 %1$d 个模型</item>
+    </plurals>
+    <string name="models_all_title">%1$s · 全部模型</string>
+    <plurals name="models_all_note">
+        <item quantity="other">共 %1$d 个，在用的排在最前面。右上角刷新会重新向服务商要一次列表。</item>
+    </plurals>
+    <string name="models_use_as">%1$s · 用作</string>
+    <string name="models_openai_compat">OpenAI 兼容</string>
+    <string name="models_no_list">不提供模型列表</string>
+    <plurals name="models_count">
+        <item quantity="other">%1$d 个模型</item>
+    </plurals>
+    <string name="models_used_by">%1$s在用</string>
+</resources>

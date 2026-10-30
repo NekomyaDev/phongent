@@ -150,8 +150,8 @@ object TriggerRuntime {
 
     @Synchronized fun runNow(context: Context, id: String) {
         val store = store(context)
-        val trigger = store.get(id) ?: error("定时任务已删除")
-        val window = store.claimNow(id, System.currentTimeMillis()) ?: error("这条任务仍在执行")
+        val trigger = store.get(id) ?: error(tr(R.string.trigger_deleted))
+        val window = store.claimNow(id, System.currentTimeMillis()) ?: error(tr(R.string.trigger_busy))
         try {
             if (trigger.reminderText != null) deliverReminder(context, store, trigger, window.key)
             else TaskService.startTrigger(context, trigger.goal, trigger.threadId, window.key, trigger.conditionGoal)

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.model.Capabilities
 import com.wangzan101.mika.core.model.ListedModel
 import com.wangzan101.mika.core.model.ModelRole
@@ -15,6 +17,8 @@ import org.junit.Test
 
 /** 模型页的文字:用途卡、服务商一行、删除提示,以及列表排序。 */
 class ModelsCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val caps = Capabilities(toolCalls = true, vision = false, contextTokens = 64_000, reasoning = false)
     private val ds = Provider("p1", "DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com",
         listOf(ListedModel("deepseek-chat"), ListedModel("deepseek-reasoner"), ListedModel("deepseek-coder")))

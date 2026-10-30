@@ -223,7 +223,8 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ProviderPresets.all.forEach { p ->
-            SelectChip(p.label, f.preset == p.label, { actions.selectPreset(p.label) }, Modifier.testTag("preset-${p.label}"))
+            // 「自定义」按界面语言显示;服务商的名字原样
+            SelectChip(if (p == ProviderPresets.custom) stringResource(R.string.preset_custom) else p.label, f.preset == p.label, { actions.selectPreset(p.label) }, Modifier.testTag("preset-${p.label}"))
         }
     }
     GroupCard {

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.memory.MemoryIndex
 import com.wangzan101.mika.core.memory.MemoryItem
 import com.wangzan101.mika.core.memory.MemoryKind
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.wangzan101.mika.i18n.uiLocale
 import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.core.tool.Verb
 
@@ -122,11 +125,11 @@ class MemoryViewModel(
     private fun report(e: Throwable?) {
         val msg = when ((e as? MemoryRejected)?.code) {
             null -> null
-            "sensitive" -> "这类信息我不会记"
-            "too_long" -> "一条记忆要写 1 到 200 个字"
-            "memory_full" -> "记忆满了,先删掉几条"
-            "unavailable" -> "记忆暂时读不出来,稍后再试"
-            else -> "没改成"
+            "sensitive" -> tr(R.string.memory_sensitive)
+            "too_long" -> tr(R.string.memory_too_long)
+            "memory_full" -> tr(R.string.memory_full)
+            "unavailable" -> tr(R.string.memory_unavailable)
+            else -> tr(R.string.memory_not_changed)
         }
         if (msg != null) local.update { it.copy(message = msg) }
     }
@@ -146,11 +149,11 @@ class MemoryViewModel(
         val p = skills ?: return
         val problem = edited?.let { SkillDrafter.validate(it, toolNames, scriptTool, runnableScripts) }
         if (problem != null) {
-            local.update { it.copy(message = SKILL_PROBLEMS[problem] ?: "这份技能的格式不对,没有收下") }
+            local.update { it.copy(message = SKILL_PROBLEMS[problem] ?: tr(R.string.skill_bad_format)) }
             return
         }
         if (p.approve(draftId, edited) == null) {
-            local.update { it.copy(message = "原技能已变化，这份更新草稿没有覆盖它。请重新查看后再起草。") }
+            local.update { it.copy(message = tr(R.string.skill_changed)) }
         }
         skillsChanged()
     }
@@ -172,7 +175,7 @@ class MemoryViewModel(
     fun restorePreviousSkill(name: String) {
         val p = skills ?: return
         val revision = p.revisions(name).firstOrNull() ?: return
-        if (!p.restore(revision.id)) local.update { it.copy(message = "恢复旧技能失败，请稍后重试。") }
+        if (!p.restore(revision.id)) local.update { it.copy(message = tr(R.string.skill_restore_failed)) }
         skillsChanged()
     }
 
@@ -183,19 +186,21 @@ class MemoryViewModel(
     }
 
     companion object {
-        private val SKILL_PROBLEMS = mapOf(
-            "sensitive" to "这类信息我不会记",
-            "invalid_name" to "技能名只能用小写字母、数字和连字符",
-            "missing_description" to "要写一句描述(description)",
-            "missing_section" to "要有入口、步骤、容易出错的地方、怎样算办成、什么时候停下交给用户五个小节",
-            "too_long" to "技能太长了,最多 4000 字",
-            "unknown_tool" to "里面提到了 Mika 没有的工具",
+        private val SKILL_PROBLEMS get() = mapOf(
+            "sensitive" to tr(R.string.memory_sensitive),
+            "invalid_name" to tr(R.string.skill_invalid_name),
+            "missing_description" to tr(R.string.skill_missing_description),
+            "missing_section" to tr(R.string.skill_missing_section),
+            "too_long" to tr(R.string.skill_too_long),
+            "unknown_tool" to tr(R.string.skill_unknown_tool),
         )
 
         fun sourceLine(s: MemorySource): String =
-            if (s.type == "manual") "你手写的"
-            else "你在 ${SimpleDateFormat("M 月 d 日", Locale.CHINA).format(Date(s.atMs))}" +
-                (if (s.channel != null && s.channel != "Ui") "通过${s.channel}说" else "说") + ":『${s.quote.orEmpty()}』"
+            if (s.type == "manual") tr(R.string.memory_manual)
+            else SimpleDateFormat(tr(R.string.date_pattern_md), uiLocale()).format(Date(s.atMs)).let { day ->
+                if (s.channel != null && s.channel != "Ui") tr(R.string.memory_said_via, day, s.channel, s.quote.orEmpty())
+                else tr(R.string.memory_said, day, s.quote.orEmpty())
+            }
     }
 }
 
@@ -234,10 +239,10 @@ data class SkillsUi(val drafts: List<SkillRow> = emptyList(), val installed: Lis
         }
 
         private fun outcomeLabel(o: String) = when (o) {
-            "verified" -> "核查通过"
-            "unverified" -> "没能核实"
-            "verifier_rejected" -> "核查退回"
-            else -> "没办成"
+            "verified" -> tr(R.string.verify_passed)
+            "unverified" -> tr(R.string.verify_unverified)
+            "verifier_rejected" -> tr(R.string.verify_returned)
+            else -> tr(R.string.capsule_failed)
         }
     }
 }

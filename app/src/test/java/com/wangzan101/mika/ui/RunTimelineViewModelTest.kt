@@ -1,5 +1,6 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.guard.GuardVerdict
 import com.wangzan101.mika.core.guard.Severity
 import com.wangzan101.mika.core.record.Redactor
@@ -22,6 +23,8 @@ import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.core.tool.Verb
 
 class RunTimelineViewModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     @get:Rule val tmp = TemporaryFolder()
 
     private var clock = 1_760_000_000_000L

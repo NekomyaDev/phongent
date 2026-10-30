@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui.viewer
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -60,14 +62,14 @@ object FileViewer {
     fun openElsewhere(context: Context, uri: Uri, name: String) {
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeOf(context, uri))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        start(context, Intent.createChooser(intent, name), "没有能打开这个文件的 App")
+        start(context, Intent.createChooser(intent, name), tr(R.string.viewer_no_open_app))
     }
 
     /** 分享:把文件发给别的 App(带读取授权)。 */
     fun share(context: Context, uri: Uri, name: String) {
         val intent = Intent(Intent.ACTION_SEND).setType(mimeOf(context, uri)).putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        start(context, Intent.createChooser(intent, name), "没有能分享这个文件的 App")
+        start(context, Intent.createChooser(intent, name), tr(R.string.viewer_no_share_app))
     }
 
     private fun mimeOf(context: Context, uri: Uri): String =

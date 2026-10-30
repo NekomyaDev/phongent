@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_lead">Pick which model does each job under “Roles”; models come from the providers connected below.</string>
+    <string name="models_roles">Roles</string>
+    <string name="models_providers">Providers</string>
+    <string name="models_add_provider">Add provider</string>
+    <string name="models_key_note">API keys are stored only on this phone, encrypted.</string>
+    <string name="models_main_add_first">Add a provider first</string>
+    <string name="models_main_pick">Tap to choose one</string>
+    <string name="models_same_as_main">Use main model</string>
+    <string name="models_main_not_picked">Main model not chosen yet</string>
+    <string name="models_off">None</string>
+    <string name="models_off_note">Reads the screen as text only</string>
+    <string name="models_vision_same_note">Choose this if the main model can see images</string>
+    <string name="models_light_same_note">Same as the main model, nothing else to pick</string>
+    <string name="models_pick_from">Choose from connected providers</string>
+    <string name="models_filter_hint">Type part of a model name</string>
+    <string name="models_no_match">No model names match.</string>
+    <string name="models_model_name">Model name</string>
+    <string name="models_model_name_hint">This provider has no list; enter it from the docs</string>
+    <string name="models_use">Use</string>
+    <string name="models_role_empty">No models to choose from yet. Add a provider first.</string>
+    <string name="models_picker_note">Tags come from the provider and are for reference only; the choice is yours.</string>
+    <string name="models_listing">Listing models…</string>
+    <string name="models_connection">Connection</string>
+    <string name="models_status">Status</string>
+    <string name="models_list_failed">Couldn’t list models</string>
+    <string name="models_url">URL</string>
+    <string name="models_key_saved">Saved</string>
+    <string name="models_key_none">Not entered</string>
+    <string name="models_change">Change</string>
+    <string name="models_change_key">Change API key</string>
+    <string name="models_new_key_hint">Paste the new key</string>
+    <string name="save">Save</string>
+    <string name="models_models">Models</string>
+    <string name="models_models_note">Tap a model to use it as the main, vision or light model.</string>
+    <string name="models_no_list_note">This provider has no model list. To use one of its models, enter the name from its docs under “Roles”.</string>
+    <string name="models_not_listed">This provider’s models haven’t been listed yet.</string>
+    <string name="refresh">Refresh</string>
+    <string name="models_in_use">In use</string>
+    <string name="models_delete">Delete this provider</string>
+    <string name="role_main">Main model</string>
+    <string name="role_vision">Vision model</string>
+    <string name="role_light">Light model</string>
+    <string name="role_main_what">Thinking and doing</string>
+    <string name="role_vision_what">Looks at screenshots</string>
+    <string name="role_light_what">Small jobs like checks and notes</string>
+    <string name="role_main_hint">Does all the thinking and acting. Pick a model with tool calling so tasks go reliably.</string>
+    <string name="role_vision_hint">Gets screenshots when reading the screen; more accurate on complex screens. Optional: without it Mika reads the screen as text.</string>
+    <string name="role_light_hint">Handles small jobs like checking whether a task is done and tidying memory. Cheap and fast is best.</string>
+    <string name="models_delete_title">Delete “%1$s”?</string>
+    <string name="models_delete_body">"Its API key will be deleted too. "</string>
+    <string name="models_delete_unused">It isn’t used for any role.</string>
+    <string name="models_delete_used">%1$s uses it; you’ll need to choose again after deleting.</string>
+    <plurals name="models_more">
+        <item quantity="one">%1$d more, type a name to filter</item>
+        <item quantity="other">%1$d more, type a name to filter</item>
+    </plurals>
+    <plurals name="models_view_all">
+        <item quantity="one">See all %1$d model</item>
+        <item quantity="other">See all %1$d models</item>
+    </plurals>
+    <string name="models_all_title">%1$s · All models</string>
+    <plurals name="models_all_note">
+        <item quantity="one">%1$d in total, models in use first. Refresh at the top right to fetch the list again.</item>
+        <item quantity="other">%1$d in total, models in use first. Refresh at the top right to fetch the list again.</item>
+    </plurals>
+    <string name="models_use_as">%1$s · Use as</string>
+    <string name="models_openai_compat">OpenAI-compatible</string>
+    <string name="models_no_list">No model list</string>
+    <plurals name="models_count">
+        <item quantity="one">%1$d model</item>
+        <item quantity="other">%1$d models</item>
+    </plurals>
+    <string name="models_used_by">used as %1$s</string>
+</resources>

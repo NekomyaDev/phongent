@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.usage.ProviderUsage
 import com.wangzan101.mika.core.usage.UsageBucket
 import com.wangzan101.mika.core.usage.UsageCounts
@@ -19,6 +21,8 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 class UsageCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val today = LocalDate.of(2026, 10, 27)
 
     @Test fun tokensUseWanAndYiWithThreeSignificantDigits() {

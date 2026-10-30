@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.record.RunEvent
 import com.wangzan101.mika.core.record.RunMetrics
 import com.wangzan101.mika.record.RunStore
@@ -71,7 +73,7 @@ sealed interface TimelineUi {
     data class Ready(val header: TimelineHeader, val steps: List<TimelineStep>) : TimelineUi
 
     companion object {
-        const val EXPIRED_TEXT = "这次的记录已过期"
+        val EXPIRED_TEXT: String get() = tr(R.string.timeline_expired)
     }
 }
 
@@ -156,13 +158,13 @@ class RunTimelineViewModel(
                 is RunEvent.Verifier -> tag(verifierTag(e.verdict))
                 is RunEvent.Confirmation -> tag(
                     when (e.decision) {
-                        "approved" -> Tag("你同意了", TagTone.Ok)
-                        "declined", "declined_before" -> Tag("你没同意", TagTone.Bad)
-                        else -> Tag("要你同意", TagTone.Warn)
+                        "approved" -> Tag(tr(R.string.tag_approved), TagTone.Ok)
+                        "declined", "declined_before" -> Tag(tr(R.string.tag_declined), TagTone.Bad)
+                        else -> Tag(tr(R.string.tag_needs_ok), TagTone.Warn)
                     },
                 )
-                is RunEvent.Takeover -> tag(Tag("请你接手", TagTone.Warn))
-                is RunEvent.Barrier -> tag(Tag("遇到障碍", TagTone.Warn))
+                is RunEvent.Takeover -> tag(Tag(tr(R.string.tag_takeover), TagTone.Warn))
+                is RunEvent.Barrier -> tag(Tag(tr(R.string.tag_barrier), TagTone.Warn))
                 else -> Unit
             }
             return rows.values.map { row ->
@@ -178,18 +180,18 @@ class RunTimelineViewModel(
         }
 
         internal fun timingLabel(t: StepTiming): String {
-            if (t.modelMs == null && t.toolMs == null) return "耗时未记录"
+            if (t.modelMs == null && t.toolMs == null) return tr(R.string.timing_unrecorded)
             return buildList {
-                t.totalMs?.let { add("约 ${shortDuration(it)}") }
-                t.modelMs?.let { add("模型 ${shortDuration(it)}") }
-                t.toolMs?.let { add("操作 ${shortDuration(it)}") }
-                if (t.retryMs > 0) add("含重试 ${shortDuration(t.retryMs)}")
+                t.totalMs?.let { add(tr(R.string.timing_total, shortDuration(it))) }
+                t.modelMs?.let { add(tr(R.string.timing_model, shortDuration(it))) }
+                t.toolMs?.let { add(tr(R.string.timing_tool, shortDuration(it))) }
+                if (t.retryMs > 0) add(tr(R.string.timing_retry, shortDuration(t.retryMs)))
             }.joinToString(" · ")
         }
 
         private fun shortDuration(ms: Long): String = when {
-            ms < 1_000 -> "$ms 毫秒"
-            ms < 60_000 -> "%.1f 秒".format(java.util.Locale.ROOT, ms / 1_000.0)
+            ms < 1_000 -> tr(R.string.duration_ms, ms)
+            ms < 60_000 -> tr(R.string.duration_seconds_decimal, "%.1f".format(java.util.Locale.ROOT, ms / 1_000.0))
             else -> duration(ms)
         }
 
@@ -207,17 +209,17 @@ class RunTimelineViewModel(
         private val ERROR = Regex(""""error"\s*:\s*"([a-z_]+)"""")
 
         private fun resultLabel(json: String, changed: Boolean?): String = when {
-            NOT_OK.containsMatchIn(json) -> ERROR.find(json)?.groupValues?.get(1)?.let { ERROR_LABELS[it] }?.let { "出错:$it" } ?: "出错了"
-            changed == true -> "生效"
-            changed == false -> "没变化"
-            else -> "完成"
+            NOT_OK.containsMatchIn(json) -> ERROR.find(json)?.groupValues?.get(1)?.let { ERROR_LABELS[it] }?.let { tr(R.string.result_error_detail, it) } ?: tr(R.string.result_error)
+            changed == true -> tr(R.string.result_effective)
+            changed == false -> tr(R.string.result_unchanged)
+            else -> tr(R.string.result_completed)
         }
 
         private fun guardTags(json: String): List<Tag> = guardObjects(json).mapNotNull { o ->
             val severity = (o["severity"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
             val what = (o["code"] as? JsonPrimitive)?.contentOrNull?.let { GUARD_LABELS[it] }
-            val head = if (severity == "stop") "守卫停止" else "守卫提醒"
-            Tag(if (what == null) head else "$head:$what", if (severity == "stop") TagTone.Bad else TagTone.Warn)
+            val head = if (severity == "stop") tr(R.string.guard_stop) else tr(R.string.guard_warn)
+            Tag(if (what == null) head else tr(R.string.guard_with_what, head, what), if (severity == "stop") TagTone.Bad else TagTone.Warn)
         }
 
         /**
@@ -254,61 +256,61 @@ class RunTimelineViewModel(
             null
         }
 
-        private val GUARD_LABELS = mapOf(
-            "repeating_action" to "同一个操作反复做",
-            "no_progress" to "画面一直没变化",
-            "too_many_failures" to "操作连续失败",
+        private val GUARD_LABELS get() = mapOf(
+            "repeating_action" to tr(R.string.guard_repeating),
+            "no_progress" to tr(R.string.guard_no_progress),
+            "too_many_failures" to tr(R.string.guard_failures),
         )
 
-        private val ERROR_LABELS = mapOf(
-            "ref_expired" to "界面已经变了,要重新看屏幕",
-            "no_app_open" to "还没打开 App",
-            "invalid_arguments" to "参数不对",
-            "operation_failed" to "操作没成功",
-            "unknown_tool" to "没有这个工具",
-            "protected_content" to "画面受保护,看不到",
-            "confirmation_required" to "要先征得你同意",
-            "confirmation_mismatch" to "和你同意的内容对不上",
-            "confirmation_declined" to "你没有同意",
-            "action_not_applied" to "字没输进去",
-            "verification_failed" to "核查没通过",
-            "parallel_tool_call_skipped" to "一次只能做一个操作",
-            "screenshot_unavailable" to "截不到图",
-            "vision_unavailable" to "看图没成功",
-            "payment_requires_takeover" to "付款要你来",
-            "finish_missing_evidence" to "结果缺少依据",
-            "double_click_unsupported" to "不支持双击",
+        private val ERROR_LABELS get() = mapOf(
+            "ref_expired" to tr(R.string.err_ref_expired),
+            "no_app_open" to tr(R.string.err_no_app),
+            "invalid_arguments" to tr(R.string.err_invalid_args),
+            "operation_failed" to tr(R.string.err_op_failed),
+            "unknown_tool" to tr(R.string.err_unknown_tool),
+            "protected_content" to tr(R.string.err_protected),
+            "confirmation_required" to tr(R.string.err_confirm_required),
+            "confirmation_mismatch" to tr(R.string.err_confirm_mismatch),
+            "confirmation_declined" to tr(R.string.err_confirm_declined),
+            "action_not_applied" to tr(R.string.err_not_applied),
+            "verification_failed" to tr(R.string.verify_failed),
+            "parallel_tool_call_skipped" to tr(R.string.err_parallel_skipped),
+            "screenshot_unavailable" to tr(R.string.err_no_screenshot),
+            "vision_unavailable" to tr(R.string.err_vision),
+            "payment_requires_takeover" to tr(R.string.err_payment),
+            "finish_missing_evidence" to tr(R.string.err_no_evidence),
+            "double_click_unsupported" to tr(R.string.err_double_click),
         )
 
         private fun verifierTag(verdict: String) = when (verdict) {
-            "pass" -> Tag("核查通过", TagTone.Ok)
-            "fail" -> Tag("核查没通过", TagTone.Bad)
-            else -> Tag("没能核实", TagTone.Warn)
+            "pass" -> Tag(tr(R.string.verify_passed), TagTone.Ok)
+            "fail" -> Tag(tr(R.string.verify_failed), TagTone.Bad)
+            else -> Tag(tr(R.string.verify_unverified), TagTone.Warn)
         }
 
-        private fun verdictLabel(verdict: String?) = if (verdict == null) "没有核查" else verifierTag(verdict).text
+        private fun verdictLabel(verdict: String?) = if (verdict == null) tr(R.string.verify_none) else verifierTag(verdict).text
 
         /** [judged]:交出回答后判的结局;回答如实说没办成、只办了一部分的按它写。 */
         private fun outcomeLabel(outcome: String?, judged: String?) = when {
             outcome != "succeeded" && outcome != "unverified" -> outcomeLabel(outcome)
-            judged == "partial" -> "只办成了一部分"
-            judged == "not_possible" -> "没有办成"
+            judged == "partial" -> tr(R.string.outcome_partial)
+            judged == "not_possible" -> tr(R.string.outcome_not_possible)
             else -> outcomeLabel(outcome)
         }
 
         private fun outcomeLabel(outcome: String?) = when (outcome) {
-            "succeeded" -> "办成了"
-            "unverified" -> "办完了,没能核实"
-            "failed" -> "没有完成"
-            "cancelled" -> "已取消"
-            "error" -> "出错了"
-            null -> "没有结束"
+            "succeeded" -> tr(R.string.outcome_succeeded)
+            "unverified" -> tr(R.string.outcome_unverified)
+            "failed" -> tr(R.string.outcome_failed)
+            "cancelled" -> tr(R.string.steer_cancelled)
+            "error" -> tr(R.string.result_error)
+            null -> tr(R.string.outcome_unfinished)
             else -> outcome
         }
 
         internal fun duration(ms: Long): String {
             val s = (ms / 1000).coerceAtLeast(0)
-            return if (s < 60) "$s 秒" else "${s / 60} 分 ${s % 60} 秒"
+            return if (s < 60) tr(R.string.duration_s, s) else tr(R.string.duration_m_s, s / 60, s % 60)
         }
     }
 }

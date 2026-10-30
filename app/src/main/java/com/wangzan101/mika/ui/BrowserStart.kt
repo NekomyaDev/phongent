@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -72,11 +74,11 @@ import com.wangzan101.mika.ui.theme.MikaSpace
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-const val BROWSER_SEARCH_HINT = "搜索或输入网址"
-const val BROWSER_ENGINE_NOTE = "用必应搜索"
-const val BROWSER_TYPING_NOTE = "输入网址直接打开，其他内容用必应搜索"
-const val BROWSER_LOGIN_LEGEND = "已登录，Mika 办事时也能直接用"
-const val BROWSER_ADD_HINT = "打开网站后，在「更多」里点「加入常用网站」"
+val BROWSER_SEARCH_HINT: String get() = tr(R.string.browser_search_hint)
+val BROWSER_ENGINE_NOTE: String get() = tr(R.string.browser_engine_note)
+val BROWSER_TYPING_NOTE: String get() = tr(R.string.browser_typing_note)
+val BROWSER_LOGIN_LEGEND: String get() = tr(R.string.browser_login_legend)
+val BROWSER_ADD_HINT: String get() = tr(R.string.browser_add_hint)
 private const val COLUMNS = 4
 
 /**
@@ -106,23 +108,23 @@ fun BrowserStart(
     }
     Column(Modifier.fillMaxSize()) {
         if (editing) {
-            TopBar("整理常用网站", right = {
+            TopBar(tr(R.string.browser_edit_favorites), right = {
                 Text(
-                    "完成", Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { editing = false }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    tr(R.string.done), Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { editing = false }.padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MikaType.BodyStrong, color = c.accent,
                 )
             })
         } else {
-            TopBar("浏览器", MikaIcons.Back, onBack, "返回")
+            TopBar(tr(R.string.drawer_browser), MikaIcons.Back, onBack, tr(R.string.back))
         }
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = MikaSpace.Page),
         ) {
             if (editing) {
-                SectionHeader("点左上角的 × 移除")
+                SectionHeader(tr(R.string.browser_tap_x))
                 SiteGrid(sites, face, editing = true, onOpen = {}, onRemove = onRemoveSite, onEdit = {}, onAdd = null)
-                Legend("长按某个网站也能进来整理", dot = false)
+                Legend(tr(R.string.browser_long_press), dot = false)
             } else {
                 Spacer(Modifier.height(MikaSpace.S20))
                 BigSearchField(query, { query = it }, onGo = {
@@ -134,10 +136,10 @@ fun BrowserStart(
                 })
                 if (query.isBlank()) {
                     Caption(BROWSER_ENGINE_NOTE)
-                    SectionHeader("常用网站", if (sites.isEmpty()) null else "整理") { editing = true }
+                    SectionHeader(tr(R.string.browser_favorites), if (sites.isEmpty()) null else tr(R.string.browser_edit)) { editing = true }
                     SiteGrid(sites, face, editing = false, onOpen = onOpenSite, onRemove = {}, onEdit = { editing = true }, onAdd = onAddHint)
                     if (sites.any { it.loggedIn }) Legend(BROWSER_LOGIN_LEGEND, dot = true)
-                    SectionHeader("最近打开", if (recent.isEmpty()) null else "清除", onClearRecent)
+                    SectionHeader(tr(R.string.browser_recent_source), if (recent.isEmpty()) null else tr(R.string.clear), onClearRecent)
                     RecentCard(recent, face, now, onOpenUrl)
                 } else {
                     val suggestions = remember(query, recent) { StartPageModel.suggestions(query, recent) }
@@ -180,9 +182,9 @@ private fun BigSearchField(value: String, onChange: (String) -> Unit, onGo: () -
         }
         if (value.isNotEmpty()) {
             Box(
-                Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = "清空", role = Role.Button) { onChange("") },
+                Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = tr(R.string.browser_clear_input), role = Role.Button) { onChange("") },
                 contentAlignment = Alignment.Center,
-            ) { Icon(MikaIcons.Close, "清空", Modifier.size(16.dp), tint = c.ink3) }
+            ) { Icon(MikaIcons.Close, tr(R.string.browser_clear_input), Modifier.size(16.dp), tint = c.ink3) }
         }
     }
 }
@@ -269,8 +271,8 @@ private fun SiteCell(
         Modifier.graphicsLayer { rotationZ = if (even) angle else -angle }
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
-                onClickLabel = if (editing) null else "打开${face.name}",
-                onLongClickLabel = if (editing) null else "整理常用网站",
+                onClickLabel = if (editing) null else tr(R.string.browser_open_site, face.name),
+                onLongClickLabel = if (editing) null else tr(R.string.browser_edit_favorites),
                 onClick = { if (!editing) onOpen() },
                 onLongClick = { if (!editing) onEdit() },
             )
@@ -289,10 +291,10 @@ private fun SiteCell(
             if (editing) {
                 Box(
                     Modifier.align(Alignment.TopStart).offset((-6).dp, (-6).dp).size(22.dp).clip(CircleShape)
-                        .background(c.ink2).clickable(onClickLabel = "移除${face.name}", role = Role.Button, onClick = onRemove)
+                        .background(c.ink2).clickable(onClickLabel = tr(R.string.browser_remove_site, face.name), role = Role.Button, onClick = onRemove)
                         .testTag("browser-site-remove"),
                     contentAlignment = Alignment.Center,
-                ) { Icon(MikaIcons.Close, "移除${face.name}", Modifier.size(11.dp), tint = c.bg) }
+                ) { Icon(MikaIcons.Close, tr(R.string.browser_remove_site, face.name), Modifier.size(11.dp), tint = c.bg) }
             }
         }
         Text(face.name, style = MikaType.Hint, color = c.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -303,7 +305,7 @@ private fun SiteCell(
 private fun AddCell(onAdd: () -> Unit) {
     val c = MikaTheme.colors
     Column(
-        Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "添加常用网站", role = Role.Button, onClick = onAdd)
+        Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = tr(R.string.browser_add_favorite), role = Role.Button, onClick = onAdd)
             .padding(horizontal = 2.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -311,7 +313,7 @@ private fun AddCell(onAdd: () -> Unit) {
         Box(Modifier.size(54.dp).cardSurface(c, TileShape), contentAlignment = Alignment.Center) {
             Icon(MikaIcons.Plus, null, Modifier.size(24.dp), tint = c.ink3)
         }
-        Text("添加", style = MikaType.Hint, color = c.ink2, maxLines = 1)
+        Text(tr(R.string.add), style = MikaType.Hint, color = c.ink2, maxLines = 1)
     }
 }
 
@@ -320,7 +322,7 @@ private fun RecentCard(recent: List<RecentItem>, face: (String) -> SiteFace, now
     val c = MikaTheme.colors
     GroupCard {
         if (recent.isEmpty()) {
-            Text("还没有打开过的网页", Modifier.fillMaxWidth().padding(16.dp), style = MikaType.Body, color = c.ink3)
+            Text(tr(R.string.browser_no_recent), Modifier.fillMaxWidth().padding(16.dp), style = MikaType.Body, color = c.ink3)
         }
         recent.forEachIndexed { i, r ->
             if (i > 0) Hairline(start = 56.dp)

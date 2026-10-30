@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.sandbox
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.content.Context
 import android.os.Build
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
@@ -98,7 +100,7 @@ class SandboxState internal constructor(
     @Synchronized
     internal fun resetting() {
         Files.deleteIfExists(recordFile.toPath())
-        installing("重置", 0)
+        installing(tr(R.string.sandbox_resetting), 0)
     }
 
     /** 安装或重置结束(不论成败):撤掉进行中的状态,按记录重新算。 */
@@ -112,7 +114,7 @@ class SandboxState internal constructor(
     fun refresh() { _status.value = read() }
 
     private fun read(): SandboxStatus {
-        if ("arm64-v8a" !in abis()) return SandboxStatus.Unsupported("此设备不支持(需要 arm64)")
+        if ("arm64-v8a" !in abis()) return SandboxStatus.Unsupported(tr(R.string.install_unsupported))
         installing?.let { return it }
         val r = record()
         val step = r["completedStep"]?.jsonPrimitive?.contentOrNull
@@ -121,9 +123,9 @@ class SandboxState internal constructor(
         val hasShell = Files.exists(File(dirs.rootfs, "bin/sh").toPath(), LinkOption.NOFOLLOW_LINKS)
         return when {
             step == InstallStep.Done.name && hasShell -> SandboxStatus.Ready(network = networkAllowed)
-            step == InstallStep.Done.name -> SandboxStatus.Broken("运行环境文件不完整,可在设置 → 高级里重置")
+            step == InstallStep.Done.name -> SandboxStatus.Broken(tr(R.string.sandbox_incomplete))
             broken != null -> SandboxStatus.Broken(broken)
-            step != null -> SandboxStatus.Broken("安装没有完成,可以重试")
+            step != null -> SandboxStatus.Broken(tr(R.string.sandbox_not_finished))
             else -> SandboxStatus.NotInstalled
         }
     }

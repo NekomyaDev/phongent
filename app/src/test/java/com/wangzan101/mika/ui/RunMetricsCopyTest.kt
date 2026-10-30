@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.record.RunMetrics
 import com.wangzan101.mika.core.record.RunStats
 import org.junit.Assert.assertEquals
@@ -7,6 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RunMetricsCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test fun durations() {
         assertEquals("0 秒", RunMetricsCopy.duration(0))
         assertEquals("3.2 秒", RunMetricsCopy.duration(3_240))

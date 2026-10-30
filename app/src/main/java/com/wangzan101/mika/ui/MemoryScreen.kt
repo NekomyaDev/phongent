@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.ui.components.keepsKeyboard
 import com.wangzan101.mika.ui.components.KeyboardDismissArea
 import androidx.activity.compose.BackHandler
@@ -47,8 +50,8 @@ import com.wangzan101.mika.ui.theme.MikaType
 private val SEGMENT_TAGS = Segment.entries.map { "segment-${it.name}" }
 
 /** 记忆按类别分组的顺序和小标题。 */
-private val KIND_GROUPS = listOf(MemoryKind.fact to "关于你", MemoryKind.preference to "偏好", MemoryKind.procedure to "做法")
-private val KIND_NAMES = listOf("事实", "偏好", "做法")
+private val KIND_GROUPS get() = listOf(MemoryKind.fact to tr(R.string.memory_about_you), MemoryKind.preference to tr(R.string.memory_preferences), MemoryKind.procedure to tr(R.string.memory_procedures))
+private val KIND_NAMES get() = listOf(tr(R.string.memory_fact), tr(R.string.memory_preferences), tr(R.string.memory_procedures))
 
 /** 设置 →「记忆与技能」:看得见、改得了、删得掉。分三段:记忆、技能(内容在 [SkillsSection])、待确认。 */
 @Composable
@@ -62,29 +65,29 @@ fun MemoryScreen(vm: MemoryViewModel, onBack: () -> Unit) {
     val searchable = ui.segment != Segment.Skills
 
     SubPage(
-        "记忆与技能", onBack,
+        stringResource(R.string.memory_and_skills), onBack,
         right = if (searchable) ({
-            BarIconButton(MikaIcons.Search, "搜索", { searching = !searching; if (!searching) vm.search("") })
+            BarIconButton(MikaIcons.Search, stringResource(R.string.search), { searching = !searching; if (!searching) vm.search("") })
         }) else null,
     ) {
         ui.brokenNotice?.let {
-            GroupCard { Text("之前的记忆读不出来,已另存,现在从空开始。", Modifier.padding(16.dp), style = MikaType.Caption, color = MikaTheme.colors.warn) }
+            GroupCard { Text(stringResource(R.string.memory_unreadable), Modifier.padding(16.dp), style = MikaType.Caption, color = MikaTheme.colors.warn) }
         }
 
-        val pendingLabel = if (ui.pendingCount > 0) "待确认 ${ui.pendingCount}" else "待确认"
+        val pendingLabel = if (ui.pendingCount > 0) stringResource(R.string.memory_pending_n, ui.pendingCount) else stringResource(R.string.memory_pending)
         SegmentedControl(
-            listOf("记忆", "技能", pendingLabel), Segment.entries.indexOf(ui.segment), { vm.select(Segment.entries[it]) },
+            listOf(stringResource(R.string.memory_memory), stringResource(R.string.memory_skills), pendingLabel), Segment.entries.indexOf(ui.segment), { vm.select(Segment.entries[it]) },
             tags = SEGMENT_TAGS,
         )
         if (searchable && (searching || ui.query.isNotEmpty())) {
-            SearchField(ui.query, vm::search, "搜索", Modifier.testTag("memory-search"))
+            SearchField(ui.query, vm::search, stringResource(R.string.search), Modifier.testTag("memory-search"))
         }
 
         when (ui.segment) {
             Segment.Memories -> {
                 if (ui.rows.isEmpty()) {
                     GroupLabel("")
-                    EmptyNote(if (ui.query.isBlank()) "还没有记住的事" else "没有找到")
+                    EmptyNote(if (ui.query.isBlank()) stringResource(R.string.memory_empty) else stringResource(R.string.not_found))
                 }
                 KIND_GROUPS.forEach { (kind, label) ->
                     val rows = ui.rows.filter { it.kind == kind }
@@ -99,24 +102,24 @@ fun MemoryScreen(vm: MemoryViewModel, onBack: () -> Unit) {
                 }
                 GroupLabel("")
                 GroupCard {
-                    ListRow(MikaIcons.Plus, "手写一条", first = true, titleColor = MikaTheme.colors.accent, tone = TileTone.Accent, onClick = { adding = true })
+                    ListRow(MikaIcons.Plus, stringResource(R.string.memory_add), first = true, titleColor = MikaTheme.colors.accent, tone = TileTone.Accent, onClick = { adding = true })
                 }
             }
             Segment.Skills -> SkillsSection(vm, ui.skills, pending = false)
             Segment.Pending -> {
                 if (ui.pendingCount == 0) {
                     GroupLabel("")
-                    EmptyNote("没有等你确认的东西")
+                    EmptyNote(stringResource(R.string.memory_nothing_pending))
                 }
                 if (ui.pending.isNotEmpty()) {
-                    GroupLabel("等你批准的记忆")
+                    GroupLabel(stringResource(R.string.memory_pending_title))
                     GroupCard {
                         ui.pending.forEachIndexed { i, r ->
                             Column {
                                 MemoryRow(r, first = i == 0, onClick = null)
                                 RowActions {
-                                    MikaButton("好", { vm.approve(r.id) }, size = ButtonSize.Small)
-                                    MikaButton("不要", { vm.reject(r.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+                                    MikaButton(stringResource(R.string.ok_yes), { vm.approve(r.id) }, size = ButtonSize.Small)
+                                    MikaButton(stringResource(R.string.no_thanks), { vm.reject(r.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
                                 }
                             }
                         }
@@ -126,14 +129,14 @@ fun MemoryScreen(vm: MemoryViewModel, onBack: () -> Unit) {
             }
         }
 
-        GroupLabel("开关")
+        GroupLabel(stringResource(R.string.memory_switches))
         GroupCard {
-            SwitchRow("使用记忆", "关掉后不读也不记", ui.switches.useMemory, first = true) { on -> vm.setSwitches { it.copy(useMemory = on) } }
-            SwitchRow("自动记住我说过的事", "任务结束后从你的原话里整理", ui.switches.autoRemember) { on -> vm.setSwitches { it.copy(autoRemember = on) } }
-            SwitchRow("从办成的任务里学技能", "学到的技能要你收下才会用", ui.switches.learnSkills) { on -> vm.setSwitches { it.copy(learnSkills = on) } }
+            SwitchRow(stringResource(R.string.memory_use), stringResource(R.string.memory_use_sub), ui.switches.useMemory, first = true) { on -> vm.setSwitches { it.copy(useMemory = on) } }
+            SwitchRow(stringResource(R.string.memory_auto), stringResource(R.string.memory_auto_sub), ui.switches.autoRemember) { on -> vm.setSwitches { it.copy(autoRemember = on) } }
+            SwitchRow(stringResource(R.string.memory_learn), stringResource(R.string.memory_learn_sub), ui.switches.learnSkills) { on -> vm.setSwitches { it.copy(learnSkills = on) } }
         }
         GroupCard {
-            ListRow(MikaIcons.Close, "全部清除", "删掉所有记忆和学到的技能", first = true, titleColor = MikaTheme.colors.bad, tone = TileTone.Bad, onClick = vm::requestClear)
+            ListRow(MikaIcons.Close, stringResource(R.string.routes_clear_all), stringResource(R.string.memory_clear_sub), first = true, titleColor = MikaTheme.colors.bad, tone = TileTone.Bad, onClick = vm::requestClear)
         }
     }
 
@@ -141,29 +144,29 @@ fun MemoryScreen(vm: MemoryViewModel, onBack: () -> Unit) {
         ActionSheet(
             r.content,
             listOf(
-                SheetAction("改一改") { editing = r },
-                SheetAction(if (r.pinned) "取消置顶" else "置顶") { vm.setPinned(r.id, !r.pinned) },
-                SheetAction("删除", destructive = true) { vm.delete(r.id) },
+                SheetAction(stringResource(R.string.edit_it)) { editing = r },
+                SheetAction(if (r.pinned) stringResource(R.string.unpin) else stringResource(R.string.pin)) { vm.setPinned(r.id, !r.pinned) },
+                SheetAction(stringResource(R.string.confirm_delete), destructive = true) { vm.delete(r.id) },
             ),
             onDismiss = { acting = null },
         )
     }
     editing?.let { r ->
-        EditDialog("改一改", r.content, r.keywords, onDismiss = { editing = null }) { content, keywords, _ -> vm.edit(r.id, content, keywords); editing = null }
+        EditDialog(stringResource(R.string.edit_it), r.content, r.keywords, onDismiss = { editing = null }) { content, keywords, _ -> vm.edit(r.id, content, keywords); editing = null }
     }
     if (adding) {
-        EditDialog("手写一条", "", emptyList(), onDismiss = { adding = false }, withKind = true) { content, keywords, kind -> vm.add(kind, content, keywords); adding = false }
+        EditDialog(stringResource(R.string.memory_add), "", emptyList(), onDismiss = { adding = false }, withKind = true) { content, keywords, kind -> vm.add(kind, content, keywords); adding = false }
     }
     ui.message?.let { m ->
-        AlertDialog(onDismissRequest = vm::dismissMessage, text = { Text(m) }, confirmButton = { TextButton(vm::dismissMessage) { Text("知道了") } })
+        AlertDialog(onDismissRequest = vm::dismissMessage, text = { Text(m) }, confirmButton = { TextButton(vm::dismissMessage) { Text(stringResource(R.string.ok_got_it)) } })
     }
     if (ui.clearStage > 0) {
         AlertDialog(
             onDismissRequest = vm::cancelClear,
-            title = { Text(if (ui.clearStage == 1) "全部清除?" else "真的要清除吗?") },
-            text = { Text(if (ui.clearStage == 1) "所有记忆、学到的技能和草稿都会删掉。" else "清除后不能恢复。") },
-            confirmButton = { TextButton(vm::confirmClear, Modifier.testTag("confirm-clear")) { Text(if (ui.clearStage == 1) "继续" else "全部清除") } },
-            dismissButton = { TextButton(vm::cancelClear) { Text("取消") } },
+            title = { Text(if (ui.clearStage == 1) stringResource(R.string.memory_clear_q) else stringResource(R.string.memory_clear_sure)) },
+            text = { Text(if (ui.clearStage == 1) stringResource(R.string.memory_clear_body) else stringResource(R.string.memory_clear_final)) },
+            confirmButton = { TextButton(vm::confirmClear, Modifier.testTag("confirm-clear")) { Text(if (ui.clearStage == 1) stringResource(R.string.chat_continue) else stringResource(R.string.routes_clear_all)) } },
+            dismissButton = { TextButton(vm::cancelClear) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -176,8 +179,8 @@ private fun SwitchRow(title: String, subtitle: String, on: Boolean, first: Boole
 @Composable
 private fun MemoryRow(r: Row, first: Boolean, onClick: (() -> Unit)?) {
     val subtitle = listOfNotNull(
-        (if (r.pinned) "已置顶 · " else "") + r.source,
-        r.replaces?.let { "原来:$it" },
+        (if (r.pinned) stringResource(R.string.memory_pinned_prefix) else "") + r.source,
+        r.replaces?.let { stringResource(R.string.memory_was, it) },
     ).joinToString("\n")
     androidx.compose.foundation.layout.Box(Modifier.testTag("memory-row")) {
         ListRow(null, r.content, subtitle, first = first, onClick = onClick)
@@ -203,11 +206,11 @@ private fun EditDialog(
         text = {
             KeyboardDismissArea { Column {
                 if (withKind) SegmentedControl(KIND_NAMES, kind, { kind = it }, Modifier.padding(bottom = 8.dp), tags = listOf("memory-kind-fact", "memory-kind-preference", "memory-kind-procedure"))
-                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().keepsKeyboard().testTag("memory-content"), label = { Text("内容") })
-                OutlinedTextField(words, { words = it }, Modifier.fillMaxWidth().padding(top = 8.dp).keepsKeyboard().testTag("memory-keywords"), label = { Text("检索词(空格分开)") })
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().keepsKeyboard().testTag("memory-content"), label = { Text(stringResource(R.string.memory_content)) })
+                OutlinedTextField(words, { words = it }, Modifier.fillMaxWidth().padding(top = 8.dp).keepsKeyboard().testTag("memory-keywords"), label = { Text(stringResource(R.string.memory_keywords)) })
             } }
         },
-        confirmButton = { TextButton({ onSave(text, words.split(Regex("\\s+")).filter { it.isNotBlank() }, KIND_GROUPS[kind].first) }, Modifier.testTag("memory-save")) { Text("保存") } },
-        dismissButton = { TextButton(onDismiss) { Text("取消") } },
+        confirmButton = { TextButton({ onSave(text, words.split(Regex("\\s+")).filter { it.isNotBlank() }, KIND_GROUPS[kind].first) }, Modifier.testTag("memory-save")) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

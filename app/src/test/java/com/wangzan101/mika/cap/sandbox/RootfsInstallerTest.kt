@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.sandbox
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.workspace.SandboxTree
 import com.wangzan101.mika.core.cap.sandbox.RootfsExtractor
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
@@ -23,6 +25,8 @@ import java.security.MessageDigest
 
 /** 自带的运行环境换成用宿主 tar 现做、再用 xz 压的小包;不联网。 */
 class RootfsInstallerTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val tmp: File = Files.createTempDirectory("rootfs-installer").toFile()
     private val dirs = SandboxDirs(File(tmp, "files/sandbox"), File(tmp, "cache/proot-tmp"), File(tmp, "lib"), JVM_GATE, SandboxTree())
     private val state = SandboxState(dirs, File(tmp, "files/sandbox-settings.json")) { listOf("arm64-v8a") }

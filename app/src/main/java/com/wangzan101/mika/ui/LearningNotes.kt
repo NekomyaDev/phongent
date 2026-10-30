@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,17 +25,17 @@ internal fun LazyListScope.learningNotes(index: Int, ex: Exchange, vm: ChatViewM
             ex.memoryNotes.forEach { n ->
                 NoteLine(vm.noteText(n)) {
                     if (n.pendingId != null) {
-                        Link("好") { vm.approveNote(runId, n) }
-                        Link("不要") { vm.rejectNote(runId, n) }
-                    } else if (n.undoToken != null) Link("撤销") { vm.undoNote(runId, n) }
+                        Link(stringResource(R.string.ok_yes)) { vm.approveNote(runId, n) }
+                        Link(stringResource(R.string.no_thanks)) { vm.rejectNote(runId, n) }
+                    } else if (n.undoToken != null) Link(stringResource(R.string.undo)) { vm.undoNote(runId, n) }
                 }
             }
             ex.skillNotes.forEach { n ->
                 NoteLine(n.text) {
-                    if (n.draftId != null) Link("看看") { vm.viewSkill(n) }
+                    if (n.draftId != null) Link(stringResource(R.string.take_a_look)) { vm.viewSkill(n) }
                     if (n.suspended != null) {
-                        Link("恢复") { vm.restoreSkill(runId, n) }
-                        Link("删除") { vm.deleteSkill(runId, n) }
+                        Link(stringResource(R.string.restore)) { vm.restoreSkill(runId, n) }
+                        Link(stringResource(R.string.confirm_delete)) { vm.deleteSkill(runId, n) }
                     }
                 }
             }

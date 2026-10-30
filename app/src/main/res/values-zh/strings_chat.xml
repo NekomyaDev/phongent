@@ -110,4 +110,8 @@
     <string name="screen_send">把此刻的屏幕发给 Mika</string>
     <string name="pip_screen">Mika 的虚拟屏</string>
     <string name="collapse">收起</string>
+    <string name="no_app_for_link">没有能打开这个链接的 App</string>
+    <string name="source_none">没有保存这次答复的来源</string>
+    <string name="source_image">来源画面</string>
+    <string name="zoom_in">放大看</string>
 </resources>

@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.ui.components.keepsKeyboard
 import com.wangzan101.mika.ui.components.KeyboardDismissArea
 import androidx.compose.foundation.layout.Column
@@ -46,17 +49,17 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
 
     if (pending) {
         if (ui.drafts.isNotEmpty()) {
-            GroupLabel("新技能草稿，收下后先试用并核实")
+            GroupLabel(stringResource(R.string.skills_drafts))
             GroupCard {
                 ui.drafts.forEachIndexed { i, d ->
                     Column(Modifier.testTag("skill-row")) {
                         ListRow(null, d.display, d.description.ifBlank { null }, first = i == 0, onClick = { toggle(d.id) })
                         SkillBody(d, expanded = viewing == d.id)
                         RowActions {
-                            MikaButton("收下试用", { vm.approveSkill(d.id) }, size = ButtonSize.Small)
-                            MikaButton("改一改", { editing = d }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
-                            MikaButton(if (viewing == d.id) "收起全文" else "看全文", { toggle(d.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
-                            MikaButton("不要", { vm.rejectSkill(d.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+                            MikaButton(stringResource(R.string.skills_accept_try), { vm.approveSkill(d.id) }, size = ButtonSize.Small)
+                            MikaButton(stringResource(R.string.edit_it), { editing = d }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+                            MikaButton(if (viewing == d.id) stringResource(R.string.skills_hide_full) else stringResource(R.string.skills_view_full), { toggle(d.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+                            MikaButton(stringResource(R.string.no_thanks), { vm.rejectSkill(d.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
                         }
                     }
                 }
@@ -64,18 +67,18 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
         }
         val drafts = ui.appKnowledge.filter { it.stage == AppKnowledgeStage.Draft }
         if (drafts.isNotEmpty()) {
-            GroupLabel("App 知识草稿")
+            GroupLabel(stringResource(R.string.skills_app_drafts))
             GroupCard {
                 drafts.forEachIndexed { i, row -> AppKnowledgeItem(vm, row, i == 0, viewing == row.id) { toggle(row.id) } }
             }
         }
     } else {
-        GroupLabel("我的技能")
+        GroupLabel(stringResource(R.string.skills_mine))
         GroupCard {
-            if (ui.installed.isEmpty()) EmptyNote("还没有学到的技能")
+            if (ui.installed.isEmpty()) EmptyNote(stringResource(R.string.skills_empty))
             ui.installed.forEachIndexed { i, s ->
-                val state = when { s.suspended -> "已停用"; s.trial -> "试用中，未核实"; else -> null }
-                val detail = listOfNotNull(state, s.recent.takeIf { it.isNotEmpty() }?.let { "最近:" + it.joinToString(" · ") }).joinToString(" · ")
+                val state = when { s.suspended -> stringResource(R.string.skills_suspended); s.trial -> stringResource(R.string.skills_trial); else -> null }
+                val detail = listOfNotNull(state, s.recent.takeIf { it.isNotEmpty() }?.let { stringResource(R.string.skills_recent, it.joinToString(" · ")) }).joinToString(" · ")
                 Column(Modifier.testTag("skill-row")) {
                     ListRow(null, s.display, s.description.ifBlank { null }, first = i == 0, detail = detail, onClick = { acting = s }) {
                         MikaSwitch(!s.suspended, { on -> if (on) vm.restoreSkill(s.name) else vm.suspendSkill(s.name) })
@@ -86,7 +89,7 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
         }
         val inUse = ui.appKnowledge.filter { it.stage != AppKnowledgeStage.Draft }
         if (inUse.isNotEmpty()) {
-            GroupLabel("App 知识")
+            GroupLabel(stringResource(R.string.skills_app_knowledge))
             GroupCard {
                 inUse.forEachIndexed { i, row -> AppKnowledgeItem(vm, row, i == 0, viewing == row.id) { toggle(row.id) } }
             }
@@ -97,9 +100,9 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
         ActionSheet(
             s.display,
             listOfNotNull(
-                SheetAction(if (viewing == s.id) "收起全文" else "看全文") { toggle(s.id) },
-                if (s.canRestore) SheetAction("恢复上一版") { vm.restorePreviousSkill(s.name) } else null,
-                SheetAction("删除", destructive = true) { vm.deleteSkill(s.name) },
+                SheetAction(if (viewing == s.id) stringResource(R.string.skills_hide_full) else stringResource(R.string.skills_view_full)) { toggle(s.id) },
+                if (s.canRestore) SheetAction(stringResource(R.string.skills_restore_prev)) { vm.restorePreviousSkill(s.name) } else null,
+                SheetAction(stringResource(R.string.confirm_delete), destructive = true) { vm.deleteSkill(s.name) },
             ),
             onDismiss = { acting = null },
         )
@@ -109,10 +112,10 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
         var text by remember(d.id) { mutableStateOf(d.markdown) }
         AlertDialog(
             onDismissRequest = { editing = null },
-            title = { Text("改一改再试用") },
+            title = { Text(stringResource(R.string.skills_edit_title)) },
             text = { KeyboardDismissArea { OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().heightIn(min = 240.dp).keepsKeyboard().testTag("skill-markdown")) } },
-            confirmButton = { TextButton({ vm.approveSkill(d.id, text); editing = null }) { Text("收下试用") } },
-            dismissButton = { TextButton({ editing = null }) { Text("取消") } },
+            confirmButton = { TextButton({ vm.approveSkill(d.id, text); editing = null }) { Text(stringResource(R.string.skills_accept_try)) } },
+            dismissButton = { TextButton({ editing = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -121,18 +124,18 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean) 
 @Composable
 private fun AppKnowledgeItem(vm: MemoryViewModel, row: AppKnowledgeRow, first: Boolean, expanded: Boolean, onToggle: () -> Unit) {
     val stage = when (row.stage) {
-        AppKnowledgeStage.Draft -> "草稿，未使用"
-        AppKnowledgeStage.Trial -> "试用中，未核实"
-        AppKnowledgeStage.Verified -> "已核实"
-        AppKnowledgeStage.Archived -> "已归档"
+        AppKnowledgeStage.Draft -> tr(R.string.skills_draft_unused)
+        AppKnowledgeStage.Trial -> stringResource(R.string.skills_trial)
+        AppKnowledgeStage.Verified -> tr(R.string.skills_verified)
+        AppKnowledgeStage.Archived -> tr(R.string.skills_archived)
     }
     Column {
         ListRow(null, row.name, stage, first = first, onClick = onToggle)
         if (expanded) Text(row.markdown, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), style = MikaType.Hint, color = MikaTheme.colors.ink2)
         RowActions {
-            MikaButton(if (expanded) "收起全文" else "看全文", onToggle, kind = ButtonKind.Tonal, size = ButtonSize.Small)
-            if (row.stage == AppKnowledgeStage.Draft) MikaButton("收下试用", { vm.approveAppDraft(row.id) }, size = ButtonSize.Small)
-            if (row.stage != AppKnowledgeStage.Verified) MikaButton("归档", { vm.rejectAppDraft(row.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+            MikaButton(if (expanded) stringResource(R.string.skills_hide_full) else stringResource(R.string.skills_view_full), onToggle, kind = ButtonKind.Tonal, size = ButtonSize.Small)
+            if (row.stage == AppKnowledgeStage.Draft) MikaButton(stringResource(R.string.skills_accept_try), { vm.approveAppDraft(row.id) }, size = ButtonSize.Small)
+            if (row.stage != AppKnowledgeStage.Verified) MikaButton(stringResource(R.string.skills_archive), { vm.rejectAppDraft(row.id) }, kind = ButtonKind.Tonal, size = ButtonSize.Small)
         }
     }
 }
@@ -144,7 +147,7 @@ private fun SkillBody(r: SkillRow, expanded: Boolean) {
     if (r.changedLines.isEmpty() && !expanded) return
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
         if (r.changedLines.isNotEmpty()) {
-            Text("改了这几行:", style = MikaType.Hint, color = c.ink3)
+            Text(stringResource(R.string.skills_changed_lines), style = MikaType.Hint, color = c.ink3)
             r.changedLines.forEach { Text(it, style = MikaType.Hint, color = if (it.startsWith("+")) c.ok else c.bad) }
         }
         if (expanded) Text(r.markdown, Modifier.padding(top = 6.dp), style = MikaType.Hint, color = c.ink2)

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -13,6 +15,7 @@ import com.wangzan101.mika.cap.web.SiteEntry
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.wangzan101.mika.i18n.uiLocale
 import com.wangzan101.mika.ui.components.GroupCard
 import com.wangzan101.mika.ui.components.GroupLabel
 import com.wangzan101.mika.ui.components.ListRow
@@ -34,9 +37,9 @@ class WebSitesState(
     val onLogoutAll: () -> Unit,
 )
 
-const val WEB_LOGOUT_PARTIAL = "个别网站的登录可能仍在,如需彻底清除请用「全部退出」。"
-const val WEB_CHALLENGED_NOTE = "Mika 最近在这个网站上碰到过人机验证或访问拦截。如果一直这样,可以清除这个网站的数据(Cookie 与网页存储)后重新登录。"
-const val WEB_DATA_NOTE = "网站的登录数据只存在这台手机上 Mika 的私有目录里,没有另行加密,和系统浏览器的保护程度相同。"
+val WEB_LOGOUT_PARTIAL: String get() = tr(R.string.web_logout_partial)
+val WEB_CHALLENGED_NOTE: String get() = tr(R.string.web_challenged_note)
+val WEB_DATA_NOTE: String get() = tr(R.string.web_data_note)
 
 /** 设置页的「网站登录」:列出内置浏览器访问过的网站(登录过的在前),可以打开登录、退出单个网站、全部退出。 */
 @Composable
@@ -45,26 +48,26 @@ fun WebSitesSection(state: WebSitesState, labeled: Boolean = true) {
     var confirmAll by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    if (labeled) GroupLabel("网站登录")
+    if (labeled) GroupLabel(tr(R.string.settings_web_logins))
     GroupCard {
         if (state.sites.isEmpty()) {
-            ListRow(MikaIcons.Globe, "还没有访问过的网站", "Mika 在网页上办过事、或你在这里登录过之后会列在这里", first = true)
+            ListRow(MikaIcons.Globe, tr(R.string.web_none), tr(R.string.web_none_sub), first = true)
         }
         val now = System.currentTimeMillis()
         state.sites.forEachIndexed { i, s ->
             ListRow(
                 MikaIcons.Globe, s.host,
                 subtitle = listOfNotNull(
-                    "在 Mika 里登录过".takeIf { s.loggedInByUser },
-                    "碰到过验证或拦截".takeIf { s.challenged(now) },
-                    "最近访问 ${day(s.lastVisitMs)}",
+                    tr(R.string.web_signed_in_by_you).takeIf { s.loggedInByUser },
+                    tr(R.string.web_challenged).takeIf { s.challenged(now) },
+                    tr(R.string.web_last_visit, day(s.lastVisitMs)),
                 ).joinToString(" · "),
                 first = i == 0,
                 onClick = { picked = s },
-            ) { RowValue("管理", ValueTone.Link) }
+            ) { RowValue(tr(R.string.web_manage), ValueTone.Link) }
         }
         ListRow(
-            MikaIcons.Close, "全部退出并清除网页数据", titleColor = MikaTheme.colors.bad, tone = TileTone.Bad,
+            MikaIcons.Close, tr(R.string.web_logout_all_title), titleColor = MikaTheme.colors.bad, tone = TileTone.Bad,
             onClick = { confirmAll = true },
         )
     }
@@ -75,37 +78,37 @@ fun WebSitesSection(state: WebSitesState, labeled: Boolean = true) {
             onDismissRequest = { picked = null },
             title = { Text(s.host) },
             text = {
-                val base = if (s.loggedInByUser) "你在 Mika 里登录过这个网站。" else "Mika 访问过这个网站。"
+                val base = if (s.loggedInByUser) tr(R.string.web_you_signed_in) else tr(R.string.web_mika_visited)
                 Text(if (s.challenged(System.currentTimeMillis())) "$base\n\n$WEB_CHALLENGED_NOTE" else base)
             },
             confirmButton = {
                 Column {
                     state.onOpenLogin?.let { open ->
-                        TextButton({ picked = null; open(s.host) }) { Text("打开登录") }
+                        TextButton({ picked = null; open(s.host) }) { Text(tr(R.string.web_open_login)) }
                     }
                     val clearing = s.challenged(System.currentTimeMillis())
                     TextButton({
                         picked = null
                         state.onLogout(s.host)
-                        notice = if (clearing) "已清除 ${s.host} 的 Cookie 与网页存储,下次用要重新登录。个别数据可能仍在,如需彻底清除请用「全部退出」。" else "已退出 ${s.host}。$WEB_LOGOUT_PARTIAL"
-                    }) { Text(if (clearing) "清除这个网站的数据" else "退出这个网站", color = MikaTheme.colors.bad) }
+                        notice = if (clearing) tr(R.string.web_cleared, s.host) else tr(R.string.web_signed_out, s.host, WEB_LOGOUT_PARTIAL)
+                    }) { Text(if (clearing) tr(R.string.web_clear_site) else tr(R.string.web_sign_out_site), color = MikaTheme.colors.bad) }
                 }
             },
-            dismissButton = { TextButton({ picked = null }) { Text("取消") } },
+            dismissButton = { TextButton({ picked = null }) { Text(tr(R.string.cancel)) } },
         )
     }
 
     if (confirmAll) {
         AlertDialog(
             onDismissRequest = { confirmAll = false },
-            title = { Text("全部退出并清除网页数据?") },
-            text = { Text("会退出内置浏览器里所有网站的登录,并清除它们存在 Mika 里的网页数据。之后 Mika 用网页办事时要重新登录。") },
+            title = { Text(tr(R.string.web_logout_all_q)) },
+            text = { Text(tr(R.string.web_logout_all_body)) },
             confirmButton = {
-                TextButton({ confirmAll = false; state.onLogoutAll(); notice = "已全部退出并清除网页数据。" }) {
-                    Text("全部退出", color = MikaTheme.colors.bad)
+                TextButton({ confirmAll = false; state.onLogoutAll(); notice = tr(R.string.web_logged_out_all) }) {
+                    Text(tr(R.string.web_logout_all), color = MikaTheme.colors.bad)
                 }
             },
-            dismissButton = { TextButton({ confirmAll = false }) { Text("取消") } },
+            dismissButton = { TextButton({ confirmAll = false }) { Text(tr(R.string.cancel)) } },
         )
     }
 
@@ -113,9 +116,9 @@ fun WebSitesSection(state: WebSitesState, labeled: Boolean = true) {
         AlertDialog(
             onDismissRequest = { notice = null },
             text = { Text(n) },
-            confirmButton = { TextButton({ notice = null }) { Text("知道了") } },
+            confirmButton = { TextButton({ notice = null }) { Text(tr(R.string.ok_got_it)) } },
         )
     }
 }
 
-private fun day(ms: Long): String = SimpleDateFormat("M月d日", Locale.CHINA).format(Date(ms))
+private fun day(ms: Long): String = SimpleDateFormat(tr(R.string.date_pattern_md_compact), uiLocale()).format(Date(ms))

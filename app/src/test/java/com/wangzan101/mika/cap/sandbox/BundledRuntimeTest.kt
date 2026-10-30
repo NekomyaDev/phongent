@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.sandbox
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.workspace.SandboxTree
 import com.wangzan101.mika.core.cap.sandbox.SANDBOX_PACKAGES
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
@@ -18,6 +20,8 @@ import java.security.MessageDigest
 
 /** 仓库里的自带运行环境与生成的常量、软件包清单、构建脚本彼此一致,并且真能解开。单元测试的工作目录是 app/。 */
 class BundledRuntimeTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val asset = File("src/main/assets/${BundledRuntime.ASSET}")
     private val manifest = Json.parseToJsonElement(File("src/main/assets/runtime/packages.json").readText()).jsonObject
 

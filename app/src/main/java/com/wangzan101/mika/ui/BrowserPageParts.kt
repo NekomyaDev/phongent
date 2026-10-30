@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.foundation.Image
@@ -77,8 +79,8 @@ import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-const val BROWSER_DESKTOP_TAG = "电脑版"
-const val BROWSER_LOGIN_DONE = "登录好了"
+val BROWSER_DESKTOP_TAG: String get() = tr(R.string.browser_desktop)
+val BROWSER_LOGIN_DONE: String get() = tr(R.string.browser_login_done)
 
 internal val MiniShape = RoundedCornerShape(8.dp)
 internal val InitialSmall = TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
@@ -147,15 +149,15 @@ fun BrowserPageBar(
                     onSubmit(input)
                 }
                 Text(
-                    "取消", Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { editing = false; focus.clearFocus() }
+                    tr(R.string.cancel), Modifier.clip(MikaShapes.Pill).clickable(role = Role.Button) { editing = false; focus.clearFocus() }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     style = MikaType.Body, color = c.accent,
                 )
             } else {
-                BarIconButton(MikaIcons.Close, "关闭网页", onClose)
+                BarIconButton(MikaIcons.Close, tr(R.string.browser_close_page), onClose)
                 AddressPill(page, face, Modifier.weight(1f)) { editing = true }
-                if (page.loading) BarIconButton(MikaIcons.Stop, "停止", onStop)
-                else BarIconButton(MikaIcons.Refresh, "刷新", onReload)
+                if (page.loading) BarIconButton(MikaIcons.Stop, tr(R.string.chat_stop), onStop)
+                else BarIconButton(MikaIcons.Refresh, tr(R.string.refresh), onReload)
             }
         }
         val progress = page.takeIf { it.loading }?.progress
@@ -174,14 +176,14 @@ private fun AddressPill(page: BrowserPage, face: SiteFace?, modifier: Modifier, 
     val shown = query ?: face?.name ?: page.url
     Row(
         modifier.height(40.dp).clip(MikaShapes.Pill).background(c.fill)
-            .clickable(onClickLabel = "改网址", role = Role.Button, onClick = onClick)
+            .clickable(onClickLabel = tr(R.string.browser_edit_url), role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp).testTag("browser-address-pill"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         when {
             query != null -> Icon(MikaIcons.Search, null, Modifier.size(14.dp), tint = c.ink3)
-            page.url.startsWith("https://") -> Icon(MikaIcons.Lock, "加密连接", Modifier.size(14.dp), tint = c.ink3)
+            page.url.startsWith("https://") -> Icon(MikaIcons.Lock, tr(R.string.browser_secure), Modifier.size(14.dp), tint = c.ink3)
         }
         Text(shown, Modifier.weight(1f, fill = false), style = MikaType.Body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (page.desktop) {
@@ -238,11 +240,11 @@ fun BrowserToolbar(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BarIconButton(MikaIcons.Back, "后退", onBackPage, enabled = page.canBack)
-            BarIconButton(MikaIcons.Forward, "前进", onForward, enabled = page.canForward)
-            BarIconButton(MikaIcons.Home, "起始页", onHome)
-            BarIconButton(MikaIcons.Share, "分享", onShare)
-            BarIconButton(MikaIcons.More, "更多", onMore)
+            BarIconButton(MikaIcons.Back, tr(R.string.back), onBackPage, enabled = page.canBack)
+            BarIconButton(MikaIcons.Forward, tr(R.string.browser_forward), onForward, enabled = page.canForward)
+            BarIconButton(MikaIcons.Home, tr(R.string.browser_home), onHome)
+            BarIconButton(MikaIcons.Share, tr(R.string.share), onShare)
+            BarIconButton(MikaIcons.More, tr(R.string.more), onMore)
         }
     }
 }
@@ -252,8 +254,8 @@ fun BrowserToolbar(
 fun LoginBanner(desktop: Boolean, onDone: () -> Unit) {
     val c = MikaTheme.colors
     val text = buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("给 Mika 登录") }
-        append(" · 用 Mika 办事时的${if (desktop) "电脑版" else "手机版"}打开，登录好了 Mika 也能用")
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(tr(R.string.browser_login_for_mika)) }
+        append(tr(R.string.browser_login_for_mika_sub, if (desktop) tr(R.string.browser_desktop) else tr(R.string.browser_mobile)))
     }
     Row(
         Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 8.dp)
@@ -302,15 +304,15 @@ fun BrowserMoreSheet(
                 }
             }
             fun act(f: () -> Unit): () -> Unit = { onDismiss(); f() }
-            ListRow(MikaIcons.Refresh, "刷新", first = true, onClick = act(onReload))
-            ListRow(MikaIcons.Copy, "复制链接", onClick = act(onCopy))
-            ListRow(MikaIcons.External, "在其他浏览器里打开", onClick = act(onOpenOutside))
+            ListRow(MikaIcons.Refresh, tr(R.string.refresh), first = true, onClick = act(onReload))
+            ListRow(MikaIcons.Copy, tr(R.string.browser_copy_link), onClick = act(onCopy))
+            ListRow(MikaIcons.External, tr(R.string.browser_open_outside), onClick = act(onOpenOutside))
             if (host != null) {
-                ListRow(MikaIcons.Star, if (favorite) "从常用移除" else "加入常用网站", onClick = act(onToggleFavorite))
+                ListRow(MikaIcons.Star, if (favorite) tr(R.string.browser_unfavorite) else tr(R.string.browser_favorite), onClick = act(onToggleFavorite))
                 ListRow(
                     if (desktop) MikaIcons.Phone else MikaIcons.Desktop,
-                    if (desktop) "换回手机版" else "换成电脑版",
-                    subtitle = if (desktop) "这个网站下次也用手机版" else "这个网站下次也用电脑版",
+                    if (desktop) tr(R.string.browser_to_mobile) else tr(R.string.browser_to_desktop),
+                    subtitle = if (desktop) tr(R.string.browser_keep_mobile) else tr(R.string.browser_keep_desktop),
                     onClick = act(onToggleDesktop),
                 )
             }

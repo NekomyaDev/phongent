@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.agent.SpeedFlags
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -7,8 +9,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeveloperSwitchesTest {
-    private val speed = DeveloperSwitches.speed(SpeedFlags.OFF)
-    private val experimental = DeveloperSwitches.experimental(SpeedFlags.OFF)
+    @get:Rule val texts = ChineseTexts()
+
+    private val speed by lazy { DeveloperSwitches.speed(SpeedFlags.OFF) }
+    private val experimental by lazy { DeveloperSwitches.experimental(SpeedFlags.OFF) }
 
     /** 原「速度」下的八个开关,每个只在一组里出现一次,id 不重复。 */
     @Test

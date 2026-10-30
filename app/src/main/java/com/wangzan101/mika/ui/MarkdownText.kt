@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -60,7 +62,7 @@ fun MarkdownText(markdown: String, style: TextStyle, modifier: Modifier = Modifi
                 try {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(context, "没有能打开这个链接的 App", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, tr(R.string.no_app_for_link), Toast.LENGTH_SHORT).show()
                 }
             }
         }

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.sandbox
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.content.Context
 import android.os.Build
 import com.wangzan101.mika.core.cap.sandbox.RootfsExtractor
@@ -41,11 +43,11 @@ class RuntimeBundle(
 
 /** 通知与设置页上显示的步骤名。 */
 internal val InstallStep.label: String get() = when (this) {
-    InstallStep.Check -> "检查设备"
-    InstallStep.Extract -> "解包"
-    InstallStep.Configure -> "配置"
-    InstallStep.Skills -> "同步技能脚本"
-    InstallStep.Done -> "完成"
+    InstallStep.Check -> tr(R.string.install_check)
+    InstallStep.Extract -> tr(R.string.install_extract)
+    InstallStep.Configure -> tr(R.string.install_configure)
+    InstallStep.Skills -> tr(R.string.install_skills)
+    InstallStep.Done -> tr(R.string.result_completed)
 }
 
 /**
@@ -93,7 +95,7 @@ class RootfsInstaller(
                     state.markStep(s, bundle.version)
                 }
             } catch (e: CancellationException) {
-                state.markBroken("安装被中断,可以重试")
+                state.markBroken(tr(R.string.install_interrupted))
                 throw e
             } catch (e: Exception) {
                 state.markBroken(e.message ?: e.javaClass.simpleName)
@@ -150,10 +152,10 @@ class RootfsInstaller(
                 while (raw.read(buf) >= 0) Unit // xz 尾部没读到的字节也要算进校验
             }
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            if (actual != bundle.sha256) throw IOException("文件校验不符")
+            if (actual != bundle.sha256) throw IOException(tr(R.string.install_checksum))
         } catch (e: Exception) {
             RootfsExtractor.deleteTree(fresh)
-            throw IOException("运行环境解包失败,请重新安装 Mika:${e.message}", e)
+            throw IOException(tr(R.string.install_unpack_failed, e.message), e)
         }
         if (Files.exists(dirs.rootfs.toPath(), LinkOption.NOFOLLOW_LINKS)) {
             Files.move(dirs.rootfs.toPath(), old.toPath(), StandardCopyOption.ATOMIC_MOVE)
@@ -163,15 +165,15 @@ class RootfsInstaller(
     }
 
     private suspend fun check() {
-        if ("arm64-v8a" !in abis()) throw IOException("此设备不支持(需要 arm64)")
+        if ("arm64-v8a" !in abis()) throw IOException(tr(R.string.install_unsupported))
         val free = freeBytes()
         // 升级时新旧两份同时在盘上
         val need = 2 * bundle.maxBytes
-        if (free < need) throw IOException("可用空间不足 ${need shr 20} MB(剩 ${free / (1 shl 20)} MB)")
+        if (free < need) throw IOException(tr(R.string.install_no_space, need shr 20, free / (1 shl 20)))
         val (code, out) = selfTest()
         val lines = out.lines().map { it.trim() }
         if (code != 0 || lines.firstOrNull() != "mikarun ok") {
-            throw IOException("运行环境无法启动:${lines.lastOrNull { it.isNotEmpty() } ?: "退出码 $code"}")
+            throw IOException(tr(R.string.install_cannot_start, lines.lastOrNull { it.isNotEmpty() } ?: tr(R.string.install_exit_code, code)))
         }
         // 断网过滤器不可用不挡安装:联网关着时命令会被拒绝,这里只记下原因给设置页
         state.recordIsolation(lines.firstOrNull { it.startsWith("seccomp unavailable") }?.removePrefix("seccomp unavailable:")?.trim())
@@ -180,7 +182,7 @@ class RootfsInstaller(
     private fun configure() {
         writeInRootfs("etc/hosts", "127.0.0.1 localhost\n::1 localhost\n")
         writeInRootfs("etc/resolv.conf", dnsServers().ifEmpty { FALLBACK_DNS }.joinToString("") { "nameserver $it\n" })
-        val client = clientScript() ?: throw IOException("缺少 mika 命令(安装包不完整)")
+        val client = clientScript() ?: throw IOException(tr(R.string.install_no_client))
         writeInRootfs("usr/local/bin/mika", client, executable = true)
         prepareDev(dirs.rootfs)
         writeProcStandIns()

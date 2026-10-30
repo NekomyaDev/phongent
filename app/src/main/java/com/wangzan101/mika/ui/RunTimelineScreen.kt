@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.trPlural
+import androidx.compose.ui.res.stringResource
 import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -67,7 +70,7 @@ fun RunTimelineScreen(vm: RunTimelineViewModel, onBack: () -> Unit) {
 
     PageBackground {
         Column(Modifier.fillMaxSize()) {
-            TopBar("运行过程", left = MikaIcons.Back, leftLabel = "返回", onLeft = onBack)
+            TopBar(stringResource(R.string.timeline_title), left = MikaIcons.Back, leftLabel = stringResource(R.string.back), onLeft = onBack)
             when (val u = ui) {
                 TimelineUi.Loading -> Unit
                 TimelineUi.Expired -> EmptyNote(TimelineUi.EXPIRED_TEXT, Modifier.padding(top = 80.dp))
@@ -77,7 +80,7 @@ fun RunTimelineScreen(vm: RunTimelineViewModel, onBack: () -> Unit) {
                 ) {
                     item("header") { HeaderGroup(u.header) }
                     if (u.steps.isNotEmpty()) {
-                        item("label") { GroupLabel("共 ${u.steps.size} 步") }
+                        item("label") { GroupLabel(trPlural(R.plurals.timeline_total_steps, u.steps.size)) }
                         item("steps") {
                             GroupCard {
                                 Column(Modifier.padding(start = 16.dp)) {
@@ -102,7 +105,7 @@ private fun HeaderGroup(h: TimelineHeader) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)) {
             Text(h.goal, style = MikaType.Title, color = c.ink)
             if (h.criteria.isNotEmpty()) {
-                Text("做成的标准", Modifier.padding(top = 10.dp), style = MikaType.Label, color = c.ink3)
+                Text(stringResource(R.string.timeline_criteria), Modifier.padding(top = 10.dp), style = MikaType.Label, color = c.ink3)
                 h.criteria.forEachIndexed { i, text ->
                     Text(
                         if (h.criteria.size > 1) "${i + 1}. $text" else text, Modifier.padding(top = 3.dp),
@@ -112,18 +115,18 @@ private fun HeaderGroup(h: TimelineHeader) {
             }
         }
         h.metrics?.let { RunMetricsSummary(it) }
-        ListRow(null, "结局") { RowValue(h.outcome, if (h.outcome == "办成了") ValueTone.Ok else ValueTone.Plain) }
-        if (h.verdict != "没有核查") ListRow(null, "核查") { RowValue(h.verdict) }
+        ListRow(null, stringResource(R.string.timeline_outcome)) { RowValue(h.outcome, if (h.outcome == stringResource(R.string.outcome_succeeded)) ValueTone.Ok else ValueTone.Plain) }
+        if (h.verdict != stringResource(R.string.verify_none)) ListRow(null, stringResource(R.string.timeline_check)) { RowValue(h.verdict) }
         // 小结那一行已经写了用时
-        if (h.metrics == null) h.duration?.let { d -> ListRow(null, "用时") { RowValue(d) } }
-        ListRow(null, "更多详情", onClick = { more = !more }) {
-            RowValue(if (more) "收起" else "展开")
+        if (h.metrics == null) h.duration?.let { d -> ListRow(null, stringResource(R.string.timeline_duration)) { RowValue(d) } }
+        ListRow(null, stringResource(R.string.timeline_more), onClick = { more = !more }) {
+            RowValue(if (more) stringResource(R.string.collapse) else stringResource(R.string.expand))
             RowChevron()
         }
         if (more) {
-            ListRow(null, "模型调用") { RowValue("${h.modelCalls} 次") }
+            ListRow(null, stringResource(R.string.timeline_model_calls)) { RowValue(trPlural(R.plurals.times, h.modelCalls)) }
             if (h.usedMemory.isNotEmpty()) {
-                ListRow(null, "用到的记忆") { RowValue("${h.usedMemory.size} 条") }
+                ListRow(null, stringResource(R.string.timeline_memory_used)) { RowValue(trPlural(R.plurals.items, h.usedMemory.size)) }
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
                     h.usedMemory.forEach { memory ->
                         Text("· $memory", Modifier.padding(top = 3.dp), style = MikaType.Hint, color = c.ink2)
@@ -131,7 +134,7 @@ private fun HeaderGroup(h: TimelineHeader) {
                 }
             }
             Text(
-                "每步耗时按模型等待和工具执行统计，不含等你操作的时间。",
+                stringResource(R.string.timeline_timing_note),
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
                 style = MikaType.Hint, color = c.ink3,
             )
@@ -145,7 +148,7 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
     val c = MikaTheme.colors
     var open by rememberSaveable(s.step) { mutableStateOf(false) }
     val shot = s.screenshotId
-    val failed = s.result?.startsWith("出错") == true
+    val failed = s.result?.startsWith(stringResource(R.string.result_error_prefix)) == true
     StepItem(
         if (failed) StepState.Failed else StepState.Done, first, last,
         Modifier.then(if (shot != null) Modifier.clickable { open = !open } else Modifier),
@@ -153,7 +156,7 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
     ) {
         Column(Modifier.fillMaxWidth().padding(end = 16.dp, top = 11.dp, bottom = 11.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                Text("第 ${s.step} 步", style = MikaType.Label, color = c.ink3)
+                Text(stringResource(R.string.step_number, s.step), style = MikaType.Label, color = c.ink3)
                 Text(
                     if (s.activities.isEmpty()) listOfNotNull(s.tool, s.detail).joinToString(" · ") else "",
                     Modifier.weight(1f).padding(start = 8.dp),
@@ -165,7 +168,7 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         color = when {
                             failed -> c.bad
-                            it == "生效" -> c.ok
+                            it == stringResource(R.string.result_effective) -> c.ok
                             else -> c.ink3
                         },
                     )
@@ -176,15 +179,15 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
                 Text(s.said, Modifier.padding(top = 3.dp), style = MikaType.Caption, color = c.ink2)
             }
             s.activities.forEach { a ->
-                val action = if (a.count > 1) "查看了 ${a.count} 次" else a.label
+                val action = if (a.count > 1) trPlural(R.plurals.timeline_viewed_times, a.count) else a.label
                 val effect = when (a.effect) {
-                    "changed", "done", "place_changed" -> "生效"
-                    "small_change" -> "有变化"
-                    "unchanged", "no_effect" -> "没变化"
-                    "completed" -> "完成"
+                    "changed", "done", "place_changed" -> stringResource(R.string.result_effective)
+                    "small_change" -> stringResource(R.string.effect_small_change)
+                    "unchanged", "no_effect" -> stringResource(R.string.result_unchanged)
+                    "completed" -> stringResource(R.string.result_completed)
                     null -> ""
                     // 错误码只对开发有意义,给人看的是没成功
-                    else -> "没成功"
+                    else -> stringResource(R.string.step_failed)
                 }
                 Text(
                     listOfNotNull(action, a.target?.takeIf(String::isNotBlank), effect.takeIf(String::isNotBlank)).joinToString(" · "),
@@ -198,7 +201,7 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
             }
             if (shot != null) {
                 Text(
-                    if (open) "收起画面" else "看当时的画面", Modifier.padding(top = 6.dp),
+                    if (open) stringResource(R.string.timeline_hide_screen) else stringResource(R.string.timeline_show_screen), Modifier.padding(top = 6.dp),
                     style = MikaType.Label, color = c.accent,
                 )
                 if (open) Shot(vm, shot, s.step)
@@ -230,7 +233,7 @@ private fun Shot(vm: RunTimelineViewModel, id: Int, step: Int) {
     val shape = RoundedCornerShape(12.dp)
     image?.let {
         Image(
-            it, "第 $step 步的画面",
+            it, stringResource(R.string.timeline_step_screen, step),
             Modifier.padding(top = 8.dp).widthIn(max = 220.dp).clip(shape).background(MikaTheme.colors.fill, shape),
             contentScale = ContentScale.FillWidth,
         )

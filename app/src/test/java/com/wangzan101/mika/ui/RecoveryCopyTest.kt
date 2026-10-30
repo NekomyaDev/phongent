@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.shell.AutoOnBlock
 import com.wangzan101.mika.core.shell.PermissionResult
 import com.wangzan101.mika.core.shell.RecoveryCapability
@@ -14,6 +16,8 @@ import org.junit.Test
 import java.time.ZoneOffset
 
 class RecoveryCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val jargon = listOf("shell", "端口", "mDNS", "TLS", "Binder", "uid", "进程", "adb", "WRITE_SECURE", "deviceidle")
 
     private fun allText(): List<String> = buildList {

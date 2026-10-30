@@ -1,11 +1,15 @@
 package com.wangzan101.mika.ui
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SandboxCopyTest {
+    @get:Rule val texts = ChineseTexts()
+
     @Test
     fun resetSubtitleFollowsStatus() {
         assertEquals("正在准备", SandboxCopy.resetSubtitle(SandboxStatus.Installing(42, "解包")))

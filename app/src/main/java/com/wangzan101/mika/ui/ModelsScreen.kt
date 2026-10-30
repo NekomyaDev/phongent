@@ -1,5 +1,9 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
+import androidx.compose.ui.res.stringResource
 import com.wangzan101.mika.ui.components.keepsKeyboard
 import com.wangzan101.mika.ui.components.KeyboardDismissArea
 import androidx.compose.foundation.background
@@ -89,7 +93,7 @@ fun ModelsScreen(store: ProviderStore, onBack: () -> Unit) {
 private fun Page(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     PageBackground {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).windowInsetsPadding(WindowInsets.ime)) {
-            TopBar(title, MikaIcons.Back, onBack, "返回")
+            TopBar(title, MikaIcons.Back, onBack, stringResource(R.string.back))
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
                 content()
             }
@@ -367,7 +371,7 @@ fun AllModelsContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetailActio
     val shown = all.filter { q.isEmpty() || it.id.contains(q, ignoreCase = true) }
     PageBackground {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).windowInsetsPadding(WindowInsets.ime)) {
-            TopBar(ModelsCopy.allModelsTitle(p.name), MikaIcons.Back, onBack, "返回", right = {
+            TopBar(ModelsCopy.allModelsTitle(p.name), MikaIcons.Back, onBack, stringResource(R.string.back), right = {
                 BarIconButton(MikaIcons.Refresh, ModelsCopy.REFRESH, actions.refresh, enabled = state != ListState.Running)
             })
             Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp)) {
@@ -446,75 +450,75 @@ private fun UseAsSheet(ui: ModelSetupUi, p: Provider, model: String, onUse: (Mod
 
 /** 模型页(用途、选择页、服务商详情、全部模型)的文字(纯函数,便于测试)。三个用途的说法全 App 只在这里。 */
 object ModelsCopy {
-    const val TITLE = "模型"
-    const val LEAD = "每件事用哪个模型，在「用途」里选；模型来自下面连好的服务商。"
-    const val ROLES = "用途"
-    const val PROVIDERS = "服务商"
-    const val ADD_PROVIDER = "添加服务商"
-    const val KEY_NOTE = "API Key 只保存在这台手机上，加密存放。"
-    const val UNSET = "未设置"
-    const val MAIN_ADD_FIRST = "先添加一个服务商"
-    const val MAIN_PICK = "点这里选一个"
-    const val SAME_AS_MAIN = "用主模型"
-    const val MAIN_NOT_PICKED = "主模型还没选"
-    const val OFF = "不用"
-    const val OFF_NOTE = "只靠文字读屏"
-    const val VISION_SAME_NOTE = "主模型能看图时选这个"
-    const val LIGHT_SAME_NOTE = "和主模型同一个，不用另外选"
-    const val PICK_FROM = "从已连接的服务商里选"
-    const val FILTER_HINT = "输入模型名的一部分"
-    const val NO_MATCH = "没有名字对得上的模型。"
-    const val MODEL_NAME = "模型名"
-    const val MODEL_NAME_HINT = "这家不提供列表，照文档填"
-    const val USE = "使用"
-    const val ROLE_EMPTY = "还没有可选的模型。先添加一个服务商。"
-    const val PICKER_NOTE = "标签是服务商给的信息，只作参考；选哪个由你定。"
-    const val LISTING = "正在列出模型…"
-    const val CONNECTION = "连接"
-    const val STATUS = "状态"
-    const val CONNECTED = "已连接"
-    const val LIST_FAILED = "列模型失败"
-    const val KIND = "接口"
-    const val BASE_URL = "地址"
+    val TITLE: String get() = tr(R.string.settings_model)
+    val LEAD: String get() = tr(R.string.models_lead)
+    val ROLES: String get() = tr(R.string.models_roles)
+    val PROVIDERS: String get() = tr(R.string.models_providers)
+    val ADD_PROVIDER: String get() = tr(R.string.models_add_provider)
+    val KEY_NOTE: String get() = tr(R.string.models_key_note)
+    val UNSET: String get() = tr(R.string.settings_not_set)
+    val MAIN_ADD_FIRST: String get() = tr(R.string.models_main_add_first)
+    val MAIN_PICK: String get() = tr(R.string.models_main_pick)
+    val SAME_AS_MAIN: String get() = tr(R.string.models_same_as_main)
+    val MAIN_NOT_PICKED: String get() = tr(R.string.models_main_not_picked)
+    val OFF: String get() = tr(R.string.models_off)
+    val OFF_NOTE: String get() = tr(R.string.models_off_note)
+    val VISION_SAME_NOTE: String get() = tr(R.string.models_vision_same_note)
+    val LIGHT_SAME_NOTE: String get() = tr(R.string.models_light_same_note)
+    val PICK_FROM: String get() = tr(R.string.models_pick_from)
+    val FILTER_HINT: String get() = tr(R.string.models_filter_hint)
+    val NO_MATCH: String get() = tr(R.string.models_no_match)
+    val MODEL_NAME: String get() = tr(R.string.models_model_name)
+    val MODEL_NAME_HINT: String get() = tr(R.string.models_model_name_hint)
+    val USE: String get() = tr(R.string.models_use)
+    val ROLE_EMPTY: String get() = tr(R.string.models_role_empty)
+    val PICKER_NOTE: String get() = tr(R.string.models_picker_note)
+    val LISTING: String get() = tr(R.string.models_listing)
+    val CONNECTION: String get() = tr(R.string.models_connection)
+    val STATUS: String get() = tr(R.string.models_status)
+    val CONNECTED: String get() = tr(R.string.phone_connected)
+    val LIST_FAILED: String get() = tr(R.string.models_list_failed)
+    val KIND: String get() = tr(R.string.model_kind)
+    val BASE_URL: String get() = tr(R.string.models_url)
     const val API_KEY = "API Key"
-    const val KEY_SAVED = "已保存"
-    const val KEY_NONE = "没有填"
-    const val CHANGE = "更换"
-    const val CHANGE_KEY = "更换 API Key"
-    const val NEW_KEY_HINT = "粘贴新的 Key"
-    const val SAVE = "保存"
-    const val MODELS = "模型"
-    const val MODELS_NOTE = "点一个模型，可以把它用作主模型、看图或轻量模型。"
-    const val NO_LIST_NOTE = "这家不提供模型列表。要用它的模型，在「用途」里照文档填模型名。"
-    const val NOT_LISTED = "还没列出这家的模型。"
-    const val REFRESH = "刷新"
-    const val IN_USE = "正在用这个"
-    const val DELETE = "删除这个服务商"
-    const val DELETE_CONFIRM = "删除"
+    val KEY_SAVED: String get() = tr(R.string.models_key_saved)
+    val KEY_NONE: String get() = tr(R.string.models_key_none)
+    val CHANGE: String get() = tr(R.string.models_change)
+    val CHANGE_KEY: String get() = tr(R.string.models_change_key)
+    val NEW_KEY_HINT: String get() = tr(R.string.models_new_key_hint)
+    val SAVE: String get() = tr(R.string.save)
+    val MODELS: String get() = tr(R.string.models_models)
+    val MODELS_NOTE: String get() = tr(R.string.models_models_note)
+    val NO_LIST_NOTE: String get() = tr(R.string.models_no_list_note)
+    val NOT_LISTED: String get() = tr(R.string.models_not_listed)
+    val REFRESH: String get() = tr(R.string.refresh)
+    val IN_USE: String get() = tr(R.string.models_in_use)
+    val DELETE: String get() = tr(R.string.models_delete)
+    val DELETE_CONFIRM: String get() = tr(R.string.confirm_delete)
 
     /** 用途卡上的一行:[title] 是模型名([isModel])、「用主模型」「不用」或「未设置」([unset]),[subtitle] 是补充说明。 */
     data class RoleLine(val title: String, val subtitle: String, val isModel: Boolean = false, val unset: Boolean = false)
 
     fun roleName(role: ModelRole) = when (role) {
-        ModelRole.Main -> "主模型"
-        ModelRole.Vision -> "看图模型"
-        ModelRole.Light -> "轻量模型"
+        ModelRole.Main -> tr(R.string.role_main)
+        ModelRole.Vision -> tr(R.string.role_vision)
+        ModelRole.Light -> tr(R.string.role_light)
     }
 
     /** 这个用途做什么。 */
     fun roleWhat(role: ModelRole) = when (role) {
-        ModelRole.Main -> "思考和办事"
-        ModelRole.Vision -> "读屏时看截图"
-        ModelRole.Light -> "判断、记东西这类小事"
+        ModelRole.Main -> tr(R.string.role_main_what)
+        ModelRole.Vision -> tr(R.string.role_vision_what)
+        ModelRole.Light -> tr(R.string.role_light_what)
     }
 
     fun roleLabel(role: ModelRole) = "${roleName(role)} · ${roleWhat(role)}"
 
     /** 选择页顶上的说明。 */
     fun roleHint(role: ModelRole) = when (role) {
-        ModelRole.Main -> "思考和办事都靠它。选支持工具调用的模型，办事才靠得住。"
-        ModelRole.Vision -> "读屏时把截图给它看，界面复杂时更准。不选也能用，只靠文字读屏。"
-        ModelRole.Light -> "判断任务有没有办完、整理记忆这类小事用它。选便宜、快的更合适。"
+        ModelRole.Main -> tr(R.string.role_main_hint)
+        ModelRole.Vision -> tr(R.string.role_vision_hint)
+        ModelRole.Light -> tr(R.string.role_light_hint)
     }
 
     fun roleIcon(role: ModelRole): ImageVector = when (role) {
@@ -544,26 +548,26 @@ object ModelsCopy {
         else -> LIGHT_SAME_NOTE
     }
 
-    fun roleNames(roles: List<ModelRole>) = roles.joinToString("、") { roleName(it) }
+    fun roleNames(roles: List<ModelRole>) = roles.joinToString(tr(R.string.list_sep)) { roleName(it) }
 
-    fun deleteTitle(name: String) = "删除「$name」？"
+    fun deleteTitle(name: String) = tr(R.string.models_delete_title, name)
 
     /** 删除前说清会影响哪些用途。 */
     fun deleteBody(roles: List<ModelRole>) =
-        "这家的 API Key 会一起删掉。" + if (roles.isEmpty()) "它没在给任何用途干活。" else "${roleNames(roles)}正在用它，删除后要重新选。"
+        tr(R.string.models_delete_body) + if (roles.isEmpty()) tr(R.string.models_delete_unused) else tr(R.string.models_delete_used, roleNames(roles))
 
-    fun more(n: Int) = "还有 $n 个，输入名字筛选"
+    fun more(n: Int) = trPlural(R.plurals.models_more, n)
 
-    fun viewAll(n: Int) = "查看全部 $n 个模型"
+    fun viewAll(n: Int) = trPlural(R.plurals.models_view_all, n)
 
-    fun allModelsTitle(name: String) = "$name · 全部模型"
+    fun allModelsTitle(name: String) = tr(R.string.models_all_title, name)
 
-    fun allModelsNote(n: Int) = "共 $n 个，在用的排在最前面。右上角刷新会重新向服务商要一次列表。"
+    fun allModelsNote(n: Int) = trPlural(R.plurals.models_all_note, n)
 
-    fun useAsSubtitle(name: String) = "$name · 用作"
+    fun useAsSubtitle(name: String) = tr(R.string.models_use_as, name)
 
     fun kindLabel(kind: ProviderConfig.Kind) = when (kind) {
-        ProviderConfig.Kind.OpenAiCompat -> "OpenAI 兼容"
+        ProviderConfig.Kind.OpenAiCompat -> tr(R.string.models_openai_compat)
         ProviderConfig.Kind.Anthropic -> "Anthropic"
         ProviderConfig.Kind.Gemini -> "Gemini"
     }
@@ -573,12 +577,12 @@ object ModelsCopy {
     /** 记住的模型数;还没列过时为空,服务不提供列表时说明。 */
     fun modelCount(p: Provider): String? = when {
         p.models == null -> null
-        p.models.isEmpty() -> "不提供模型列表"
-        else -> "${p.models.size} 个模型"
+        p.models.isEmpty() -> tr(R.string.models_no_list)
+        else -> trPlural(R.plurals.models_count, p.models.size)
     }
 
     /** 服务商一行的说明:已连接 · N 个模型 · 哪些用途在用;刷新失败时说明。 */
     fun providerLine(p: Provider, state: ListState?, roles: List<ModelRole>): String =
         if (state is ListState.Failed) LIST_FAILED
-        else listOfNotNull(CONNECTED, modelCount(p), roles.takeIf { it.isNotEmpty() }?.let { "${roleNames(it)}在用" }).joinToString(" · ")
+        else listOfNotNull(CONNECTED, modelCount(p), roles.takeIf { it.isNotEmpty() }?.let { tr(R.string.models_used_by, roleNames(it)) }).joinToString(" · ")
 }

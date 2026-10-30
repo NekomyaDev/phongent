@@ -1,5 +1,7 @@
 package com.wangzan101.mika.browser
 
+import org.junit.Rule
+import com.wangzan101.mika.i18n.ChineseTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -7,6 +9,8 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 class StartPageModelTest {
+    @get:Rule val texts = ChineseTexts()
+
     private val zone = ZoneId.of("Asia/Shanghai")
     private fun at(y: Int, mo: Int, d: Int, h: Int, mi: Int) = LocalDateTime.of(y, mo, d, h, mi).atZone(zone).toInstant().toEpochMilli()
     private val name: (String) -> String = { if (it == "shop.example.com") "购物" else SiteNames.fallback(it) }

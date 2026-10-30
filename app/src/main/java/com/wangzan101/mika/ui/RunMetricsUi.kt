@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -47,39 +50,39 @@ import kotlin.math.roundToLong
 
 /** 运行小结和运行统计的说法。token 数用 Token 用量页同一种写法([UsageCopy.tokens])。 */
 object RunMetricsCopy {
-    const val MODEL = "模型思考"
-    const val OBSERVE = "读屏"
-    const val ACT = "操作"
-    const val OTHER = "其他（等待、重试）"
-    const val STATS_TITLE = "运行统计"
-    const val STATS_SUBTITLE = "最近几次运行的用时、来回次数和 Token"
-    const val STATS_EMPTY = "还没有运行统计。让 Mika 办件事，这里就会记下。"
-    const val STATS_NOTE = "只统计这台手机上最近 ${RunMetricsStore.DEFAULT_KEEP} 次运行；时间从 Mika 开始处理算起，第一次反馈是第一次看到它在做什么的时候。"
-    const val COPY = "复制 JSON"
-    const val SHARE = "分享 JSON"
+    val MODEL: String get() = tr(R.string.metrics_model)
+    val OBSERVE: String get() = tr(R.string.metrics_observe)
+    val ACT: String get() = tr(R.string.metrics_act)
+    val OTHER: String get() = tr(R.string.metrics_other)
+    val STATS_TITLE: String get() = tr(R.string.metrics_title)
+    val STATS_SUBTITLE: String get() = tr(R.string.metrics_sub)
+    val STATS_EMPTY: String get() = tr(R.string.metrics_empty)
+    val STATS_NOTE: String get() = tr(R.string.metrics_note, RunMetricsStore.DEFAULT_KEEP)
+    val COPY: String get() = tr(R.string.metrics_copy)
+    val SHARE: String get() = tr(R.string.metrics_share)
 
     /** 统计范围:最近 10 / 30 / 100 次,或存下的全部(null)。 */
     val RANGES: List<Int?> = listOf(10, 30, 100, null)
-    val RANGE_LABELS = listOf("最近 10 次", "30 次", "100 次", "全部")
+    val RANGE_LABELS get() = listOf(tr(R.string.metrics_last_10), trPlural(R.plurals.metrics_runs, 30), trPlural(R.plurals.metrics_runs, 100), tr(R.string.usage_all))
 
     /** 时长:一分钟以内到 0.1 秒(「3.2 秒」「45 秒」),往上「2 分 13 秒」,一小时以上「1 小时 5 分」。 */
     fun duration(ms: Long): String {
         val t = ms.coerceAtLeast(0)
         if (t < 59_950) {
             val tenths = Math.round(t / 100.0)
-            return if (tenths % 10 == 0L) "${tenths / 10} 秒" else String.format(Locale.ROOT, "%.1f 秒", tenths / 10.0)
+            return tr(R.string.duration_seconds_decimal, if (tenths % 10 == 0L) "${tenths / 10}" else String.format(Locale.ROOT, "%.1f", tenths / 10.0))
         }
         val s = Math.round(t / 1000.0)
-        if (s < 3600) return "${s / 60} 分 ${s % 60} 秒"
-        return "${s / 3600} 小时 ${s % 3600 / 60} 分"
+        if (s < 3600) return tr(R.string.duration_m_s, s / 60, s % 60)
+        return tr(R.string.duration_h_m, s / 3600, s % 3600 / 60)
     }
 
     /** 时间线顶上那一行:「共 2 分 13 秒 · 和模型来回 14 次 · 8.6 万 Token · 第一次反馈 3.2 秒」。 */
     fun summaryLine(m: RunMetrics): String = listOfNotNull(
-        "共 ${duration(m.totalMs)}",
-        "和模型来回 ${m.modelCalls} 次",
+        tr(R.string.metrics_total, duration(m.totalMs)),
+        trPlural(R.plurals.metrics_round_trips, m.modelCalls),
         "${UsageCopy.tokens(m.tokens)} ${UsageCopy.UNIT}",
-        m.firstFeedbackMs?.let { "第一次反馈 ${duration(it)}" },
+        m.firstFeedbackMs?.let { tr(R.string.metrics_first_feedback_at, duration(it)) },
     ).joinToString(" · ")
 
     /** 用时和占总时长的比例。 */
@@ -92,24 +95,24 @@ object RunMetricsCopy {
         add(OBSERVE to share(m.observeMs, m.totalMs))
         add(ACT to share(m.actMs, m.totalMs))
         add(OTHER to share(m.otherMs, m.totalMs))
-        if (m.retryWaitMs > 0) add("其中重试等待" to duration(m.retryWaitMs))
-        add("输入 Token" to UsageCopy.tokens(m.inputTokens))
-        add("输出 Token" to UsageCopy.tokens(m.outputTokens))
-        add("缓存命中" to UsageCopy.tokens(m.cachedTokens))
-        if (m.callsWithoutUsage > 0) add("没报用量" to "${m.callsWithoutUsage} 次")
-        m.allCalls?.let { add("全部模型请求" to "$it 次（含旁路调用和重试）") }
-        add("步数" to "${m.steps} 步")
-        add("读屏 / 操作" to "${m.observeCalls} 次 / ${m.actCalls} 次")
+        if (m.retryWaitMs > 0) add(tr(R.string.metrics_retry_wait) to duration(m.retryWaitMs))
+        add(tr(R.string.metrics_input_tokens) to UsageCopy.tokens(m.inputTokens))
+        add(tr(R.string.metrics_output_tokens) to UsageCopy.tokens(m.outputTokens))
+        add(tr(R.string.usage_cached) to UsageCopy.tokens(m.cachedTokens))
+        if (m.callsWithoutUsage > 0) add(tr(R.string.metrics_no_usage) to trPlural(R.plurals.times, m.callsWithoutUsage))
+        m.allCalls?.let { add(tr(R.string.metrics_all_calls) to trPlural(R.plurals.metrics_all_calls_value, it)) }
+        add(tr(R.string.metrics_steps) to trPlural(R.plurals.chat_steps_n, m.steps))
+        add(tr(R.string.metrics_observe_act) to tr(R.string.metrics_observe_act_value, m.observeCalls, m.actCalls))
     }
 
     /** 运行统计的各行。 */
     fun statsRows(s: RunStats): List<Pair<String, String>> = listOf(
-        "统计了" to "${s.runs} 次运行",
-        "办成率" to "${UsageCopy.percent(s.successRate)}（${s.succeeded}/${s.runs}）",
-        "用时中位数" to duration(s.medianTotalMs),
-        "第一次反馈中位数" to (s.medianFirstFeedbackMs?.let(::duration) ?: "—"),
-        "平均和模型来回" to String.format(Locale.ROOT, "%.1f 次", s.avgModelCalls),
-        "平均 Token" to UsageCopy.tokens(s.avgTokens.roundToLong()),
+        tr(R.string.metrics_counted) to trPlural(R.plurals.metrics_n_runs, s.runs),
+        tr(R.string.metrics_success_rate) to tr(R.string.metrics_success_value, UsageCopy.percent(s.successRate), s.succeeded, s.runs),
+        tr(R.string.metrics_median_time) to duration(s.medianTotalMs),
+        tr(R.string.metrics_median_feedback) to (s.medianFirstFeedbackMs?.let(::duration) ?: "—"),
+        tr(R.string.metrics_avg_round_trips) to tr(R.string.metrics_avg_round_trips_value, String.format(Locale.ROOT, "%.1f", s.avgModelCalls)),
+        tr(R.string.metrics_avg_tokens) to UsageCopy.tokens(s.avgTokens.roundToLong()),
     )
 
     /** 时间去向:各项之和占总时长之和。 */
@@ -120,8 +123,8 @@ object RunMetricsCopy {
         OTHER to UsageCopy.percent(ratio(s.otherMs, s.totalMs)),
     )
 
-    fun copied(n: Int) = "已复制 $n 次运行的小结"
-    const val EXPORT_FAILED = "没能导出，数据可能太大，换个小一点的范围试试。"
+    fun copied(n: Int) = trPlural(R.plurals.metrics_copied, n)
+    val EXPORT_FAILED: String get() = tr(R.string.metrics_export_failed)
 
     private fun ratio(a: Long, b: Long) = if (b <= 0) 0.0 else a.toDouble() / b
 }
@@ -136,7 +139,7 @@ fun RunMetricsSummary(m: RunMetrics) {
             .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
     ) {
         Text(RunMetricsCopy.summaryLine(m), style = MikaType.Caption, color = c.ink2)
-        Text(if (open) "收起" else "看时间花在哪", Modifier.padding(top = 2.dp), style = MikaType.Hint, color = c.accent)
+        Text(if (open) tr(R.string.collapse) else tr(R.string.metrics_where_time), Modifier.padding(top = 2.dp), style = MikaType.Hint, color = c.accent)
     }
     if (open) RunMetricsCopy.breakdown(m).forEach { (k, v) -> ListRow(null, k) { RowValue(v) } }
 }
@@ -175,13 +178,13 @@ fun RunStatsContent(
             EmptyNote(RunMetricsCopy.STATS_EMPTY, Modifier.padding(top = 48.dp))
             return@PageScaffold
         }
-        GroupLabel("概况")
+        GroupLabel(tr(R.string.metrics_overview))
         GroupCard { RunMetricsCopy.statsRows(stats).forEachIndexed { i, (k, v) -> ListRow(null, k, first = i == 0) { RowValue(v) } } }
-        GroupLabel("时间花在哪")
+        GroupLabel(tr(R.string.metrics_time_split))
         GroupCard { RunMetricsCopy.splitRows(stats).forEachIndexed { i, (k, v) -> ListRow(null, k, first = i == 0) { RowValue(v) } } }
-        GroupLabel("导出")
+        GroupLabel(tr(R.string.metrics_export))
         GroupCard {
-            ListRow(null, "这 ${stats.runs} 次运行的小结", "每次一项，可以拿去自己分析", first = true)
+            ListRow(null, trPlural(R.plurals.metrics_summary_of, stats.runs), tr(R.string.metrics_summary_sub), first = true)
             RowActions {
                 MikaButton(RunMetricsCopy.COPY, onCopy, Modifier.testTag("run-stats-copy"), size = ButtonSize.Small)
                 MikaButton(RunMetricsCopy.SHARE, onShare, Modifier.testTag("run-stats-share"), kind = ButtonKind.Tonal, size = ButtonSize.Small)

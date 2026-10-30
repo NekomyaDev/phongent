@@ -1,5 +1,8 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,11 +97,14 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import com.wangzan101.mika.i18n.uiLocale
 import kotlin.math.roundToInt
 
 /** 用量页顶上的五段:前四段是固定的范围,[Custom] 打开日期选择。 */
-enum class UsagePreset(val label: String) {
-    Day("24 小时"), Week("7 天"), Month("30 天"), Quarter("90 天"), Custom("自定义");
+enum class UsagePreset(private val labelRes: Int) {
+    Day(R.string.usage_24h), Week(R.string.usage_7d), Month(R.string.usage_30d), Quarter(R.string.usage_90d), Custom(R.string.usage_custom);
+
+    val label: String get() = tr(labelRes)
 
     /** 这一段对应的范围;[Custom] 要给出 [from]..[to](本地日期)。 */
     fun range(from: LocalDate?, to: LocalDate?): UsageRange = when (this) {
@@ -115,21 +121,21 @@ data class ModelRank(val provider: ProviderUsage, val model: ModelUsage, val sha
 
 /** Token 用量的文字、数字写法和图表用的小规则。 */
 object UsageCopy {
-    const val TITLE = "Token 用量"
-    const val NONE = "还没有"
-    const val EMPTY_TITLE = "这段时间还没有用量"
-    const val EMPTY_BODY = "让 Mika 办件事，这里就会记下用了多少 Token。"
-    const val NOTE = "数字以服务商返回的为准，只存在这台手机上。"
-    const val TOTAL = "总用量"
-    const val TREND = "用量趋势"
-    const val BY_PROVIDER = "按服务商"
-    const val BY_PROVIDER_HINT = "点一家看它的模型"
-    const val BY_MODEL = "按模型"
-    const val ALL = "全部"
-    const val ALL_PROVIDERS = "全部服务商"
-    const val OTHERS = "其他"
-    const val DELETED = "（已删除）"
-    const val CHANGE_DATES = "改日期"
+    val TITLE: String get() = tr(R.string.usage_title)
+    val NONE: String get() = tr(R.string.usage_none)
+    val EMPTY_TITLE: String get() = tr(R.string.usage_empty_title)
+    val EMPTY_BODY: String get() = tr(R.string.usage_empty_body)
+    val NOTE: String get() = tr(R.string.usage_note)
+    val TOTAL: String get() = tr(R.string.usage_total)
+    val TREND: String get() = tr(R.string.usage_trend)
+    val BY_PROVIDER: String get() = tr(R.string.usage_by_provider)
+    val BY_PROVIDER_HINT: String get() = tr(R.string.usage_by_provider_hint)
+    val BY_MODEL: String get() = tr(R.string.usage_by_model)
+    val ALL: String get() = tr(R.string.usage_all)
+    val ALL_PROVIDERS: String get() = tr(R.string.usage_all_providers)
+    val OTHERS: String get() = tr(R.string.usage_others)
+    val DELETED: String get() = tr(R.string.usage_deleted)
+    val CHANGE_DATES: String get() = tr(R.string.usage_change_dates)
     const val UNIT = "Token"
 
     /** 图表里有自己颜色的服务商最多几家(主题里 [MikaColors.series] 的个数),其余在趋势图里归为「其他」。 */
@@ -142,9 +148,17 @@ object UsageCopy {
     fun tokens(n: Long): String {
         if (n < 10_000) return n.toString()
         val wan = round3(BigDecimal(n).divide(BigDecimal(10_000)))
-        if (wan < BigDecimal(10_000)) return "${wan.stripTrailingZeros().toPlainString()} 万"
-        val yi = round3(BigDecimal(n).divide(BigDecimal(100_000_000)))
-        return "${yi.stripTrailingZeros().toPlainString()} 亿"
+        if (tr(R.string.ui_locale).startsWith("zh")) {
+            if (wan < BigDecimal(10_000)) return "${wan.stripTrailingZeros().toPlainString()} 万"
+            val yi = round3(BigDecimal(n).divide(BigDecimal(100_000_000)))
+            return "${yi.stripTrailingZeros().toPlainString()} 亿"
+        }
+        // 英文按千、百万、十亿写:12.3K、1.5M
+        for ((unit, size) in listOf("K" to 1_000L, "M" to 1_000_000L, "B" to 1_000_000_000L)) {
+            val v = round3(BigDecimal(n).divide(BigDecimal(size)))
+            if (v < BigDecimal(1_000) || unit == "B") return "${v.stripTrailingZeros().toPlainString()}$unit"
+        }
+        return n.toString()
     }
 
     private fun round3(v: BigDecimal): BigDecimal = v.setScale(
@@ -157,9 +171,9 @@ object UsageCopy {
     )
 
     /** 设置首页那一行的值:近 7 天的合计,没有时写「还没有」。 */
-    fun settingsValue(weekTokens: Long): String = if (weekTokens <= 0) NONE else "近 7 天 ${tokens(weekTokens)}"
+    fun settingsValue(weekTokens: Long): String = if (weekTokens <= 0) NONE else tr(R.string.usage_last_7d, tokens(weekTokens))
 
-    fun calls(n: Long) = "$n 次"
+    fun calls(n: Long) = trPlural(R.plurals.times, n.toInt())
 
     /** 占比:不到 1% 但不是 0 时写「<1%」。 */
     fun percent(share: Double): String {
@@ -167,24 +181,25 @@ object UsageCopy {
         return if (p == 0 && share > 0) "<1%" else "$p%"
     }
 
-    fun missing(n: Long) = "有 $n 次调用服务商没报用量，没算进去。"
+    fun missing(n: Long) = trPlural(R.plurals.usage_missing, n.toInt())
 
     fun providerName(p: ProviderUsage) = if (p.deleted) p.name + DELETED else p.name
 
     fun stepLabel(step: UsageStep) = when (step) {
-        UsageStep.Hour -> "每小时"
-        UsageStep.Day -> "每天"
-        UsageStep.Week -> "每周"
+        UsageStep.Hour -> tr(R.string.usage_hourly)
+        UsageStep.Day -> tr(R.string.usage_daily)
+        UsageStep.Week -> tr(R.string.usage_weekly)
     }
 
     /** 本地日期:今年的不写年份。 */
     fun date(d: LocalDate, today: LocalDate): String =
-        if (d.year == today.year) "${d.monthValue} 月 ${d.dayOfMonth} 日" else "${d.year} 年 ${d.monthValue} 月 ${d.dayOfMonth} 日"
+        if (d.year == today.year) tr(R.string.date_month_day, d.monthValue, d.month.getDisplayName(java.time.format.TextStyle.SHORT, uiLocale()), d.dayOfMonth)
+        else tr(R.string.date_year_month_day, d.year, d.monthValue, d.month.getDisplayName(java.time.format.TextStyle.SHORT, uiLocale()), d.dayOfMonth)
 
     /** 范围选择下面那一行,写出实际是哪几天。 */
     fun rangeText(range: UsageRange, today: LocalDate): String = when (range) {
-        UsageRange.Last24Hours -> "过去 24 小时"
-        is UsageRange.LastDays -> "${date(UsageQuery.days(range, today).first, today)} – 今天"
+        UsageRange.Last24Hours -> tr(R.string.usage_past_24h)
+        is UsageRange.LastDays -> tr(R.string.usage_until_today, date(UsageQuery.days(range, today).first, today))
         is UsageRange.Custom -> UsageQuery.days(range, today).let { (from, to) ->
             if (from == to) date(from, today) else "${date(from, today)} – ${date(to, today)}"
         }
@@ -192,9 +207,9 @@ object UsageCopy {
 
     /** 趋势图下面的刻度:按小时写「18:00」(此刻那一格写「现在」),按天、按周写「10/27」(今天写「今天」)。 */
     fun axis(b: UsageBucket, step: UsageStep, today: LocalDate, last: Boolean = false): String = when {
-        step == UsageStep.Hour && last -> "现在"
+        step == UsageStep.Hour && last -> tr(R.string.usage_now)
         step == UsageStep.Hour -> "%d:%02d".format(b.start.hour, b.start.minute)
-        b.start.toLocalDate() == today -> "今天"
+        b.start.toLocalDate() == today -> tr(R.string.usage_today)
         else -> "${b.start.monthValue}/${b.start.dayOfMonth}"
     }
 
@@ -385,10 +400,10 @@ private fun TotalsCard(t: UsageTotals) {
                 )
             }
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Stat("输入", UsageCopy.tokens(t.input), Modifier.weight(1f))
-                Stat("输出", UsageCopy.tokens(t.output), Modifier.weight(1f))
-                Stat("缓存命中", UsageCopy.tokens(t.cached), Modifier.weight(1f))
-                Stat("调用", UsageCopy.calls(t.calls), Modifier.weight(1f))
+                Stat(tr(R.string.usage_input), UsageCopy.tokens(t.input), Modifier.weight(1f))
+                Stat(tr(R.string.usage_output), UsageCopy.tokens(t.output), Modifier.weight(1f))
+                Stat(tr(R.string.usage_cached), UsageCopy.tokens(t.cached), Modifier.weight(1f))
+                Stat(tr(R.string.usage_calls), UsageCopy.calls(t.calls), Modifier.weight(1f))
             }
         }
     }
@@ -675,10 +690,10 @@ private fun UsageRangePicker(today: LocalDate, from: LocalDate?, to: LocalDate?,
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton({ if (start != null && end != null) onPicked(date(start), date(end)) }, enabled = start != null && end != null) {
-                Text("查看")
+                Text(tr(R.string.view))
             }
         },
-        dismissButton = { TextButton(onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onDismiss) { Text(tr(R.string.cancel)) } },
     ) {
         DateRangePicker(state, Modifier.weight(1f), showModeToggle = false)
     }

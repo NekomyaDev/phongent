@@ -1,5 +1,7 @@
 package com.wangzan101.mika.browser
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import android.content.Context
 import android.content.MutableContextWrapper
 import android.graphics.Bitmap
@@ -124,7 +126,7 @@ class UserBrowser private constructor(private val app: Context) {
             if (done || t !== tab || t.destroyed) return
             done = true
             if (state == LoginState.SignedOut) {
-                _notice.value = "页面上看着还没登录，登录好了再点「登录好了」。"
+                _notice.value = tr(R.string.browser_not_logged_in)
                 return
             }
             sites.markLoggedIn(site)
@@ -257,7 +259,7 @@ class UserBrowser private constructor(private val app: Context) {
 
     private fun refusal(url: String): String? {
         WebUrlPolicy.checkNavigable(url) ?: return null
-        return if (WebUrlPolicy.external(url) != null) "这是打开其他应用的链接，浏览器里不打开。" else "这个地址打不开：浏览器只打开网页（http、https）。"
+        return if (WebUrlPolicy.external(url) != null) tr(R.string.browser_external_link) else tr(R.string.browser_bad_scheme)
     }
 
     private fun newTab(): WebTab = WebTab(wrapper, "browser", OWNER).also { t ->
@@ -328,11 +330,11 @@ class UserBrowser private constructor(private val app: Context) {
         }
 
         override fun onExternalLink(tab: WebTab, link: ExternalLink) {
-            _notice.value = "已拦下一个打开其他应用的链接。"
+            _notice.value = tr(R.string.browser_blocked_app_link)
         }
 
         override fun onDownload(tab: WebTab, url: String, userAgent: String, contentDisposition: String?, mime: String?) {
-            _notice.value = "浏览器里暂时不能下载文件。"
+            _notice.value = tr(R.string.browser_no_download)
         }
 
         override fun onCrashed(tab: WebTab) {
@@ -340,7 +342,7 @@ class UserBrowser private constructor(private val app: Context) {
             // 在回调之外销毁
             main.post {
                 if (tab === this@UserBrowser.tab) closePage()
-                _notice.value = "网页出了问题，已经关掉，可以重新打开。"
+                _notice.value = tr(R.string.browser_crashed)
             }
         }
 
@@ -429,7 +431,7 @@ class UserBrowser private constructor(private val app: Context) {
         /** 收下的网站图标至少这么大,存的时候至多这么大(像素)。 */
         private const val MIN_ICON_PX = 16
         private const val MAX_ICON_PX = 128
-        const val LOGGED_IN_NOTICE = "已登录，Mika 办事时也能用了。"
+        val LOGGED_IN_NOTICE: String get() = tr(R.string.browser_logged_in)
 
         @Volatile private var instance: UserBrowser? = null
 

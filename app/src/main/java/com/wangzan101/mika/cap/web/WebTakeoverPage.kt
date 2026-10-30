@@ -1,5 +1,7 @@
 package com.wangzan101.mika.cap.web
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.i18n.AppLanguage
 import android.app.Activity
 import android.content.Context
@@ -84,7 +86,7 @@ open class WebTakeoverPage : Activity() {
             setBackgroundColor(Color.rgb(242, 242, 247))
         }
         bar.addView(TextView(this).apply {
-            text = if (s.loginMode) "在 Mika 的浏览器里登录,登好后点「完成」" else "Mika 在等你:${reasonLabel(s.reason)}"
+            text = if (s.loginMode) tr(R.string.web_takeover_login) else tr(R.string.web_takeover_waiting, reasonLabel(s.reason))
             textSize = 15f
             setTextColor(Color.BLACK)
         })
@@ -105,11 +107,11 @@ open class WebTakeoverPage : Activity() {
             setOnClickListener { act(action) }
         })
         if (s.loginMode) {
-            add("完成", WebHandover.Action.Done)
+            add(tr(R.string.done), WebHandover.Action.Done)
         } else {
-            add("处理好了", WebHandover.Action.HandBack)
-            add("我自己做完了", WebHandover.Action.FinishedMyself)
-            add("取消任务", WebHandover.Action.Cancel)
+            add(tr(R.string.action_hand_back), WebHandover.Action.HandBack)
+            add(tr(R.string.action_finished_myself), WebHandover.Action.FinishedMyself)
+            add(tr(R.string.action_cancel_task), WebHandover.Action.Cancel)
         }
         bar.addView(buttons)
         return bar
@@ -180,12 +182,12 @@ open class WebTakeoverPage : Activity() {
             Intent(context, WebTakeoverActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         private fun reasonLabel(reason: String?) = when (reason) {
-            "login" -> "登录"
-            "captcha" -> "验证码"
-            "access_blocked" -> "安全验证"
-            "payment" -> "付款"
-            "decision" -> "需要你决定"
-            else -> "需要你处理"
+            "login" -> tr(R.string.takeover_reason_login)
+            "captcha" -> tr(R.string.takeover_reason_captcha)
+            "access_blocked" -> tr(R.string.web_reason_security)
+            "payment" -> tr(R.string.takeover_reason_payment)
+            "decision" -> tr(R.string.takeover_reason_decision)
+            else -> tr(R.string.takeover_title)
         }
     }
 }

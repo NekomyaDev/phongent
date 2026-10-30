@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,37 +22,37 @@ data class DevSwitch(
 /** 开发者选项的两组:速度(已验证、默认多半开着)和实验(默认关)。开关的值与存储([SpeedFlags])不变。 */
 object DeveloperSwitches {
     fun speed(flags: SpeedFlags): List<DevSwitch> = listOf(
-        DevSwitch("adaptive-vision", "先读元素，必要时看图", "控件信息够用时不把图片交给模型，读不清时再补图", flags.adaptiveVision) { flags.copy(adaptiveVision = it) },
-        DevSwitch("inline-screen", "操作后带回屏幕变化", "每次操作后顺带看一眼屏幕,少一次单独读屏", flags.inlineScreen) { flags.copy(inlineScreen = it) },
-        DevSwitch("batch-steps", "有把握时连做几步", "确定的几步一次做完,中途不再停下来问模型", flags.batchSteps) { flags.copy(batchSteps = it) },
-        DevSwitch("deep-links", "直接打开要去的页面", "能用链接直达 App 里的页面,就不一层层点进去", flags.deepLinks) { flags.copy(deepLinks = it) },
-        DevSwitch("light-steps", "简单步骤交给轻量模型", "容易的步骤让更快的轻量模型来做,难的仍由主模型做", flags.lightSteps) { flags.copy(lightSteps = it) },
+        DevSwitch("adaptive-vision", tr(R.string.dev_adaptive), tr(R.string.dev_adaptive_sub), flags.adaptiveVision) { flags.copy(adaptiveVision = it) },
+        DevSwitch("inline-screen", tr(R.string.dev_inline), tr(R.string.dev_inline_sub), flags.inlineScreen) { flags.copy(inlineScreen = it) },
+        DevSwitch("batch-steps", tr(R.string.dev_batch), tr(R.string.dev_batch_sub), flags.batchSteps) { flags.copy(batchSteps = it) },
+        DevSwitch("deep-links", tr(R.string.dev_deep_links), tr(R.string.dev_deep_links_sub), flags.deepLinks) { flags.copy(deepLinks = it) },
+        DevSwitch("light-steps", tr(R.string.dev_light), tr(R.string.dev_light_sub), flags.lightSteps) { flags.copy(lightSteps = it) },
     )
 
     fun experimental(flags: SpeedFlags): List<DevSwitch> = listOf(
-        DevSwitch("replay", "照着上次的做法做", "做过的事按记住的操作路线快速重做,对不上就交回模型", flags.replay) { flags.copy(replay = it) },
-        DevSwitch("parallel-tasks", "不同对话同时进行", "不同对话的任务各占一块虚拟屏,一起做", flags.parallelTasks) { flags.copy(parallelTasks = it) },
-        DevSwitch("structured-compaction", "长任务的摘要分条写", "步骤多了要压缩时,按目标、事实、进展、下一步记下来", flags.structuredCompaction) { flags.copy(structuredCompaction = it) },
+        DevSwitch("replay", tr(R.string.dev_replay), tr(R.string.dev_replay_sub), flags.replay) { flags.copy(replay = it) },
+        DevSwitch("parallel-tasks", tr(R.string.dev_parallel), tr(R.string.dev_parallel_sub), flags.parallelTasks) { flags.copy(parallelTasks = it) },
+        DevSwitch("structured-compaction", tr(R.string.dev_compaction), tr(R.string.dev_compaction_sub), flags.structuredCompaction) { flags.copy(structuredCompaction = it) },
     )
 }
 
 /** 「做事方式」一组:询问 / 自主的全局开关。 */
 object AutonomyCopy {
-    const val GROUP = "做事方式"
-    const val TITLE = "自主模式"
-    const val SUBTITLE = "打开后连付款也不先问你，Mika 直接做完；关着时只有付款先问"
+    val GROUP: String get() = tr(R.string.dev_group)
+    val TITLE: String get() = tr(R.string.dev_autonomy)
+    val SUBTITLE: String get() = tr(R.string.dev_autonomy_sub)
 }
 
-const val DEVELOPER_NOTE = "这些开关影响 Mika 做事的方式和速度，一般保持默认。"
+val DEVELOPER_NOTE: String get() = tr(R.string.dev_note)
 
 /** 当前看图模型的「看图定位已验证」:[model] 是它的模型名。 */
 data class GroundingSetting(val model: String, val verified: Boolean)
 
 object GroundingCopy {
-    const val GROUP = "看图"
-    const val TITLE = "看图定位已验证"
+    val GROUP: String get() = tr(R.string.cap_vision)
+    val TITLE: String get() = tr(R.string.dev_grounding)
 
-    fun subtitle(model: String) = "看图模型 $model 实测过框得准再打开；关着时，它框出的位置要另有佐证才会去点。"
+    fun subtitle(model: String) = tr(R.string.dev_grounding_sub, model)
 }
 
 /**
@@ -68,16 +70,16 @@ fun DeveloperOptionsScreen(
     onGrounding: (Boolean) -> Unit = {},
     onOpenRunStats: (() -> Unit)? = null,
 ) {
-    PageScaffold("开发者选项", onBack) {
+    PageScaffold(tr(R.string.settings_developer), onBack) {
         GroupLabel(AutonomyCopy.GROUP)
         GroupCard {
             ListRow(null, AutonomyCopy.TITLE, AutonomyCopy.SUBTITLE, first = true, onClick = { onAutonomous(!autonomous) }) {
                 MikaSwitch(autonomous, onAutonomous, Modifier.testTag("dev-autonomous"))
             }
         }
-        GroupLabel("速度")
+        GroupLabel(tr(R.string.dev_speed))
         SwitchGroup(DeveloperSwitches.speed(speed), onSpeed)
-        GroupLabel("实验")
+        GroupLabel(tr(R.string.dev_experiments))
         SwitchGroup(DeveloperSwitches.experimental(speed), onSpeed)
         if (grounding != null) {
             GroupLabel(GroundingCopy.GROUP)
@@ -88,7 +90,7 @@ fun DeveloperOptionsScreen(
             }
         }
         if (onOpenRunStats != null) {
-            GroupLabel("运行记录")
+            GroupLabel(tr(R.string.dev_run_log))
             GroupCard {
                 ListRow(null, RunMetricsCopy.STATS_TITLE, RunMetricsCopy.STATS_SUBTITLE, first = true, onClick = onOpenRunStats) { RowChevron() }
             }

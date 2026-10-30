@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui.components
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +50,7 @@ fun SubPage(
 ) {
     PageBackground {
         Column(Modifier.fillMaxSize()) {
-            TopBar(title, MikaIcons.Back, onBack, "返回", right = right)
+            TopBar(title, MikaIcons.Back, onBack, stringResource(R.string.back), right = right)
             Column(
                 modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),

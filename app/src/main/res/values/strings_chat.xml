@@ -114,4 +114,8 @@
     <string name="screen_send">Send your current screen to Mika</string>
     <string name="pip_screen">Mika’s virtual screen</string>
     <string name="collapse">Collapse</string>
+    <string name="no_app_for_link">No app can open this link</string>
+    <string name="source_none">No source was saved for this answer</string>
+    <string name="source_image">Source screen</string>
+    <string name="zoom_in">Zoom in</string>
 </resources>

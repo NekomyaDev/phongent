@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.Color
@@ -57,7 +59,7 @@ fun SourceScreen(vm: SourceViewModel, onBack: () -> Unit) {
     val c = MikaTheme.colors
     PageBackground {
         Column(Modifier.fillMaxSize()) {
-            TopBar("来源", left = MikaIcons.Back, leftLabel = "返回", onLeft = onBack)
+            TopBar(stringResource(R.string.source_label), left = MikaIcons.Back, leftLabel = stringResource(R.string.back), onLeft = onBack)
             ui?.let { source ->
                 LazyColumn(
                     Modifier.fillMaxSize(),
@@ -71,7 +73,7 @@ fun SourceScreen(vm: SourceViewModel, onBack: () -> Unit) {
                             GroupCard {
                                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                                     Text(
-                                        listOfNotNull("第 ${entry.step} 步", entry.place, entry.title).joinToString(" · "),
+                                        listOfNotNull(stringResource(R.string.step_number, entry.step), entry.place, entry.title).joinToString(" · "),
                                         style = MikaType.BodyStrong, color = c.ink,
                                     )
                                     // 有画面就只给画面:识别出的文字和画面重复;没有画面时摘录就是唯一的依据
@@ -84,7 +86,7 @@ fun SourceScreen(vm: SourceViewModel, onBack: () -> Unit) {
                         }
                     }
                     if (source.legacyText.isNullOrBlank() && source.entries.isEmpty()) {
-                        item("empty") { EmptyNote("没有保存这次答复的来源") }
+                        item("empty") { EmptyNote(stringResource(R.string.source_none)) }
                     }
                 }
             }
@@ -99,8 +101,8 @@ private fun SourceShot(vm: SourceViewModel, id: Int) {
     }
     var zoomed by remember { mutableStateOf(false) }
     image?.let {
-        Image(it, "来源画面", Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(12.dp))
-            .clickable(onClickLabel = "放大看") { zoomed = true },
+        Image(it, stringResource(R.string.source_image), Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(12.dp))
+            .clickable(onClickLabel = stringResource(R.string.zoom_in)) { zoomed = true },
             contentScale = ContentScale.FillWidth)
         if (zoomed) ZoomedShot(it) { zoomed = false }
     }
@@ -111,10 +113,10 @@ private fun SourceShot(vm: SourceViewModel, id: Int) {
 private fun ZoomedShot(image: ImageBitmap, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black).clickable(onClickLabel = "收起", onClick = onClose),
+            Modifier.fillMaxSize().background(Color.Black).clickable(onClickLabel = stringResource(R.string.collapse), onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
-            Image(image, "来源画面", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Image(image, stringResource(R.string.source_image), Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         }
     }
 }

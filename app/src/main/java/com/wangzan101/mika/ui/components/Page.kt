@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui.components
 
+import com.wangzan101.mika.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +32,7 @@ fun PageScaffold(
 ) {
     PageBackground(modifier) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(title, MikaIcons.Back, onBack, "返回")
+            TopBar(title, MikaIcons.Back, onBack, stringResource(R.string.back))
             Column(
                 Modifier.weight(1f).fillMaxWidth()
                     .verticalScroll(rememberScrollState())

@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
@@ -55,12 +57,12 @@ fun PhoneOpsScreen(
 ) {
     val check = Prerequisites.check(status, hasMainModel = true)
     var confirmUnpair by remember { mutableStateOf(false) }
-    PageScaffold("手机操作", onBack) {
-        GroupLabel("状态")
+    PageScaffold(stringResource(R.string.settings_phone_ops), onBack) {
+        GroupLabel(stringResource(R.string.settings_status))
         GroupCard {
             val (a11yText, a11yTone) = StatusCopy.accessibilityValue(status.accessibility)
             ListRow(
-                MikaIcons.Hand, "无障碍服务", "读取和操作 Mika 的虚拟屏", first = true,
+                MikaIcons.Hand, stringResource(R.string.settings_a11y), stringResource(R.string.settings_a11y_sub), first = true,
                 onClick = check.problems.firstOrNull { it is Problem.Accessibility }?.let { { onProblem(it) } },
             ) { RowValue(a11yText, a11yTone) }
             // 安卓 13 以下手机功能整个不可用,不列这一行(系统版本那一行已说明)
@@ -76,15 +78,15 @@ fun PhoneOpsScreen(
                 ) { if (reconnect) RowValue(PhoneSetupCopy.RECONNECT, ValueTone.Link) else RowValue(hText, hTone) }
             }
             val (notifText, notifTone) = StatusCopy.notificationSummary(status.notificationOverview().summary)
-            ListRow(MikaIcons.Bell, StatusCopy.NOTIFICATIONS, "进度和「需要你」提醒", onClick = onOpenNotifications) {
+            ListRow(MikaIcons.Bell, StatusCopy.NOTIFICATIONS, stringResource(R.string.settings_notif_progress_sub), onClick = onOpenNotifications) {
                 RowValue(notifText, notifTone)
                 RowChevron()
             }
             val tooOld = status.sdkInt < Prerequisites.MIN_SDK
             val focusWarning = Problem.FocusMayLeak in check.problems
             ListRow(
-                MikaIcons.Phone, "系统版本",
-                if (focusWarning) "安卓 $androidRelease · 安卓 13 上后台操作可能影响主屏焦点,建议安卓 14+" else "安卓 $androidRelease",
+                MikaIcons.Phone, stringResource(R.string.settings_system_version),
+                if (focusWarning) stringResource(R.string.settings_android_focus, androidRelease) else stringResource(R.string.settings_android, androidRelease),
                 onClick = when {
                     tooOld -> ({ onProblem(Problem.SystemTooOld) })
                     focusWarning -> ({ onProblem(Problem.FocusMayLeak) })
@@ -92,14 +94,14 @@ fun PhoneOpsScreen(
                 },
             ) {
                 when {
-                    tooOld -> RowValue("不支持", ValueTone.Bad)
-                    focusWarning -> RowValue("可用", ValueTone.Plain)
-                    else -> RowValue("满足", ValueTone.Ok)
+                    tooOld -> RowValue(stringResource(R.string.pill_unsupported), ValueTone.Bad)
+                    focusWarning -> RowValue(stringResource(R.string.pill_available), ValueTone.Plain)
+                    else -> RowValue(stringResource(R.string.settings_meets), ValueTone.Ok)
                 }
             }
         }
         if (status.sdkInt >= Prerequisites.MIN_SDK) {
-            GroupLabel("配对")
+            GroupLabel(stringResource(R.string.phone_channel))
             GroupCard {
                 ListRow(MikaIcons.Link, PhoneSetupCopy.REPAIR, PhoneSetupCopy.REPAIR_SUBTITLE, first = true, onClick = onRepair) {
                     RowChevron()
@@ -123,7 +125,7 @@ fun PhoneOpsScreen(
             confirmButton = {
                 TextButton({ confirmUnpair = false; onUnpair() }) { Text(PhoneSetupCopy.UNPAIR_CONFIRM, color = MikaTheme.colors.bad) }
             },
-            dismissButton = { TextButton({ confirmUnpair = false }) { Text("取消") } },
+            dismissButton = { TextButton({ confirmUnpair = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -140,15 +142,15 @@ fun NotificationsScreen(status: SystemStatus, onFix: (Fix) -> Unit, onBack: () -
     PageScaffold(StatusCopy.NOTIFICATIONS, onBack) {
         GroupCard {
             ListRow(
-                MikaIcons.Bell, "通知总开关",
+                MikaIcons.Bell, stringResource(R.string.settings_notif_master),
                 if (o.appAllowed) StatusCopy.NOTIF_APP_SUBTITLE_ON else StatusCopy.NOTIF_APP_SUBTITLE_OFF,
                 first = true, tone = if (o.appAllowed) TileTone.Neutral else TileTone.Bad,
                 onClick = if (o.appAllowed) null else ({ onFix(Fix.AllowNotifications) }),
             ) {
-                if (o.appAllowed) RowValue("已允许", ValueTone.Ok) else RowValue(StatusCopy.HEADS_UP_ACTION, ValueTone.Link)
+                if (o.appAllowed) RowValue(stringResource(R.string.settings_allowed), ValueTone.Ok) else RowValue(StatusCopy.HEADS_UP_ACTION, ValueTone.Link)
             }
         }
-        GroupLabel("任务通知")
+        GroupLabel(stringResource(R.string.settings_task_notifs))
         GroupCard {
             ChannelRowItem(StatusCopy.ATTENTION_CHANNEL, StatusCopy.NOTIF_ATTENTION_WHEN, o.attention, Fix.OpenAttentionChannel, onFix, first = true)
             ChannelRowItem(StatusCopy.RESULT_CHANNEL, StatusCopy.NOTIF_RESULT_WHEN, o.result, Fix.OpenResultChannel, onFix)
@@ -183,12 +185,12 @@ fun DuringWorkScreen(
     muteTarget: Boolean, onMuteTarget: (Boolean) -> Unit,
     parallel: ParallelSetting?, onParallelMax: (Int) -> Unit, onBack: () -> Unit,
 ) {
-    PageScaffold("干活时", onBack) {
+    PageScaffold(stringResource(R.string.settings_during_work), onBack) {
         GroupCard {
-            ListRow(MikaIcons.Sun, "屏幕保持常亮", "任务进行时屏幕不熄灭,结束后恢复", first = true, onClick = { onKeepScreenOn(!keepScreenOn) }) {
+            ListRow(MikaIcons.Sun, stringResource(R.string.settings_keep_on), stringResource(R.string.settings_keep_on_sub), first = true, onClick = { onKeepScreenOn(!keepScreenOn) }) {
                 MikaSwitch(keepScreenOn, onKeepScreenOn, Modifier.testTag("work-keep-screen-on"))
             }
-            ListRow(MikaIcons.Mute, "被操作的 App 静音", "Mika 操作的 App 不出声,你接手时恢复声音", onClick = { onMuteTarget(!muteTarget) }) {
+            ListRow(MikaIcons.Mute, stringResource(R.string.settings_mute), stringResource(R.string.settings_mute_sub), onClick = { onMuteTarget(!muteTarget) }) {
                 MikaSwitch(muteTarget, onMuteTarget, Modifier.testTag("work-mute-target"))
             }
             parallel?.let { ParallelRow(it, onParallelMax) }
@@ -201,19 +203,19 @@ fun DuringWorkScreen(
 private fun ParallelRow(p: ParallelSetting, onMax: (Int) -> Unit) {
     val supported = p.limit.reason == null
     ListRow(
-        MikaIcons.Phone, "同时进行的任务",
-        subtitle = p.limit.reason ?: "不同对话的任务各占一块虚拟屏",
+        MikaIcons.Phone, stringResource(R.string.settings_parallel),
+        subtitle = p.limit.reason ?: stringResource(R.string.settings_parallel_sub),
         titleColor = if (supported) MikaTheme.colors.ink else MikaTheme.colors.ink3,
     ) {
         if (!supported) {
-            RowValue("1 个")
+            RowValue(trPlural(R.plurals.settings_count_tasks, 1))
             return@ListRow
         }
         Text(
             "−", Modifier.clickable(enabled = p.max > 1) { onMax(p.max - 1) }.padding(horizontal = 10.dp, vertical = 4.dp),
             fontSize = 18.sp, color = if (p.max > 1) MikaTheme.colors.accent else MikaTheme.colors.ink3,
         )
-        RowValue("${p.max} 个")
+        RowValue(trPlural(R.plurals.settings_count_tasks, p.max))
         Text(
             "+", Modifier.clickable(enabled = p.max < 3) { onMax(p.max + 1) }.padding(horizontal = 10.dp, vertical = 4.dp),
             fontSize = 18.sp, color = if (p.max < 3) MikaTheme.colors.accent else MikaTheme.colors.ink3,
@@ -225,20 +227,20 @@ private fun ParallelRow(p: ParallelSetting, onMax: (Int) -> Unit) {
 
 /** 设置 › 悬浮胶囊的文字。 */
 object CapsuleSettingsCopy {
-    const val TITLE = "悬浮胶囊"
-    const val SUBTITLE = "用别的 App 时，在屏幕上看任务进展"
-    const val FOOTNOTE = "胶囊借用 Mika 已开着的无障碍服务画在屏幕上，不用另外授权；无障碍服务没开或画不出来时，照旧用通知提醒你。"
+    val TITLE: String get() = tr(R.string.capsule_settings_title)
+    val SUBTITLE: String get() = tr(R.string.capsule_settings_sub)
+    val FOOTNOTE: String get() = tr(R.string.capsule_settings_foot)
 
     fun label(mode: CapsuleMode): String = when (mode) {
-        CapsuleMode.Off -> "关闭"
-        CapsuleMode.DuringTasks -> "有任务时显示"
-        CapsuleMode.Always -> "一直显示"
+        CapsuleMode.Off -> tr(R.string.state_turned_off)
+        CapsuleMode.DuringTasks -> tr(R.string.capsule_mode_tasks)
+        CapsuleMode.Always -> tr(R.string.capsule_mode_always)
     }
 
     fun detail(mode: CapsuleMode): String = when (mode) {
-        CapsuleMode.Off -> "只用通知"
-        CapsuleMode.DuringTasks -> "有任务在跑或等你时出现，做完几秒后消失"
-        CapsuleMode.Always -> "没有任务时也留一颗 Mika 图标"
+        CapsuleMode.Off -> tr(R.string.capsule_mode_off_detail)
+        CapsuleMode.DuringTasks -> tr(R.string.capsule_mode_tasks_detail)
+        CapsuleMode.Always -> tr(R.string.capsule_mode_always_detail)
     }
 }
 
@@ -288,7 +290,7 @@ fun languageLabel(l: AppLanguage): String = stringResource(
 /** 设置 › 网站登录。 */
 @Composable
 fun WebSitesScreen(state: WebSitesState, onBack: () -> Unit) {
-    PageScaffold("网站登录", onBack) { WebSitesSection(state, labeled = false) }
+    PageScaffold(stringResource(R.string.settings_web_logins), onBack) { WebSitesSection(state, labeled = false) }
 }
 
 // ---------- 高级 ----------
@@ -296,21 +298,21 @@ fun WebSitesScreen(state: WebSitesState, onBack: () -> Unit) {
 /** 设置 › 文件与计算环境:允许脚本联网、重置运行环境。 */
 @Composable
 fun SandboxScreen(onBack: () -> Unit) {
-    PageScaffold("文件与计算环境", onBack) { AdvancedSettings() }
+    PageScaffold(stringResource(R.string.settings_sandbox), onBack) { AdvancedSettings() }
 }
 
 /** 设置 › 记住的操作路线:[count] 条,可以全部清除(先确认);[count] 为空表示还没读出来。 */
 @Composable
 fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
-    PageScaffold("记住的操作路线", onBack) {
+    PageScaffold(stringResource(R.string.settings_routes), onBack) {
         GroupCard {
             ListRow(
-                MikaIcons.Route, "已记住的操作路线",
-                if (count == null) "正在读取" else "$count 条 · 做过的事下次照着做,更快", first = true,
+                MikaIcons.Route, stringResource(R.string.routes_saved),
+                if (count == null) stringResource(R.string.loading) else trPlural(R.plurals.routes_count, count), first = true,
             ) {
                 if (count != null && count > 0) Text(
-                    "全部清除", Modifier.clickable { confirmClear = true }.padding(4.dp),
+                    stringResource(R.string.routes_clear_all), Modifier.clickable { confirmClear = true }.padding(4.dp),
                     style = MikaType.Value, color = MikaTheme.colors.bad,
                 )
             }
@@ -319,10 +321,10 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清除全部已记住的操作路线?") },
-            text = { Text("清除后,做过的事下次会重新一步步来做,不影响别的设置。") },
-            confirmButton = { TextButton({ confirmClear = false; onClear() }) { Text("清除") } },
-            dismissButton = { TextButton({ confirmClear = false }) { Text("取消") } },
+            title = { Text(stringResource(R.string.routes_clear_title)) },
+            text = { Text(stringResource(R.string.routes_clear_body)) },
+            confirmButton = { TextButton({ confirmClear = false; onClear() }) { Text(stringResource(R.string.clear)) } },
+            dismissButton = { TextButton({ confirmClear = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -330,5 +332,5 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
 /** 设置 › 恢复与修复:手机操作的几个授权开关。 */
 @Composable
 fun RecoveryScreen(onBack: () -> Unit) {
-    PageScaffold("恢复与修复", onBack) { RecoverySwitches() }
+    PageScaffold(stringResource(R.string.settings_recovery), onBack) { RecoverySwitches() }
 }

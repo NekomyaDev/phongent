@@ -35,4 +35,5 @@
     <string name="cap_reasoning">Reasoning</string>
     <string name="model_need_url">Enter the base URL</string>
     <string name="model_url_scheme">The base URL must start with http:// or https://</string>
+    <string name="preset_custom">Custom</string>
 </resources>

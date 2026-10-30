@@ -1,5 +1,7 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
+import com.wangzan101.mika.i18n.tr
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -35,18 +37,18 @@ import com.wangzan101.mika.ui.theme.MikaType
  * 字面上只说「脚本」「处理文件」「运行环境」,不出现沙箱、Linux、PRoot、Alpine 等技术名词。
  */
 object SandboxCopy {
-    const val NETWORK_TITLE = "允许脚本联网"
-    const val NETWORK_SUBTITLE = "默认关闭"
-    const val NETWORK_EXPLAIN = "Mika 处理文件、运行脚本时默认不联网。打开后脚本可以访问网络(比如查论文、查地图),也可能把对话里的文件发出去。"
-    const val ISOLATION_UNAVAILABLE = "此设备无法限制脚本联网:只有打开「允许脚本联网」时,Mika 才能处理文件和运行脚本"
-    const val RESET_TITLE = "重置运行环境?"
-    const val RESET_BODY = "会删除 Mika 处理文件、运行脚本用的运行环境,以及各对话里生成的文件(包括你附加的文件),然后自动重新准备。对话记录和设置不受影响。"
+    val NETWORK_TITLE: String get() = tr(R.string.sandbox_network)
+    val NETWORK_SUBTITLE: String get() = tr(R.string.sandbox_network_sub)
+    val NETWORK_EXPLAIN: String get() = tr(R.string.sandbox_network_explain)
+    val ISOLATION_UNAVAILABLE: String get() = tr(R.string.sandbox_isolation_unavailable)
+    val RESET_TITLE: String get() = tr(R.string.sandbox_reset_title)
+    val RESET_BODY: String get() = tr(R.string.sandbox_reset_body)
 
     /** 「重置运行环境」下面的一行:平时说明会怎样,准备中或准备失败时如实说。 */
     fun resetSubtitle(s: SandboxStatus): String = when (s) {
-        is SandboxStatus.Installing -> "正在准备"
-        is SandboxStatus.Broken -> "准备没有完成:${s.reason}"
-        else -> "出问题时用:删除后自动重新准备"
+        is SandboxStatus.Installing -> tr(R.string.runtime_preparing)
+        is SandboxStatus.Broken -> tr(R.string.sandbox_broken, s.reason)
+        else -> tr(R.string.sandbox_reset_sub)
     }
 }
 
@@ -88,7 +90,7 @@ fun AdvancedSection(
         }
         Note(SandboxCopy.NETWORK_EXPLAIN, if (networkAllowed) MikaTheme.colors.warn else MikaTheme.colors.ink3)
         if (isolationIssue) Note(SandboxCopy.ISOLATION_UNAVAILABLE, MikaTheme.colors.bad)
-        ListRow(MikaIcons.Close, "重置运行环境", SandboxCopy.resetSubtitle(status), titleColor = MikaTheme.colors.bad, tone = TileTone.Bad,
+        ListRow(MikaIcons.Close, tr(R.string.sandbox_reset), SandboxCopy.resetSubtitle(status), titleColor = MikaTheme.colors.bad, tone = TileTone.Bad,
             onClick = if (status is SandboxStatus.Installing) null else ({ confirming = true }))
     }
 
@@ -97,8 +99,8 @@ fun AdvancedSection(
             onDismissRequest = { confirming = false },
             title = { Text(SandboxCopy.RESET_TITLE) },
             text = { Text(SandboxCopy.RESET_BODY) },
-            confirmButton = { TextButton({ confirming = false; onReset() }) { Text("重置", color = MikaTheme.colors.bad) } },
-            dismissButton = { TextButton({ confirming = false }) { Text("取消") } },
+            confirmButton = { TextButton({ confirming = false; onReset() }) { Text(tr(R.string.reset), color = MikaTheme.colors.bad) } },
+            dismissButton = { TextButton({ confirming = false }) { Text(tr(R.string.cancel)) } },
         )
     }
 }
