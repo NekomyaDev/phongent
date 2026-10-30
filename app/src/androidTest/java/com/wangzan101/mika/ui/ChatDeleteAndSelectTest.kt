@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -39,7 +40,7 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 侧栏长按一条对话弹出操作面板(改名、置顶、删除):删除先确认、删掉、列表当场更新;改名后列表换成新名字;置顶后排到最上面带图钉。
+ * 侧栏长按一条对话在原地弹出菜单(置顶、改名、删除,点外面收起):删除先确认、删掉、列表当场更新;改名后列表换成新名字;置顶后排到最上面带图钉。
  * 还有对话页里回答、用户的话可以选中复制。不用真机的任务环境。
  */
 @RunWith(AndroidJUnit4::class)
@@ -94,7 +95,7 @@ class ChatDeleteAndSelectTest {
         show(vm, drawerOpen = true)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithTag("drawer-menu-delete").performClick()
         compose.onNodeWithText("删除这个对话？").assertExists()
         val body = compose.onNodeWithTag("delete-conversation-body").fetchSemanticsNode().config
             .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
@@ -106,7 +107,7 @@ class ChatDeleteAndSelectTest {
         assertTrue(removed.isEmpty())
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithTag("drawer-menu-delete").performClick()
         compose.onNodeWithTag("confirm-delete-conversation").performClick()
         compose.waitForIdle()
         compose.waitUntil(5_000) { removed.isNotEmpty() }
@@ -115,17 +116,39 @@ class ChatDeleteAndSelectTest {
         compose.onNodeWithText("订票").assertExists()
     }
 
-    /** 长按弹出三项:改名、置顶、删除;只是打开面板什么都不改。 */
+    /** 长按在原地弹出菜单:抬起的那一行(还是那个标题)和三项置顶、改名、删除;只是打开菜单什么都不改。 */
     @Test fun longPressShowsTheThreeActions() {
         store.append("a", Turn("查天气", "晴", "succeeded"))
         store.setTitle("a", "天气")
         show(vm(), drawerOpen = true)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("改名").assertExists()
-        compose.onNodeWithText("置顶").assertExists()
-        compose.onNodeWithText("删除").assertExists()
+        compose.onNodeWithTag("drawer-menu").assertExists()
+        compose.onNodeWithTag("drawer-menu-pin").assert(hasText("置顶"))
+        compose.onNodeWithTag("drawer-menu-rename").assert(hasText("改名"))
+        compose.onNodeWithTag("drawer-menu-delete").assert(hasText("删除"))
         compose.onNodeWithText("取消置顶").assertDoesNotExist()
+        // 菜单开着时后面的内容不给无障碍读,只剩抬起的那一行
+        assertEquals(1, compose.onAllNodesWithText("天气").fetchSemanticsNodes().size)
+        assertEquals("天气", store.title("a"))
+        assertEquals(null, store.pinnedAt("a"))
+    }
+
+    /** 点菜单外面收起菜单,什么都不改;侧栏里那一行还在。 */
+    @Test fun tappingOutsideClosesTheMenu() {
+        store.append("a", Turn("查天气", "晴", "succeeded"))
+        store.setTitle("a", "天气")
+        show(vm(), drawerOpen = true)
+
+        compose.onNodeWithText("天气").performTouchInput { longClick() }
+        compose.onNodeWithTag("drawer-menu-pin").assertExists()
+        // 右下角:菜单靠左接在那一行下面,碰不到
+        compose.onNodeWithTag("drawer-menu").performTouchInput { click(percentOffset(0.95f, 0.95f)) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("drawer-menu").assertDoesNotExist()
+        compose.onNodeWithTag("drawer-menu-pin").assertDoesNotExist()
+        compose.onNodeWithText("天气").assertExists()
+        assertTrue(removed.isEmpty())
         assertEquals("天气", store.title("a"))
         assertEquals(null, store.pinnedAt("a"))
     }
@@ -137,7 +160,7 @@ class ChatDeleteAndSelectTest {
         show(vm(), drawerOpen = true)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("改名").performClick()
+        compose.onNodeWithTag("drawer-menu-rename").performClick()
         compose.onNodeWithTag("rename-conversation-field").assert(hasText("天气"))
         compose.onNodeWithTag("rename-conversation-field").performTextReplacement("   ")
         compose.onNodeWithTag("confirm-rename-conversation").assertIsNotEnabled()
@@ -160,7 +183,7 @@ class ChatDeleteAndSelectTest {
         compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).assertCountEquals(0)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("置顶").performClick()
+        compose.onNodeWithTag("drawer-menu-pin").assert(hasText("置顶")).performClick()
         compose.waitForIdle()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
         compose.onNodeWithText("置顶").assertExists()
@@ -168,7 +191,7 @@ class ChatDeleteAndSelectTest {
         assertTrue(store.pinnedAt("a") != null)
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
-        compose.onNodeWithText("取消置顶").performClick()
+        compose.onNodeWithTag("drawer-menu-pin").assert(hasText("取消置顶")).performClick()
         compose.waitForIdle()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("conversation-pin", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("置顶").assertDoesNotExist()

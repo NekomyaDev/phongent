@@ -30,6 +30,8 @@ object MikaIcons {
     val Menu = stroke("menu", "M4 7 h16 M4 12 h16 M4 17 h10")
     /** 新对话:一支笔。 */
     val New = stroke("new", "M12 20 h8", "M16.5 3.5 a2.1 2.1 0 0 1 3 3 L7 19 l-4 1 l1 -4 z")
+    /** 改名:一支斜放的笔,笔头后面一道箍(和「新对话」不同,下面不带横线)。 */
+    val Edit = stroke("edit", "M16.5 3.5 a2.1 2.1 0 0 1 3 3 L7 19 l-4 1 l1 -4 z", "M14.5 5.5 l4 4")
     val Back = stroke("back", "M15 5 l-7 7 l7 7")
     val Forward = stroke("forward", "M9 5 l7 7 l-7 7")
     val Chevron = stroke("chevron", "M9 6 l6 6 l-6 6", width = 2f)
