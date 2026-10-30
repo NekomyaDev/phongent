@@ -140,9 +140,9 @@ Apps and websites that already have usage knowledge (names as they appear in the
 
 Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it. If downloads are slow in mainland China, the release notes include a mirror link (国内备用下载).
 
-### 2. Turn on accessibility
+### 2. Accessibility (you can skip it for now)
 
-Find Mika in the system Accessibility settings and turn it on. Mika uses it to read the UI and tap; once it is on, Mika can also read the pairing code itself when you pair wireless debugging.
+Mika uses accessibility to read the UI and tap. You don't need to turn it on by hand: once pairing succeeds in the next step, Mika turns it on by itself. For apps installed from GitHub rather than an app store, Android often blocks turning accessibility on manually ("Restricted setting"), and letting Mika do it avoids that. When the wizard reaches this step, just choose Skip.
 
 ### 3. Pair wireless debugging (once)
 

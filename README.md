@@ -140,9 +140,9 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
 
-### 2. 打开无障碍
+### 2. 无障碍（可以先跳过）
 
-在系统「无障碍」设置里找到 Mika 并打开。Mika 靠它读界面、做点按；打开后配对无线调试时它还能自己读出配对码。
+Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成功后，Mika 会自己把它打开。从 GitHub 下载安装的 App，手动打开无障碍时常被系统拦下（提示「受限制的设置」），让 Mika 自己开能省掉这个麻烦。向导里到这一步时选「跳过」即可。
 
 ### 3. 配对无线调试（只需一次）
 
