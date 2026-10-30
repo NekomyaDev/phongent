@@ -84,6 +84,23 @@ class McpHostHttpTest {
         }
     }
 
+    @Test fun chunkedBodyAfterExpectContinue() {
+        Socket("127.0.0.1", host.boundPort).use { s ->
+            val out = s.getOutputStream()
+            val reader = s.getInputStream().bufferedReader()
+            out.write(("POST /mcp HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer $TOKEN\r\nContent-Type: application/json\r\n" +
+                "Transfer-Encoding: chunked\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n").toByteArray())
+            assertTrue(reader.readLine().startsWith("HTTP/1.1 100"))
+            reader.readLine()
+            val body = """{"jsonrpc":"2.0","id":9,"method":"ping"}"""
+            val half = body.length / 2
+            out.write("${Integer.toHexString(half)}\r\n${body.substring(0, half)}\r\n".toByteArray())
+            out.write("${Integer.toHexString(body.length - half)}\r\n${body.substring(half)}\r\n0\r\n\r\n".toByteArray())
+            assertTrue(reader.readLine().startsWith("HTTP/1.1 200"))
+            assertTrue(reader.readText().contains("\"id\":9"))
+        }
+    }
+
     private companion object {
         const val TOKEN = "test-token-0123456789"
     }

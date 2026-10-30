@@ -102,7 +102,7 @@ class MiniHttpServer(
             val input = BufferedInputStream(socket.getInputStream())
             val output = socket.getOutputStream()
             while (running.get()) {
-                val request = try { readRequest(input, socket.inetAddress) ?: return } catch (e: HttpProtocolException) {
+                val request = try { readRequest(input, socket.inetAddress, output) ?: return } catch (e: HttpProtocolException) {
                     write(output, HttpResponse.empty(e.status), close = true)
                     return
                 }
@@ -122,8 +122,11 @@ class MiniHttpServer(
         const val MAX_HEAD = 16 * 1024
         const val MAX_BODY = 256 * 1024
 
-        /** 读一个请求;对方在请求开始前关了连接时返回 null。 */
-        fun readRequest(input: InputStream, remote: InetAddress): HttpRequest? {
+        /**
+         * 读一个请求;对方在请求开始前关了连接时返回 null。对方先问能不能发正文(`Expect: 100-continue`,
+         * 命令行工具发稍大的正文时会这样)而给了 [output] 时,先答一句「继续」,免得它干等。
+         */
+        fun readRequest(input: InputStream, remote: InetAddress, output: OutputStream? = null): HttpRequest? {
             val head = readHead(input) ?: return null
             val lines = head.split("\r\n")
             val parts = lines.first().split(' ')
@@ -140,6 +143,10 @@ class MiniHttpServer(
                     if (name == "content-length" && old != value) throw HttpProtocolException(400, "conflicting length")
                     if (name == "content-length") old else "$old, $value"
                 } ?: value
+            }
+            if (output != null && headers["expect"].equals("100-continue", ignoreCase = true)) {
+                output.write("HTTP/1.1 100 Continue\r\n\r\n".toByteArray(Charsets.ISO_8859_1))
+                output.flush()
             }
             val body = when {
                 headers["transfer-encoding"]?.lowercase()?.contains("chunked") == true -> readChunked(input)
