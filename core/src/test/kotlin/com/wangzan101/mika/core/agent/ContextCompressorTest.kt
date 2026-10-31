@@ -53,7 +53,7 @@ class ContextCompressorTest {
         assertEquals(ContextKind.Notice, ContextBuilder.kindOf(c.messages[2]))
         assertEquals(h.takeLast(24), c.messages.drop(3))
         val s = summary(c.messages)!!
-        assertTrue(s, "第 1 步 phone_tap(按钮1)→ 生效" in s && "第 28 步 phone_tap(按钮28)→ 生效" in s && "第 29 步" !in s)
+        assertTrue(s, "Step 1 phone_tap(按钮1) → applied" in s && "Step 28 phone_tap(按钮28) → applied" in s && "Step 29" !in s)
     }
 
     @Test fun appendOnlyBetweenCompactions() {
@@ -102,7 +102,7 @@ class ContextCompressorTest {
         val dump = round("phone_list_elements", "{}", """{"ok":true,"snapshotId":"s2","screenshotId":8,"pad":"$pad"}""")
         val h = head + obs + dump + taps(20)
         val s = summary(ContextCompressor(TOOLS).compress(h, contextTokens = 1000).messages)!!
-        assertTrue(s, "第 1 步 phone_observe #7→ 生效" in s && "第 2 步 phone_list_elements #8→ 生效" in s)
+        assertTrue(s, "Step 1 phone_observe #7 → applied" in s && "Step 2 phone_list_elements #8 → applied" in s)
     }
 
     @Test fun pinnedMessagesKept() {
@@ -186,12 +186,12 @@ class ContextCompressorTest {
             listOf(
                 ContextCompressor.HEADER,
                 ContextCompressor.SUMMARY_REMINDER,
-                "第 1 步 phone_tap(设置)→ 生效",
-                "第 2 步 phone_scroll(down)→ 没变化",
-                "第 3 步 phone_launch_app(com.x)→ app_not_found",
-                "第 4 步 phone_back→ 生效",
-                "第 5 步 phone_type_text(${"天气".repeat(10)}…)→ 生效",
-                "第 7 步 phone_observe→ 生效",
+                "Step 1 phone_tap(设置) → applied",
+                "Step 2 phone_scroll(down) → no change",
+                "Step 3 phone_launch_app(com.x) → app_not_found",
+                "Step 4 phone_back → applied",
+                "Step 5 phone_type_text(${"天气".repeat(10)}…) → applied",
+                "Step 7 phone_observe → applied",
             ),
             s.lines().take(8),
         )
@@ -204,11 +204,11 @@ class ContextCompressorTest {
         val out = ContextCompressor(TOOLS).compress(h, contextTokens = 1_000_000, aggressive = true).messages
         val texts = out.map { it.plainText() }
         // 开头 2 条,第一段摘要,保留的接管往返,第二段摘要,最近 6 次往返
-        assertTrue(texts[2]!!.startsWith(ContextCompressor.HEADER) && "第 3 步" in texts[2]!! && "第 5 步" !in texts[2]!!)
+        assertTrue(texts[2]!!.startsWith(ContextCompressor.HEADER) && "Step 3" in texts[2]!! && "Step 5" !in texts[2]!!)
         assertEquals(takeover, out.subList(3, 5))
         assertTrue(texts[5]!!.startsWith(ContextCompressor.HEADER))
-        assertEquals(listOf(ContextCompressor.HEADER, ContextCompressor.SUMMARY_REMINDER) + listOf("第 5 步 phone_tap(按钮1)→ 生效", "第 6 步 phone_tap(按钮2)→ 生效") +
-            (7..12).map { "第 $it 步 phone_tap(按钮${it - 6})→ 生效" },
+        assertEquals(listOf(ContextCompressor.HEADER, ContextCompressor.SUMMARY_REMINDER) + listOf("Step 5 phone_tap(按钮1) → applied", "Step 6 phone_tap(按钮2) → applied") +
+            (7..12).map { "Step $it phone_tap(按钮${it - 6}) → applied" },
             texts[5]!!.lines())
         assertEquals(2 + 1 + 2 + 1 + 12, out.size)
     }
@@ -219,14 +219,14 @@ class ContextCompressorTest {
             val r = listOf(Message(Role.Assistant, listOf(Part.ToolCall(id, "phone_tap", "{}")), Author.Mika)) +
                 listOfNotNull(result?.let { Message(Role.Tool, listOf(it.copy(callId = id)), Author.Mika) })
             val h = head + r + taps(12)
-            return summary(ContextCompressor(TOOLS).compress(h, contextTokens = 100).messages)!!.lines()[2].substringAfter("→ ")
+            return summary(ContextCompressor(TOOLS).compress(h, contextTokens = 100).messages)!!.lines()[2].substringAfter(" → ")
         }
-        assertEquals("无结果", one(null))
-        assertEquals("失败", one(Part.ToolResult("", """{"message":"boom"}""", isError = true)))
+        assertEquals("no result", one(null))
+        assertEquals("failed", one(Part.ToolResult("", """{"message":"boom"}""", isError = true)))
         assertEquals("ref_expired", one(Part.ToolResult("", """{"error":"ref_expired"}""", isError = true)))
         assertEquals("timeout", one(Part.ToolResult("", "timeout", isError = true)))
-        assertEquals("失败", one(Part.ToolResult("", "出了点问题", isError = true)))
-        assertEquals("生效", one(Part.ToolResult("", "done", isError = false)))
+        assertEquals("failed", one(Part.ToolResult("", "出了点问题", isError = true)))
+        assertEquals("applied", one(Part.ToolResult("", "done", isError = false)))
     }
 
     @Test fun fixedOverheadCountsAgainstBudget() {

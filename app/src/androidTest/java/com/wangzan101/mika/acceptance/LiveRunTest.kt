@@ -1,5 +1,7 @@
 package com.wangzan101.mika.acceptance
 
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.wangzan101.mika.DeviceTaskState
 import android.app.UiAutomation
 import android.content.Context
@@ -33,6 +35,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import com.wangzan101.mika.task.testTasks
 import com.wangzan101.mika.task.TaskEnvironment
+import com.wangzan101.mika.core.cap.phone.OperatingPace
 
 /**
  * 真机验收:用设置里配好的真实模型跑一个任务,只在显式传参时运行,平时整套测试里会被跳过。
@@ -41,8 +44,9 @@ import com.wangzan101.mika.task.TaskEnvironment
  *   `-e liveKey <key> -e liveBaseUrl <url> -e liveModel <model> [-e liveId <id>]`,运行 [configureProvider]。
  * - 切主模型:`-e liveMain <id>`,同样运行 [configureProvider]。
  * - 跑任务:`-e liveGoal <目标> -e liveRun <记录目录名> [-e liveTimeoutSec 600] [-e liveOnTakeover cancel|handback]
- *   [-e liveMoveAwayAtStep N] [-e liveCancelAtStep N]`,运行 [runGoal]。经由真实界面:在输入框里写目标、点发送。
+ *   [-e livePace fast|standard|human] [-e liveMoveAwayAtStep N] [-e liveCancelAtStep N]`,运行 [runGoal]。经由真实界面:在输入框里写目标、点发送。
  *   liveCancelAtStep:到第 N 步时像点停止键一样停掉任务,再等停止后的交代记进对话(写进 result.txt 的 summary)。
+ *   livePace:在 App 里操作的节奏 fast / standard / human(缺省 fast,跑得快;不改设置里的),比较快慢时传 standard。
  *   liveMoveAwayAtStep:到第 N 步时把虚拟屏上的 App 挪到主屏(模拟用户在主屏打开了同一个 App),
  *   记下暂停状态和通知,几秒后像点通知上的「继续」一样恢复。
  *
@@ -59,6 +63,7 @@ class LiveRunTest {
     @After
     fun tearDown() {
         testTasks.modelFactory = TaskEnvironment.defaultModelFactory
+        testTasks.evalHooks.operatingPace = null
     }
 
     @Test
@@ -96,11 +101,19 @@ class LiveRunTest {
     fun runGoal() {
         val goal = args.getString("liveGoal")
         assumeTrue(goal != null)
+        // 测试拉起的进程没套上 App 语言,照正常启动把默认语言换成它:内置浏览器按它向网站要页面语言
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+            ctx.getSystemService(android.app.LocaleManager::class.java).applicationLocales
+                .takeUnless { it.isEmpty }?.let { android.os.LocaleList.setDefault(it) }
+        }
         val run = args.getString("liveRun") ?: "run"
         val timeoutMs = (args.getString("liveTimeoutSec")?.toLong() ?: 600) * 1000
         val onTakeover = args.getString("liveOnTakeover") ?: "cancel"
         val moveAwayAt = args.getString("liveMoveAwayAtStep")?.toInt() ?: -1
         val cancelAt = args.getString("liveCancelAtStep")?.toInt() ?: -1
+        val pace = OperatingPace.parse(args.getString("livePace")) ?: OperatingPace.FAST
+        testTasks.evalHooks.operatingPace = pace
         var cancelled = false
         val dir = File(context.getExternalFilesDir(null), "acceptance/$run").apply { deleteRecursively(); mkdirs() }
         val log = File(dir, "log.txt")
@@ -112,9 +125,15 @@ class LiveRunTest {
         val cfg = store.configFor(ModelRole.Main) ?: error("no main model configured")
         val recorder = Recorder(::note)
         testTasks.modelFactory = { ctx, s -> TaskEnvironment.defaultModelFactory(ctx, s)?.let { recorder.wrap(it) } }
-        note("model=${cfg.model} goal=$goal")
+        note("model=${cfg.model} pace=${pace.name.lowercase()} goal=$goal")
 
         compose.typeAndSend(goal!!)
+        // 发出去就收起键盘:对话页下面的后台屏小画面才露得出来,和真人发完就收键盘一样
+        compose.runOnUiThread {
+            val w = compose.activity.window
+            compose.activity.currentFocus?.clearFocus()
+            WindowCompat.getInsetsController(w, w.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
         val chat = (context.applicationContext as MikaApp).chat
         chat.ui.value.blocked?.let { error("blocked by prerequisites: $it") }
         // 发出去了,对话里就有这一问;没有就立刻报,不白等到超时
@@ -173,6 +192,8 @@ class LiveRunTest {
                 note("chat status at end: ${chat.ui.value.exchanges.lastOrNull()?.status}")
                 break
             }
+            // 界面测试的时钟只在测试推它时才走:等的时候一起往前推,对话页的步骤、计时、小画面才会照常刷新(录演示要用)
+            compose.mainClock.advanceTimeBy(250)
             Thread.sleep(250)
         }
         val wall = (System.currentTimeMillis() - t0) / 1000.0

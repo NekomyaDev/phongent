@@ -30,6 +30,8 @@ data class UiTreeNode(
     val enabled: Boolean = true,
     val focused: Boolean = false,
     val secret: Boolean = false,
+    /** 看上去是滚轮选择器(一格一格转的时间、日期、地区……):用转滚轮的工具一次转到值。 */
+    val wheel: Boolean = false,
     val children: List<UiTreeNode> = emptyList(),
 ) {
     /** 稳定编号只替换模型地址;节点本身与 Android 端的引用表不动。 */

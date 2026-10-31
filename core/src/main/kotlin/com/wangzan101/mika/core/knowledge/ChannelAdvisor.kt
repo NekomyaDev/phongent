@@ -15,7 +15,7 @@ data class ChannelFacts(
 
 /** 给任务开头的一行「可用渠道」:代码只给事实,选哪条由模型按网页规则决定。 */
 object ChannelAdvisor {
-    private const val HEADER = "可用渠道:"
+    private const val HEADER = "Available channels: "
     /** 只列排在前面的几个,和每任务至多注入的参考资料份数相当。 */
     private const val MAX_CHANNELS = 3
 
@@ -34,21 +34,21 @@ object ChannelAdvisor {
         // App 条目关联的站点名就是站点的主域名
         val domains = same.flatMap { it.domains + if (it.surface == Surface.Android) it.related else emptyList() }.map { it.trim().lowercase().removePrefix("www.") }.filter { it.isNotEmpty() }.distinct()
         val app = if (packages.isEmpty()) null else {
-            val state = packages.firstOrNull { it in facts.installed }?.let { "App:已安装($it)" } ?: "App:未安装"
-            if (skills?.hasRoute(name, "android") == true) "$state,有 App 做法" else state
+            val state = packages.firstOrNull { it in facts.installed }?.let { "app: installed ($it)" } ?: "app: not installed"
+            if (skills?.hasRoute(name, "android") == true) "$state, known way to do it in the app" else state
         }
         val web = domains.firstOrNull()?.takeIf { facts.webAvailable }?.let { d ->
             fun ofSite(hosts: Set<String>) = hosts.firstOrNull { s -> domains.any { dd -> UrlHost.sameSite("https://$dd", "https://$s") } }
             val loggedIn = ofSite(facts.loggedInSites)
             val challenged = ofSite(facts.challengedSites)
             val notes = listOfNotNull(
-                "有网页做法".takeIf { skills?.hasRoute(name, "browser") == true },
-                loggedIn?.let { "在 Mika 里登录过($it)" },
-                challenged?.let { "最近在这里碰到过验证或拦截($it),用户可在设置里清除该站数据" },
+                "known way to do it on the web".takeIf { skills?.hasRoute(name, "browser") == true },
+                loggedIn?.let { "signed in within Mika ($it)" },
+                challenged?.let { "recently hit a verification or block here ($it); the user can clear this site's data in settings" },
             )
-            (listOf("网页:$d") + notes).joinToString(",")
+            (listOf("web: $d") + notes).joinToString(", ")
         }
         if (app == null && web == null) return null
-        return "${same.first().display} — " + listOfNotNull(app, web).joinToString(";")
+        return "${same.first().display} — " + listOfNotNull(app, web).joinToString("; ")
     }
 }

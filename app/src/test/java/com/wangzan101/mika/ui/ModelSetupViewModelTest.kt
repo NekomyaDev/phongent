@@ -55,9 +55,9 @@ class ModelSetupViewModelTest {
         modelLister = { kind, url, apiKey, _ -> listCalls += Triple(kind, url, apiKey); listing[url] ?: ModelListResult.Ok(emptyList()) },
     )
 
-    /** 建过的模型(模型名、请求头等);「测试并保存」的试调用回什么由 [reply] 定,默认回一句。 */
+    /** 建过的模型(模型名、请求头等);「测试并保存」的试调用回什么由 [reply] 定,默认调用试用的工具。 */
     private val built = mutableListOf<Pair<String, ClientSetup>>()
-    private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.Text("pong")), StopReason.EndTurn, null) }
+    private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
     private val probes = mutableListOf<Triple<String, List<Message>, List<ToolSpec>>>()
 
     private inner class Fake(override val capabilities: Capabilities, private val answer: suspend () -> ModelReply) : ChatModel {
@@ -120,7 +120,7 @@ class ModelSetupViewModelTest {
         assertEquals("good", vm.state.value.form.apiKey)
     }
 
-    /** 列出模型后让会当主模型的那个回一句:不带工具、回复限短、带客户端标识;成功才存。 */
+    /** 列出模型后让会当主模型的那个调用一次工具:带一个无参数的工具、回复上限够一次调用、带客户端标识;成功才存。 */
     @Test fun testAndSaveSendsOneTinyRequestToTheMainCandidate() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -128,13 +128,123 @@ class ModelSetupViewModelTest {
         vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
         val (model, setup) = built.first()
         assertEquals("deepseek-chat", model)
-        assertEquals(16, setup.maxOutputTokens)
+        assertEquals(1024, setup.maxOutputTokens)
         assertEquals("Mika/1.2.3", setup.headers["User-Agent"])
         assertEquals("DeepSeek 没声明会话头", setOf("User-Agent"), setup.headers.keys)
         val (_, messages, tools) = probes.single()
         assertEquals(1, messages.size)
-        assertTrue(tools.isEmpty())
+        assertEquals(listOf("get_time"), tools.map { it.name })
         assertEquals(1, store.providers.value.size)
+        assertNull(vm.state.value.probeNote)
+    }
+
+    /** 接口通、模型只回了话:接着试下一个可当主模型的(明说不会调用工具的不试);都只回话就存下服务商、不定主模型,请用户选;选好后提醒收起。 */
+    @Test fun modelThatOnlyAnswersTextIsSavedButNotMadeMain() = runTest {
+        listing[deepseekUrl] = deepseek
+        reply = { ModelReply(listOf(Part.Text("It is noon.")), StopReason.EndTurn, null) }
+        val store = store()
+        val vm = vm(store)
+        vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
+        val p = store.providers.value.single()
+        assertEquals(3, p.models?.size)
+        assertNull("不自动选主模型", store.roles.value.main)
+        assertTrue(store.list().isEmpty())
+        val s = vm.state.value
+        assertFalse("存下了,表单收起", s.showForm)
+        assertEquals(ListState.Idle, s.form.test)
+        assertEquals(listOf("deepseek-chat", "deepseek-reasoner"), built.map { it.first })
+        assertEquals(
+            "服务商已连上，但「deepseek-chat」没测试通过：它不会调用工具，Mika 干活需要会调用工具的模型。从列表里选一个你开通了的模型。\n" +
+                "试了 deepseek-chat、deepseek-reasoner，都没测试通过。",
+            s.probeNote,
+        )
+        assertEquals(p.id, s.pickToProbe)
+        assertTrue(s.probeBeforePick(ModelRole.Main, p.id))
+        assertFalse(s.probeBeforePick(ModelRole.Vision, p.id))
+        assertFalse(s.canNext)
+        vm.pick(ModelRole.Main, p.id, "deepseek-reasoner"); runCurrent()
+        assertNull(vm.state.value.probeNote)
+        assertNull(vm.state.value.pickToProbe)
+        assertEquals("deepseek-reasoner", store.configFor(ModelRole.Main)?.model)
+    }
+
+    /** 通义千问的 Key 下先列出别家的模型:先试自家的(qwen);第一个没开通就接着试下一个,通过的当主模型,说清先试的哪个没通过。 */
+    @Test fun notActivatedModelFallsBackToTheNextCandidate() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(
+            ListedModel("antdigital/Ling-3.1-flash", toolCalls = true), ListedModel("text-embedding-v4"),
+            ListedModel("qwen3-max-preview"), ListedModel("qwen-plus"),
+        ))
+        reply = {
+            if (built.last().first != "qwen-plus") throw ModelError.ModelNotAvailable(built.last().first, "The product is not activated.")
+            ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null)
+        }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals("自家的先试、向量模型不试", listOf("qwen3-max-preview", "qwen-plus"), built.map { it.first })
+        val p = store.providers.value.single()
+        assertEquals("qwen-plus", store.configFor(ModelRole.Main)?.model)
+        assertTrue("qwen-plus" in p.verifiedModels)
+        val s = vm.state.value
+        assertFalse(s.showForm)
+        assertNull(s.pickToProbe)
+        assertEquals(
+            "先试的 qwen3-max-preview 没测试通过：这个账号没开通或没权限用这个模型（服务商说：The product is not activated.）。主模型用了测试通过的「qwen-plus」。",
+            s.probeNote,
+        )
+    }
+
+    /** 试的几个都没开通:Key 是对的,照样存下服务商,不定主模型,说清试了哪些,请用户从列表里选;选的时候先试调用,不通不选。 */
+    @Test fun allCandidatesNotActivatedSavesProviderAndAsksToPick() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(
+            ListedModel("antdigital/Ling-3.1-flash", toolCalls = true), ListedModel("qwen-plus"), ListedModel("qwen-max"), ListedModel("qwen-turbo"),
+        ))
+        reply = { throw ModelError.ModelNotAvailable(built.last().first, "The product is not activated.") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals("至多试 3 个", listOf("qwen-plus", "qwen-max", "qwen-turbo"), built.map { it.first })
+        val p = store.providers.value.single()
+        assertEquals(4, p.models?.size)
+        assertEquals("sk", store.providerKey(p.id))
+        assertNull(store.roles.value.main)
+        val s = vm.state.value
+        assertFalse(s.showForm)
+        assertEquals(ListState.Idle, s.form.test)
+        assertEquals(
+            "服务商已连上，但「qwen-plus」没测试通过：这个账号没开通或没权限用这个模型（服务商说：The product is not activated.）。从列表里选一个你开通了的模型。\n" +
+                "试了 qwen-plus、qwen-max、qwen-turbo，都没开通。",
+            s.probeNote,
+        )
+        assertEquals(p.id, s.pickToProbe)
+        // 用户选了一个:先试调用,没开通就说原因、不选
+        var picked = 0
+        vm.pickManual(ModelRole.Main, p.id, "antdigital/Ling-3.1-flash") { picked++ }; runCurrent()
+        assertEquals(
+            ListState.Failed("这个账号没开通「antdigital/Ling-3.1-flash」或没权限用（服务商说：The product is not activated.）。换一个模型，或到服务商后台开通。"),
+            vm.state.value.manualPick[p.id],
+        )
+        assertEquals(0, picked)
+        assertNull(store.roles.value.main)
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.pickManual(ModelRole.Main, p.id, "qwen-turbo") { picked++ }; runCurrent()
+        assertEquals(1, picked)
+        assertEquals("qwen-turbo", store.configFor(ModelRole.Main)?.model)
+        assertNull(vm.state.value.probeNote)
+        assertNull(vm.state.value.pickToProbe)
+    }
+
+    /** 第一个就是 Key 不对(或别的不是模型的问题):不试别的,不存。 */
+    @Test fun authErrorOnTheFirstCandidateSavesNothing() = runTest {
+        listing[qwenUrl] = ModelListResult.Ok(listOf(ListedModel("qwen-plus"), ListedModel("qwen-max")))
+        reply = { throw ModelError.Auth() }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset("通义千问"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        assertEquals(listOf("qwen-plus"), built.map { it.first })
+        assertTrue(vm.state.value.form.test is ListState.Failed)
+        assertTrue(store.providers.value.isEmpty())
+        assertNull(vm.state.value.pickToProbe)
     }
 
     /** 试调用失败(例如服务商要的请求头没带):服务端的报错原样给人看,什么都不存。 */
@@ -177,15 +287,151 @@ class ModelSetupViewModelTest {
         assertEquals(go.sessionHeader, store.providers.value.single().sessionHeader)
     }
 
-    /** 服务不提供列表(没有可试的模型):不试,照旧存下。 */
-    @Test fun noListedModelsMeansNoTinyRequest() = runTest {
+    /** 没列出模型:先不存、不试,要一个模型名;填了再测试就用它试调用,通了存成不提供列表的服务商,它当主模型、记为核实过。 */
+    @Test fun noListAsksForAModelAndProbesIt() = runTest {
         val url = "http://192.168.1.5:8000/v1"
         listing[url] = ModelListResult.Failed(ListFailure.NotSupported)
         val store = store()
         val vm = vm(store)
         vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.testAndSave(); runCurrent()
         assertTrue(probes.isEmpty())
-        assertEquals(1, store.providers.value.size)
+        assertTrue("没存", store.providers.value.isEmpty())
+        val f = vm.state.value.form
+        assertTrue(f.noList)
+        assertEquals(ListState.Idle, f.test)
+        assertFalse("没填模型名不能测试", f.canTest)
+        vm.setApiKey("k")
+        assertTrue("换 Key 不收起模型名", vm.state.value.form.noList)
+        vm.setModel(" qwen3 ")
+        assertTrue(vm.state.value.form.canTest)
+        vm.testAndSave(); runCurrent()
+        assertEquals("qwen3", built.single().first)
+        val p = store.providers.value.single()
+        assertEquals(emptyList<ListedModel>(), p.models)
+        assertEquals(setOf("qwen3"), p.verifiedModels)
+        assertEquals("qwen3", store.configFor(ModelRole.Main)?.model)
+        assertFalse(vm.state.value.showForm)
+        assertEquals(emptyList<String>(), vm.state.value.unverified(p))
+    }
+
+    /** 没列出模型、手填的模型试调用也说找不到:不存,说清是哪个模型、地址或接口类型可能不对,例子按地址对得上的那家。 */
+    @Test fun noListAndModelNotFoundSavesNothing() = runTest {
+        val url = "https://generativelanguage.googleapis.com"
+        listing[url] = ModelListResult.Failed(ListFailure.NotSupported)
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.setApiKey("k")
+        vm.testAndSave(); runCurrent()
+        vm.setModel("gemini"); vm.testAndSave(); runCurrent()
+        assertEquals(
+            ListState.Failed("列不出模型，用「gemini」试调用也说找不到：地址或接口类型可能填错了，也可能没有这个模型（模型名例如 gemini-flash-latest）。"),
+            vm.state.value.form.test,
+        )
+        assertTrue(store.providers.value.isEmpty())
+        assertTrue(store.list().isEmpty())
+        // 换了地址:要重新列,模型名先收起
+        vm.setBaseUrl("$url/")
+        assertFalse(vm.state.value.form.noList)
+    }
+
+    /** 预设(列表接口照理有)没列出模型、手填的找不到:只说模型不存在。 */
+    @Test fun presetWithoutListReportsTheMissingModel() = runTest {
+        val ark = ProviderPresets.all.first { it.label == "火山方舟" }
+        listing[ark.baseUrl] = ModelListResult.Failed(ListFailure.NotSupported)
+        reply = { throw ModelError.ModelNotFound("doubao") }
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ark.label); vm.setApiKey("k"); vm.testAndSave(); runCurrent()
+        assertTrue(vm.state.value.form.noList)
+        vm.setModel("doubao"); vm.testAndSave(); runCurrent()
+        assertEquals(ListState.Failed("模型「doubao」不存在。要填服务商文档里完整的模型 ID（例如 deepseek-chat）。"), vm.state.value.form.test)
+        assertTrue(store.providers.value.isEmpty())
+    }
+
+    /** 自定义填了某家的官方地址:建议改用那家的预设;地址就是预设的、接口类型不同时一并说;改用时 Key 留着。 */
+    @Test fun officialHostSuggestsThePreset() = runTest {
+        val vm = vm()
+        vm.selectPreset(ProviderPresets.custom.label)
+        vm.setBaseUrl("https://models.example.com/v1")
+        assertNull(vm.state.value.form.suggestedPreset)
+        vm.setBaseUrl("https://generativelanguage.googleapis.com")
+        vm.setApiKey("gk")
+        val f = vm.state.value.form
+        assertEquals("Gemini", f.suggestedPreset?.label)
+        assertTrue(f.presetKindMismatch)
+        assertEquals(
+            "这是「Gemini」的官方地址，用它的预设更省事：地址和接口类型都已填好。接口类型也对不上：「Gemini」用的是 Gemini 接口，这里选的是 OpenAI 兼容。",
+            ModelSetupCopy.presetSuggestion(f),
+        )
+        assertEquals(ProviderConfig.Kind.Gemini, f.exampleKind)
+        // 同一主机的别的路径(如它的兼容接口):照样建议,但不说接口类型不对
+        vm.setBaseUrl("https://generativelanguage.googleapis.com/v1beta/openai")
+        assertEquals("Gemini", vm.state.value.form.suggestedPreset?.label)
+        assertFalse(vm.state.value.form.presetKindMismatch)
+        vm.setKind(ProviderConfig.Kind.Gemini)
+        vm.setBaseUrl("https://api.anthropic.com")
+        assertEquals("Anthropic", vm.state.value.form.suggestedPreset?.label)
+        assertTrue(vm.state.value.form.presetKindMismatch)
+        vm.selectPreset("Anthropic")
+        val after = vm.state.value.form
+        assertEquals(ProviderConfig.Kind.Anthropic, after.kind)
+        assertEquals("gk", after.apiKey)
+        assertNull("选了预设就不再建议", after.suggestedPreset)
+    }
+
+    /** 选择页里手填模型名:先试调用,不通不选、说原因;通了才选上、记为核实过。 */
+    @Test fun manualPickProbesFirst() = runTest {
+        val store = store()
+        val p = store.connect("192.168.1.5", ProviderConfig.Kind.OpenAiCompat, "http://192.168.1.5:8000/v1", "", emptyList())
+        val vm = vm(store)
+        runCurrent()
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        var picked = 0
+        vm.pickManual(ModelRole.Main, p.id, "gemini") { picked++ }
+        assertEquals(ListState.Running, vm.state.value.manualPick[p.id])
+        runCurrent()
+        assertEquals(ListState.Failed("模型「gemini」不存在。要填服务商文档里完整的模型 ID（例如 deepseek-chat）。"), vm.state.value.manualPick[p.id])
+        assertEquals(0, picked)
+        assertNull(store.roles.value.main)
+        // 只回话不调用工具的,当不了主模型
+        reply = { ModelReply(listOf(Part.Text("noon")), StopReason.EndTurn, null) }
+        vm.pickManual(ModelRole.Main, p.id, "chatty") { picked++ }; runCurrent()
+        assertEquals(ListState.Failed("chatty 没有调用工具，Mika 干活需要会调用工具的模型，换一个当主模型。"), vm.state.value.manualPick[p.id])
+        assertNull(store.roles.value.main)
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.pickManual(ModelRole.Main, p.id, " qwen3 ") { picked++ }; runCurrent()
+        assertEquals(1, picked)
+        assertNull(vm.state.value.manualPick[p.id])
+        assertEquals("qwen3", store.configFor(ModelRole.Main)?.model)
+        assertEquals(setOf("qwen3"), store.provider(p.id)?.verifiedModels)
+    }
+
+    /** 旧版本存下的不提供列表的服务商(手填的模型从没试过):提醒,「重新测试」通了提醒消失、记下;不通说原因。 */
+    @Test fun unverifiedManualModelsWarnUntilRetested() = runTest {
+        val store = store()
+        val p = store.connect("generativelanguage.googleapis.com", ProviderConfig.Kind.OpenAiCompat, "https://generativelanguage.googleapis.com", "k", emptyList())
+        store.use(ModelRole.Main, p.id, "gemini", ProviderPresets.custom.capabilities)
+        val vm = vm(store)
+        runCurrent()
+        assertEquals(listOf("gemini"), vm.state.value.unverified(vm.state.value.providers.single()))
+        reply = { throw ModelError.ModelNotFound("gemini") }
+        vm.retest(p.id); runCurrent()
+        assertEquals(
+            ListState.Failed("模型「gemini」不存在。要填服务商文档里完整的模型 ID（例如 gemini-flash-latest）。"),
+            vm.state.value.retest[p.id],
+        )
+        assertEquals(listOf("gemini"), vm.state.value.unverified(vm.state.value.providers.single()))
+        reply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
+        vm.retest(p.id); runCurrent()
+        assertNull(vm.state.value.retest[p.id])
+        assertEquals(emptyList<String>(), vm.state.value.unverified(vm.state.value.providers.single()))
+        // 有列表的服务商不提醒
+        listing[deepseekUrl] = deepseek
+        vm.openForm(); vm.selectPreset("DeepSeek"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
+        val ds = vm.state.value.providers.first { it.name == "DeepSeek" }
+        vm.pick(ModelRole.Light, ds.id, "deepseek-coder"); runCurrent()
+        assertEquals(emptyList<String>(), vm.state.value.unverified(vm.state.value.providers.first { it.name == "DeepSeek" }))
     }
 
     /** 明文 http:本机、局域网的不提示;别的地址提醒一句,照样能测试。 */
@@ -274,7 +520,12 @@ class ModelSetupViewModelTest {
         assertTrue("自定义的 OpenAI 兼容接口可以不填 Key", vm.state.value.form.canTest)
         listing["http://192.168.1.5:8000/v1"] = ModelListResult.Failed(ListFailure.NotSupported)
         vm.testAndSave(); runCurrent()
-        // 服务不提供列表:照样连上、存下,但没有模型可自动选
+        // 服务不提供列表:先要一个模型名,没存
+        assertTrue(store.providers.value.isEmpty())
+        assertFalse(vm.state.value.canNext)
+        // 模型只回话、不调用工具:存下服务商,但不当主模型
+        reply = { ModelReply(listOf(Part.Text("noon")), StopReason.EndTurn, null) }
+        vm.setModel("chatty"); vm.testAndSave(); runCurrent()
         val p = store.providers.value.single()
         assertEquals("192.168.1.5", p.name)
         assertEquals(emptyList<ListedModel>(), p.models)
@@ -332,5 +583,44 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("工具调用 · 未确认" to false), ModelSetupCopy.tags(o[0]))
         assertEquals(listOf("工具调用" to true, "64K" to false), ModelSetupCopy.tags(o[1]))
         assertEquals(listOf("不支持工具调用" to false), ModelSetupCopy.tags(o[2]))
+    }
+
+    /** 自定义服务商可以起名字(去掉首尾空白);不填用地址的主机名。同一个地址起不同的名字是两家。 */
+    @Test fun customProviderUsesTheGivenNameOrFallsBackToTheHost() = runTest {
+        val url = "https://relay.example.com/v1"
+        listing[url] = ModelListResult.Ok(listOf(ListedModel("m1")))
+        val store = store()
+        val vm = vm(store)
+        vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.setApiKey("k1")
+        assertEquals("relay.example.com", vm.state.value.form.defaultName)
+        vm.setName("  我的中转  ")
+        vm.testAndSave(); runCurrent()
+        assertEquals(listOf("我的中转"), store.providers.value.map { it.name })
+        assertEquals("", vm.state.value.form.name)
+
+        vm.openForm()
+        vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.setApiKey("k2"); vm.setName("   ")
+        vm.testAndSave(); runCurrent()
+        val names = store.providers.value.map { it.name }
+        assertEquals(listOf("我的中转", "relay.example.com"), names)
+        assertEquals(listOf("k1", "k2"), store.providers.value.map { store.providerKey(it.id) })
+    }
+
+    /** 名字有长度上限;换成预设时清掉;地址是某家预设的,默认名就是预设名;预设的名字不受表单里的名字影响。 */
+    @Test fun customNameIsCappedAndOnlyAppliesToCustom() = runTest {
+        val vm = vm()
+        vm.selectPreset(ProviderPresets.custom.label)
+        vm.setName("名".repeat(ModelSetupViewModel.MAX_NAME + 8))
+        assertEquals(ModelSetupViewModel.MAX_NAME, vm.state.value.form.name.length)
+        // 按字符截:emoji 不被截成半个
+        vm.setName("😀".repeat(ModelSetupViewModel.MAX_NAME + 3))
+        val capped = vm.state.value.form.name
+        assertEquals(ModelSetupViewModel.MAX_NAME, capped.codePointCount(0, capped.length))
+        assertEquals("😀".repeat(ModelSetupViewModel.MAX_NAME), capped)
+        vm.setBaseUrl(deepseekUrl)
+        assertEquals("DeepSeek", vm.state.value.form.defaultName)
+        vm.selectPreset("DeepSeek")
+        assertEquals("", vm.state.value.form.name)
+        assertEquals("DeepSeek", vm.state.value.form.copy(name = "别的名字").providerName)
     }
 }

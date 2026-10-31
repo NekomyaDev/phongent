@@ -3,7 +3,7 @@ name: gmail
 display: Gmail
 packages: ["com.google.android.gm"]
 aliases: ["Gmail", "谷歌邮箱", "Google 邮箱", "gmail"]
-sites: []
+sites: ["mail.google.com"]
 open: Gmail
 description: 谷歌的邮件 App,收发邮件、按类别和标签整理,另有会议
 ---

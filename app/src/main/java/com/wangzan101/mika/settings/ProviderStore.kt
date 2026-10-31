@@ -26,6 +26,7 @@ import com.wangzan101.mika.core.model.Part
 import com.wangzan101.mika.core.model.PromptCaching
 import com.wangzan101.mika.core.model.ResponsesModel
 import com.wangzan101.mika.core.model.Role
+import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.usage.UsagePurpose
 import com.wangzan101.mika.core.usage.UsageSink
 import com.wangzan101.mika.core.usage.UsageSource
@@ -71,7 +72,7 @@ data class ProviderConfig(
     val providerId: String = "",
 ) {
     /**
-     * 接口类型。[OpenAiResponses] 只在模型列表给某个模型写明 Responses 协议时用(添加服务商时不选它);
+     * 接口类型。[OpenAiResponses] 用在模型列表给某个模型写明 Responses 协议时、预设「OpenAI」,以及添加自定义服务商时选了它;
      * [ChatGpt] 是用 ChatGPT 账号登录、用套餐额度调用的那一家:凭据是登录(见 [ChatGptSession]),不是 API Key。
      */
     enum class Kind {
@@ -86,8 +87,8 @@ data class ProviderConfig(
                 ModelProtocol.Responses -> OpenAiResponses
             }
 
-            /** 添加自定义服务商时可选的接口类型(填地址和 API Key 的)。 */
-            val withApiKey: List<Kind> = listOf(OpenAiCompat, OpenAiResponses, Anthropic, Gemini)
+            /** 添加自定义服务商时可选的接口类型(填地址和 API Key 的)。Responses 排最后,和 README 里的次序一致。 */
+            val withApiKey: List<Kind> = listOf(OpenAiCompat, Anthropic, Gemini, OpenAiResponses)
         }
     }
 }
@@ -97,6 +98,8 @@ data class ProviderConfig(
  * [models] 是最近一次列出的模型(「测试并保存」或刷新时记下,和配置存在同一个文件里);
  * 为 null 表示还没列过,空列表表示列过但服务不提供列表(或一个也没有)。
  * [sessionHeader] 是它要求放对话会话号的请求头名(来自预设,见 [ProviderPreset.sessionHeader]);不要的为 null。
+ * [verifiedModels] 是在这家试调用(见 [ProviderStore.probe])得到过回复的模型名:不提供列表的服务商,模型名是手填的,
+ * 没在这里的就没核实过(旧版本存下的都没有,那时不提供列表的服务商不试调用)。
  */
 data class Provider(
     val id: String,
@@ -105,6 +108,7 @@ data class Provider(
     val baseUrl: String,
     val models: List<ListedModel>? = null,
     val sessionHeader: String? = null,
+    val verifiedModels: Set<String> = emptySet(),
 ) {
     val key: String get() = ProviderConnection.keyOf(kind, baseUrl, name)
 }
@@ -125,6 +129,8 @@ data class RoleChoices(
     val main: String? = null,
     val vision: RoleChoice = RoleChoice.Off,
     val light: RoleChoice = RoleChoice.SameAsMain,
+    /** 按用途保存,同一个模型可在不同用途选不同档位;「用主模型」连同它的档位一起跟随。 */
+    val reasoningEfforts: Map<ModelRole, String> = emptyMap(),
 ) {
     /** 这个用途的选择;主模型没选时为 null。 */
     operator fun get(role: ModelRole): RoleChoice? = when (role) {
@@ -144,10 +150,18 @@ data class RoleChoices(
     val referenced: Set<String> get() = ModelRole.entries.mapNotNull(::resolve).toSet()
 
     /** 改一个用途;这个用途不接受的选择(主模型只能是具体模型,轻量不能不用)返回 null。 */
-    fun with(role: ModelRole, choice: RoleChoice): RoleChoices? = when (role) {
+    fun with(role: ModelRole, choice: RoleChoice): RoleChoices? = (when (role) {
         ModelRole.Main -> (choice as? RoleChoice.Model)?.let { copy(main = it.configId) }
         ModelRole.Vision -> copy(vision = choice)
         ModelRole.Light -> if (choice == RoleChoice.Off) null else copy(light = choice)
+    })?.let { next ->
+        if (get(role) == choice) next else next.copy(reasoningEfforts = reasoningEfforts - role)
+    }
+
+    fun reasoningEffort(role: ModelRole): String? = when (get(role)) {
+        is RoleChoice.Model -> reasoningEfforts[role]
+        RoleChoice.SameAsMain -> main?.let { reasoningEfforts[ModelRole.Main] }
+        else -> null
     }
 
     /** 指向 [valid] 之外的选择退回默认:主模型变成没选,看图不用,轻量用主模型。 */
@@ -157,6 +171,7 @@ data class RoleChoices(
             main = main?.takeIf { it in valid },
             vision = if (vision.gone()) RoleChoice.Off else vision,
             light = if (light.gone()) RoleChoice.SameAsMain else light,
+            reasoningEfforts = reasoningEfforts.filterKeys { role -> (get(role) as? RoleChoice.Model)?.configId in valid },
         )
     }
 }
@@ -165,7 +180,21 @@ data class RoleChoices(
  * 建一个模型客户端时额外给的:[headers] 每个请求都带(客户端标识、会话号,见 [ClientHeaders]);
  * [maxOutputTokens] 限制回复长度(连接测试用),null 按适配器默认。
  */
-data class ClientSetup(val headers: Map<String, String> = emptyMap(), val maxOutputTokens: Int? = null)
+data class ClientSetup(
+    val headers: Map<String, String> = emptyMap(),
+    val maxOutputTokens: Int? = null,
+    val reasoningEffort: String? = null,
+)
+
+/** 「测试并保存」试调用(见 [ProviderStore.probe])的结果。 */
+sealed interface ProbeResult {
+    /** 模型调用了试用的工具:接口通,也会调用工具。 */
+    data object ToolCalled : ProbeResult
+    /** 接口通,模型只回了话、没调用工具:Mika 干活靠工具,这个模型当不了主模型。 */
+    data object NoToolCall : ProbeResult
+    /** 请求失败;[error] 带着服务端的报错。 */
+    data class Failed(val error: ModelError) : ProbeResult
+}
 
 /**
  * 服务商、模型配置的存取与用途选择。配置存成 JSON 文件,API Key 经 [KeyCipher] 加密后另存一个文件,每个服务商一份。
@@ -262,14 +291,16 @@ class ProviderStore(
     /**
      * 「测试并保存」连上了一个服务商:存下它(名字、接口类型、地址、Key)和列出的模型。
      * 接口类型、地址和名字都相同的服务商已经有了,就更新那一个(换 Key、换列表),不重复添加。
-     * [apiKey] 为 null 时不改已存的 Key。
+     * [apiKey] 为 null 时不改已存的 Key。[verified] 是这次试调用得到回复的模型名,记进 [Provider.verifiedModels]。
      */
     @Synchronized
     fun connect(
         name: String, kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, models: List<ListedModel>,
         sessionHeader: String? = ProviderPresets.forBaseUrl(baseUrl)?.sessionHeader,
+        verified: Set<String> = emptySet(),
     ): Provider {
-        val p = findOrAddProvider(name, kind, baseUrl).copy(models = models, sessionHeader = sessionHeader)
+        val found = findOrAddProvider(name, kind, baseUrl)
+        val p = found.copy(models = models, sessionHeader = sessionHeader, verifiedModels = found.verifiedModels + verified)
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
         if (apiKey != null) setKey(p.id, apiKey)
         writeConfig()
@@ -281,6 +312,15 @@ class ProviderStore(
     fun rememberModels(providerId: String, models: List<ListedModel>) {
         if (provider(providerId) == null) return
         _providers.value = _providers.value.map { if (it.id == providerId) it.copy(models = models) else it }
+        writeConfig()
+    }
+
+    /** 记下 [model] 在这家试调用得到了回复(见 [Provider.verifiedModels])。 */
+    @Synchronized
+    fun markVerified(providerId: String, model: String) {
+        val p = provider(providerId) ?: return
+        if (model in p.verifiedModels) return
+        _providers.value = _providers.value.map { if (it.id == providerId) it.copy(verifiedModels = it.verifiedModels + model) else it }
         writeConfig()
     }
 
@@ -345,6 +385,20 @@ class ProviderStore(
         return true
     }
 
+    /** 只改这个用途;不支持的协议、跟随主模型的用途或列表明确不支持的档位不接受。 */
+    @Synchronized
+    fun setReasoningEffort(role: ModelRole, effort: String?): Boolean {
+        if (_roles.value[role] !is RoleChoice.Model) return false
+        val cfg = configFor(role) ?: return false
+        val listed = provider(cfg.providerId)?.models?.firstOrNull { it.id == cfg.model }
+        val options = ReasoningOptions.of(cfg, listed)
+        if (effort != null && (options == null || effort !in options.levels)) return false
+        _roles.value = _roles.value.copy(reasoningEfforts =
+            if (effort == null) _roles.value.reasoningEfforts - role else _roles.value.reasoningEfforts + (role to effort))
+        writeConfig()
+        return true
+    }
+
     /** 看图模型的「看图定位已验证」(开发者选项里改);看图用主模型时改的是主模型那条配置。没有看图模型时不动。 */
     @Synchronized
     fun setVisionGroundingVerified(verified: Boolean) {
@@ -374,29 +428,32 @@ class ProviderStore(
     fun modelFor(role: ModelRole, session: ModelSession = ModelSession.fresh()): ChatModel? = configFor(role)?.let { cfg ->
         val p = provider(cfg.providerId)
         val source = UsageSource(cfg.providerId, p?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))
-        modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg), ClientSetup(headers(p?.sessionHeader, session))).metered(source, usage)
+        modelFactory(cfg, apiKey(cfg.id), endpointOf(cfg), ClientSetup(
+            headers(p?.sessionHeader, session), reasoningEffort = _roles.value.reasoningEffort(role),
+        )).metered(source, usage)
     }
 
     /**
      * 「测试并保存」的试调用:还没存下的服务商,按真实任务同一条路([modelFactory]、同样的请求头)建出 [model],
-     * 发一句最短的话、不带工具、回复限得很短(协议允许的话,见 [buildModel])。成功返回 null,失败返回原因(服务端的报错原样带上)。
+     * 带一个无参数的工具([PROBE_TOOL])、请它调用;回复限得很短(协议允许的话,见 [buildModel])。
+     * 回了工具调用为 [ProbeResult.ToolCalled],只回了话为 [ProbeResult.NoToolCall],请求失败带着服务端的报错原样返回。
      * 不计量:这几个 token 不属于任何用途。会话号用新的,不属于任何对话。超时由调用方管。
      */
     suspend fun probe(
         kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String?,
         model: String, endpoint: ModelEndpoint?, caps: Capabilities,
-    ): ModelError? {
-        val cfg = ProviderConfig(PROBE_ID, kind, baseUrl, model, caps.copy(toolCalls = false))
+    ): ProbeResult {
+        val cfg = ProviderConfig(PROBE_ID, kind, baseUrl, model, caps.copy(toolCalls = true))
         val m = modelFactory(cfg, apiKey, endpoint, ClientSetup(headers(sessionHeader, ModelSession.fresh()), PROBE_MAX_TOKENS))
         return try {
-            m.complete(PROBE_SYSTEM, listOf(Message(Role.User, listOf(Part.Text(PROBE_TEXT)), Author.Mika)), emptyList())
-            null
+            val reply = m.complete(PROBE_SYSTEM, listOf(Message(Role.User, listOf(Part.Text(PROBE_TEXT)), Author.Mika)), listOf(PROBE_TOOL))
+            if (reply.parts.any { it is Part.ToolCall }) ProbeResult.ToolCalled else ProbeResult.NoToolCall
         } catch (e: ModelError) {
-            e
+            ProbeResult.Failed(e)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            ModelError.BadResponse(e.message.orEmpty(), e)
+            ProbeResult.Failed(ModelError.BadResponse(e.message.orEmpty(), e))
         }
     }
 
@@ -500,9 +557,11 @@ class ProviderStore(
             ProviderConfig.Kind.Gemini ->
                 GeminiModel(baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http, setup.headers, setup.maxOutputTokens)
             ProviderConfig.Kind.OpenAiResponses ->
-                ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http, headers = setup.headers)
+                ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http, headers = setup.headers,
+                    reasoningEffort = setup.reasoningEffort)
             ProviderConfig.Kind.ChatGpt ->
-                ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true, headers = setup.headers)
+                ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true, headers = setup.headers,
+                    reasoningEffort = setup.reasoningEffort)
         }
     }
 
@@ -598,6 +657,7 @@ class ProviderStore(
         baseUrl = o.str("baseUrl"),
         // 旧版本存下的没有这一项:按地址对得上的预设补上(读入后写回文件时记进去)
         sessionHeader = o["sessionHeader"]?.jsonPrimitive?.content ?: ProviderPresets.forBaseUrl(o.str("baseUrl"))?.sessionHeader,
+        verifiedModels = o["verifiedModels"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty(),
         models = o["models"]?.jsonArray?.map { e ->
             val m = e.jsonObject
             ListedModel(
@@ -607,6 +667,8 @@ class ProviderStore(
                 vision = m["vision"]?.jsonPrimitive?.booleanOrNull,
                 contextTokens = m["contextTokens"]?.jsonPrimitive?.intOrNull,
                 reasoning = m["reasoning"]?.jsonPrimitive?.booleanOrNull,
+                reasoningEfforts = m["reasoningEfforts"]?.jsonArray?.map { it.jsonPrimitive.content },
+                chat = m["chat"]?.jsonPrimitive?.booleanOrNull,
                 endpoint = (m["api"] as? JsonObject)?.let { a ->
                     ModelProtocol.of(a["protocol"]?.jsonPrimitive?.content)?.let { protocol ->
                         ModelEndpoint(protocol, a.str("baseUrl"), a["reasoningField"]?.jsonPrimitive?.content)
@@ -647,7 +709,10 @@ class ProviderStore(
         }
         var r = RoleChoices()
         ModelRole.entries.forEach { role -> choice(role)?.let { c -> r.with(role, c)?.let { r = it } } }
-        return r
+        return r.copy(reasoningEfforts = ModelRole.entries.mapNotNull { role ->
+            val effort = runCatching { o[role.name]?.jsonObject?.get("reasoningEffort")?.jsonPrimitive?.content }.getOrNull()
+            if (r[role] is RoleChoice.Model && !effort.isNullOrBlank()) role to effort else null
+        }.toMap())
     }
 
     private fun JsonObject.str(k: String) = this[k]!!.jsonPrimitive.content
@@ -661,6 +726,7 @@ class ProviderStore(
                     addJsonObject {
                         put("id", p.id); put("name", p.name); put("kind", p.kind.name); put("baseUrl", p.baseUrl)
                         p.sessionHeader?.let { put("sessionHeader", it) }
+                        if (p.verifiedModels.isNotEmpty()) putJsonArray("verifiedModels") { p.verifiedModels.forEach { add(it) } }
                         p.models?.let { models ->
                             putJsonArray("models") {
                                 models.forEach { m ->
@@ -671,6 +737,8 @@ class ProviderStore(
                                         m.vision?.let { put("vision", it) }
                                         m.contextTokens?.let { put("contextTokens", it) }
                                         m.reasoning?.let { put("reasoning", it) }
+                                        m.reasoningEfforts?.let { levels -> putJsonArray("reasoningEfforts") { levels.forEach { add(it) } } }
+                                        m.chat?.let { put("chat", it) }
                                         m.endpoint?.let { e ->
                                             putJsonObject("api") {
                                                 put("protocol", e.protocol.wire); put("baseUrl", e.baseUrl)
@@ -700,7 +768,10 @@ class ProviderStore(
             putJsonObject("uses") {
                 ModelRole.entries.forEach { role ->
                     when (val c = _roles.value[role]) {
-                        is RoleChoice.Model -> putJsonObject(role.name) { put("use", USE_MODEL); put("config", c.configId) }
+                        is RoleChoice.Model -> putJsonObject(role.name) {
+                            put("use", USE_MODEL); put("config", c.configId)
+                            _roles.value.reasoningEfforts[role]?.let { put("reasoningEffort", it) }
+                        }
                         RoleChoice.SameAsMain -> putJsonObject(role.name) { put("use", USE_MAIN) }
                         RoleChoice.Off -> putJsonObject(role.name) { put("use", USE_NONE) }
                         null -> Unit
@@ -749,11 +820,15 @@ class ProviderStore(
         /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
         const val CHATGPT_NAME = "ChatGPT"
 
-        /** 试调用:临时配置的 id、系统提示、那句话、回复上限。 */
+        /**
+         * 试调用:临时配置的 id、系统提示、那句话、试用的工具、回复上限。
+         * 上限留得够一次工具调用,连同必须先想一想的模型的思考(Messages、generateContent 把思考也算在上限里)。
+         */
         private const val PROBE_ID = "probe"
-        private const val PROBE_SYSTEM = "Reply with one short word."
-        private const val PROBE_TEXT = "ping"
-        private const val PROBE_MAX_TOKENS = 16
+        private const val PROBE_SYSTEM = "This is a connection test. Call the get_time tool now. Do not answer with text."
+        private const val PROBE_TEXT = "What time is it? Use the get_time tool."
+        private val PROBE_TOOL = ToolSpec("get_time", "Returns the current time.", """{"type":"object","properties":{}}""")
+        private const val PROBE_MAX_TOKENS = 1024
         private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
         /**

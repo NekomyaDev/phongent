@@ -1,7 +1,10 @@
 package com.wangzan101.mika.cap.phone.a11y
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Path
 import android.os.Bundle
 import android.os.SystemClock
@@ -12,6 +15,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.wangzan101.mika.core.cap.phone.GesturePacing
+import com.wangzan101.mika.core.cap.phone.TypingPacing
 import com.wangzan101.mika.core.uistate.ActionResult
 import com.wangzan101.mika.core.uistate.AppProfiles
 import com.wangzan101.mika.core.uistate.LaunchChoice
@@ -28,6 +32,10 @@ import com.wangzan101.mika.core.uistate.ScreenEvent
 import com.wangzan101.mika.core.uistate.ScreenSnapshot
 import com.wangzan101.mika.core.uistate.VisibleTextLine
 import com.wangzan101.mika.core.uistate.SystemCommandResult
+import com.wangzan101.mika.core.uistate.SystemAction
+import com.wangzan101.mika.core.uistate.SystemActionResult
+import com.wangzan101.mika.core.uistate.WheelOutcome
+import com.wangzan101.mika.cap.phone.shell.SystemIntents
 import com.wangzan101.mika.core.visual.FrameGrid
 import com.wangzan101.mika.core.uistate.Verification
 import com.wangzan101.mika.core.uistate.TextField
@@ -86,6 +94,8 @@ class AndroidScreen(
     private val handedOver: () -> Boolean = { false },
     /** 手势的节奏:落指前的停顿、按住时长、落点偏差、滑动的弧线和快慢(见 [GesturePacing])。 */
     private val pacing: GesturePacing = GesturePacing.human(),
+    /** 在这个包名的 App 里打字的节奏(见 [TypingPacing]);默认一次写入全文。 */
+    private val typing: (String?) -> TypingPacing = { TypingPacing.Instant },
 ) : ScreenPort {
     /** 屏还没建时为 -1;只在确认屏已建好之后用。 */
     private val displayId get() = display.current?.displayId ?: -1
@@ -374,6 +384,26 @@ class AndroidScreen(
         verified(relocatedTo = relocatedTo) { node.performAction(action) }
     }
 
+    /**
+     * 停留时顺手轻轻滚一下:在占了大半屏的那块可滚动内容(信息流、正文)正中慢慢划 [fraction] 个屏高,停稳再抬手、不甩。
+     * 弹着输入法、输入框拿着焦点、上面盖着别的窗口(弹框、浮层)、没有够大的可滚动内容时不滚。
+     */
+    override suspend fun idleScroll(fraction: Double): Boolean = withContext(Dispatchers.IO) {
+        if (!opened || imeBox() != null || focusedEditable() != null) return@withContext false
+        if (ScreenReader.contentWindows(windows()).count { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } > 1) return@withContext false
+        val area = read().entries.filter { it.element.scrollable }
+            .map { e -> android.graphics.Rect().also { e.node.getBoundsInScreen(it) } }
+            .maxByOrNull { it.width().toLong() * it.height() } ?: return@withContext false
+        if (area.width().toLong() * area.height() < display.width.toLong() * display.height * IDLE_MIN_AREA) return@withContext false
+        val dist = (display.height * kotlin.math.abs(fraction)).roundToInt().coerceAtMost(area.height() / 2)
+        if (dist < IDLE_MIN_PX) return@withContext false
+        val cx = area.centerX()
+        val mid = area.centerY()
+        // 往下看(fraction 为正)手指往上划
+        val (from, to) = if (fraction > 0) mid + dist / 2 to mid - dist / 2 else mid - dist / 2 to mid + dist / 2
+        drag(listOf(cx to from, cx to to), IDLE_SCROLL_MS, bow = true)
+    }
+
     override suspend fun back(): ActionResult = withContext(Dispatchers.IO) {
         if (!opened) return@withContext NO_APP_OPEN
         verified { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }
@@ -388,7 +418,12 @@ class AndroidScreen(
         if (!opened) return@withContext NO_APP_OPEN
         val found = when (val f = findField(ref, snapshotId)) {
             is Field.Found -> f
-            is Field.Missing -> return@withContext if (f.reason == NO_FOCUS) typeUnseen(text) else ActionResult.Failed(f.reason)
+            is Field.Missing -> return@withContext when {
+                f.reason != NO_FOCUS -> ActionResult.Failed(f.reason)
+                // 屏上什么都没拿着输入焦点、也没弹输入法:没有框接得住粘贴,不去粘(粘了界面别处一动就会被当成「可能打进去了」)
+                !somethingHoldsInputFocus() -> ActionResult.Failed(NO_FOCUS)
+                else -> typeUnseen(text)
+            }
         }
         var field = found.node
         val original = FieldShape.of(field)
@@ -415,6 +450,9 @@ class AndroidScreen(
             }
         }
         val textsBefore = read().texts.toSet()
+        // 像人一样一段一段打出来(见 TypingPacing);密码框、要粘贴才收得到的网页框照旧一次写入。
+        // 写不进、框不接受半截字时停下,下面照旧整段写入并读回核对
+        typing(field.packageName?.toString()).forField(web, field.isPassword).leadIn(io, text)
         var frozen = false
         val verification = typeAndVerify(
             io, text, TYPE_ATTEMPTS,
@@ -440,7 +478,11 @@ class AndroidScreen(
         if (!opened) return@withContext NO_APP_OPEN
         val found = when (val f = findField(ref, snapshotId, tapToFocus = false)) {
             is Field.Found -> f
-            is Field.Missing -> return@withContext if (f.reason == NO_FOCUS) clearUnseen() else ActionResult.Failed(f.reason)
+            is Field.Missing -> return@withContext when {
+                f.reason != NO_FOCUS -> ActionResult.Failed(f.reason)
+                !somethingHoldsInputFocus() -> ActionResult.Failed(NO_FOCUS)
+                else -> clearUnseen()
+            }
         }
         val field = found.node
         verified(relocatedTo = found.relocatedTo) { if (inWebView(field)) inputText(field, "") == true else setText(field, "") }
@@ -691,6 +733,90 @@ class AndroidScreen(
     }
 
     override suspend fun listApps(): List<Pair<String, String>> = withContext(Dispatchers.IO) { launchableApps(a11y.packageManager, a11y.packageName) }
+
+    // ---------- 系统动作 ----------
+
+    /**
+     * 经安卓标准 intent 做系统动作(见 [SystemIntents])。先在 Mika 这边查谁接(能力检测,不用建屏):没有就 not_supported;
+     * 有几个时按 [SystemIntents.choose] 直接指定一个。再交给内置助手启动到 Mika 的屏(第一次用时建屏),动作前后照常盯着主屏。
+     * 闹钟、计时器本该悄悄设好:之后读系统的下一个闹钟核对;App 却开了界面时照实报。闹钟列表、新日程要等那个 App 到最上面。
+     */
+    override suspend fun systemAction(action: SystemAction): SystemActionResult = withContext(Dispatchers.IO) {
+        val intent = SystemIntents.toIntent(SystemIntents.spec(action))
+        val pm = a11y.packageManager
+        val handlers = runCatching {
+            pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map {
+                SystemIntents.Handler(it.activityInfo.packageName, it.activityInfo.name, (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
+            }
+        }.getOrDefault(emptyList())
+        val default = runCatching { pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
+        val handler = SystemIntents.choose(handlers, default)
+            ?: return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
+        val pkg = handler.packageName
+        intent.component = android.content.ComponentName(pkg, handler.className)
+        if (checkOtherTasks && !action.silent && !reserve(pkg)) return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
+        val alarms = a11y.getSystemService(AlarmManager::class.java)
+        val alarmBefore = runCatching { alarms?.nextAlarmClock?.triggerTime }
+        val id = display.get().displayId
+        val topBefore = ScreenReader.topPackage(windows())
+        val w = armSpillWatch()
+        // 接手的页面要求的权限(设闹钟)shell 可能没有:备一个以 Mika 身份启动的
+        val asMika = PendingIntent.getActivity(a11y, SYSTEM_ACTION_REQUEST, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        when (runCatching { shell.startSystemAction(id, intent, asMika) }.getOrDefault(ShellService.START_ERROR)) {
+            ShellService.START_OK -> Unit
+            ShellService.START_IN_USE_ON_MAIN -> return@withContext SystemActionResult(ActionResult.Failed("app_in_use_by_user"), pkg)
+            ShellService.START_IN_USE_BY_OTHER -> return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
+            ShellService.START_UNRESOLVED -> return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
+            else -> return@withContext SystemActionResult(ActionResult.Failed("launch_failed"), pkg)
+        }
+        fun top() = ScreenReader.topPackage(windows())
+        var alarmAfter = alarmBefore.getOrNull()
+        if (action is SystemAction.SetAlarm && alarmBefore.isSuccess) {
+            // 时钟 App 多半在后台写好再登记:等系统的下一个闹钟变了,最多等一会儿
+            val deadline = SystemClock.uptimeMillis() + ALARM_WAIT_MS
+            while (SystemClock.uptimeMillis() < deadline) {
+                alarmAfter = runCatching { alarms?.nextAlarmClock?.triggerTime }.getOrNull()
+                if (alarmAfter != alarmBefore.getOrNull()) break
+                delay(ALARM_POLL_MS)
+            }
+        } else if (!action.silent) {
+            val deadline = SystemClock.uptimeMillis() + LAUNCH_WAIT_MS
+            while (top() != pkg && SystemClock.uptimeMillis() < deadline) delay(POLL_MS)
+        }
+        waitStable(SETTLE_CAP_MS)
+        val landed = top() == pkg
+        // 本该悄悄设好的,屏上却多了那个 App 的界面
+        val showing = action.silent && landed && topBefore != pkg
+        if (landed && (!action.silent || showing)) {
+            targetPackage = pkg
+            _target.value = TargetApp(pkg, runCatching { shell.topTaskId(displayId) }.getOrDefault(-1))
+        }
+        val hint = if (!action.silent && !landed) hintNotInFront(top(), pkg) else null
+        SystemActionResult(
+            ok(hint = hint, spill = takeSpill(w)), handledBy = pkg,
+            nextAlarmBefore = alarmBefore.getOrNull(), nextAlarmAfter = alarmAfter, alarmReadable = alarmBefore.isSuccess, showing = showing,
+        )
+    }
+
+    private fun hintNotInFront(top: String?, expected: String) =
+        "$expected took the action, but the screen shows ${top ?: "no app yet"}. Observe before acting."
+
+    // ---------- 滚轮 ----------
+
+    override suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome = withContext(Dispatchers.IO) {
+        if (!opened) return@withContext WheelOutcome(false, null, null, 0, "none", error = "no_app_open")
+        val (node, _) = resolve(ref, snapshotId) ?: return@withContext WheelOutcome(false, null, null, 0, "none", error = "ref_expired")
+        val driver = WheelDriver(
+            display.width, display.height,
+            quiet = { q, cap -> withEventClock { it.awaitQuiet(q, cap) } },
+            // 慢拖:按节奏走时末尾减速到停、松手不甩,免得转过头;慢拖拖不动时换成快快划一下
+            drag = { points, slow -> drag(points, if (slow) WHEEL_DRAG_MS else WHEEL_SWIPE_MS, bow = false) },
+            ocr = { readVisibleText() },
+            imeShown = { imeBox() != null },
+            back = { runCatching { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }.getOrDefault(false) },
+        )
+        driver.set(node, value)
+    }
 
     // ---------- 打开哪一个 ----------
 
@@ -1193,6 +1319,13 @@ class AndroidScreen(
         return SEARCH_WORDS.any { name.contains(it, ignoreCase = true) }
     }
 
+    /**
+     * 这块屏上有东西拿着输入焦点(哪怕不是树里的输入框,比如 App 自己画的界面整块拿着焦点),或弹着输入法。
+     * 都没有时按键没有框可去:树里看不到的输入框也只有拿着焦点才收得到粘贴。
+     */
+    private fun somethingHoldsInputFocus(): Boolean =
+        imeBox() != null || ScreenReader.contentWindows(windows()).any { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) != null }
+
     /** 这块屏上拿着输入焦点的可编辑框;焦点落在容器(如网页)上时找它里面聚焦的可编辑节点。 */
     private fun focusedEditable(): AccessibilityNodeInfo? {
         for (w in ScreenReader.contentWindows(windows())) {
@@ -1392,6 +1525,15 @@ class AndroidScreen(
         val IN_USE_BY_OTHER = ActionResult.Failed("app_in_use_by_other_task")
 
         const val QUIET_MS = 500L
+
+        /** 停留里轻轻滚的那块可滚动内容至少占屏幕这么大。 */
+        const val IDLE_MIN_AREA = 0.5
+
+        /** 停留里轻轻滚一下至少这么多像素(再少看不出)。 */
+        const val IDLE_MIN_PX = 8
+
+        /** 停留里轻轻滚一下的时长:够慢,当慢拖,停稳再抬手。 */
+        const val IDLE_SCROLL_MS = 900L
         const val CHECK_CAP_MS = 1_500L
         const val SECOND_LOOK_QUIET_MS = 300L
         const val SECOND_LOOK_CAP_MS = 800L
@@ -1402,6 +1544,14 @@ class AndroidScreen(
         const val IN_USE_RETRY_MS = 3_000L
         const val IN_USE_POLL_MS = 500L
         const val POLL_MS = 100L
+        /** 设闹钟后等系统的下一个闹钟变,最多这么久、这么久看一次。 */
+        const val ALARM_WAIT_MS = 3_000L
+        const val ALARM_POLL_MS = 150L
+        const val SYSTEM_ACTION_REQUEST = 0x5A
+        /** 拖滚轮的时长:不短于节奏里的慢拖时长,松手时已经停住。 */
+        const val WHEEL_DRAG_MS = 1_000L
+        /** 慢拖拖不动时快划一下的时长(像人手划滚轮)。 */
+        const val WHEEL_SWIPE_MS = 400L
         const val TYPE_ATTEMPTS = 2
         const val WEB_VIEW = "android.webkit.WebView"
         const val PASTE_WAIT_MS = 1_500L

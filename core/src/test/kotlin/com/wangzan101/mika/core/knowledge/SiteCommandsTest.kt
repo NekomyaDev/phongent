@@ -45,7 +45,7 @@ return rows.filter(r => r.title.includes(args.query)).slice(0, args.limit || 20)
         assertEquals(listOf(CommandArg("limit", "integer", false, "最多几条"), CommandArg("query", "string", true, "只要标题里有这段字的")), d.args)
         assertEquals("[{title, url}]", d.returns)
         assertTrue(p.body.startsWith("const rows"))
-        assertEquals("- list_items(limit?: integer, query: string):列出结果页上的条目。返回 [{title, url}]。参数:limit 最多几条;query 只要标题里有这段字的", SiteCommandFile.line(d))
+        assertEquals("- list_items(limit?: integer, query: string): 列出结果页上的条目. Returns [{title, url}]. Arguments: limit 最多几条; query 只要标题里有这段字的", SiteCommandFile.line(d))
     }
 
     @Test fun badHeadersAreRejected() {

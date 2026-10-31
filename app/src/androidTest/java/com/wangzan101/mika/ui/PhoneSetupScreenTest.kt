@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.wangzan101.mika.core.shell.BuiltinShellFailure
@@ -28,7 +29,7 @@ class PhoneSetupScreenTest {
     @get:Rule val compose = createComposeRule()
     private val calls = mutableListOf<String>()
 
-    private fun show(inputs: SetupInputs, headsUpLowered: Boolean = false, diagnostics: Boolean = false) = compose.setContent {
+    private fun show(inputs: SetupInputs, headsUpLowered: Boolean = false, diagnostics: Boolean = false, scanning: Boolean = false) = compose.setContent {
         PhoneSetupContent(
             view = PhoneSetupFlow.view(inputs),
             onStepAction = { calls += "step $it" },
@@ -44,7 +45,42 @@ class PhoneSetupScreenTest {
             onRevisit = { calls += "revisit $it" },
             onOpenPairingChannel = { calls += "pairingChannel" },
             onDiagnostics = if (diagnostics) ({ calls += "diagnostics" }) else null,
+            scanning = scanning,
+            onConnectPort = { calls += "port $it" },
         )
+    }
+
+    /** 连不上:「稍后再说」还在,能照着「无线调试」页面填端口;填错当场提示,不去连。 */
+    @Test
+    fun failedConnectOffersLaterAndManualPort() {
+        show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed)))
+        compose.onNodeWithTag("setup-later").assertIsDisplayed()
+        compose.onNodeWithTag("setup-connect-port").performScrollTo().performTextInput("70000")
+        compose.onNodeWithTag("setup-connect-port-submit").performScrollTo().performClick()
+        compose.onNodeWithText(PhoneSetupCopy.PORT_INVALID).assertExists()
+        compose.onNodeWithTag("setup-connect-port").performTextClearance()
+        compose.onNodeWithTag("setup-connect-port").performTextInput("41235")
+        compose.onNodeWithTag("setup-connect-port-submit").performScrollTo().performClick()
+        compose.onNodeWithTag("setup-later").performClick()
+        assertEquals(listOf("port 41235", "close"), calls)
+    }
+
+    /** 正在连接:也能「稍后再说」;在本机找端口时照实说。 */
+    @Test
+    fun workingOffersLaterAndShowsPortSearch() {
+        show(SetupInputs(true, true, BuiltinShellStatus.Connecting), scanning = true)
+        compose.onNodeWithText(PhoneSetupCopy.SCANNING_PORTS).assertIsDisplayed()
+        compose.onNodeWithTag("setup-connect-port").assertDoesNotExist()
+        compose.onNodeWithTag("setup-later").assertIsDisplayed().performClick()
+        assertEquals(listOf("close"), calls)
+    }
+
+    /** 失败在配对一步(码不对)时不给填连接端口,「稍后再说」照样在。 */
+    @Test
+    fun pairingFailureHasLaterButNoConnectPort() {
+        show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.WrongCode)))
+        compose.onNodeWithTag("setup-later").assertIsDisplayed()
+        compose.onNodeWithTag("setup-connect-port").assertDoesNotExist()
     }
 
     /** 走到配对一步、无障碍跳过了:配对码只能填在通知里。 */

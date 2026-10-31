@@ -3,6 +3,7 @@ package com.wangzan101.mika.cap.phone.a11y
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.wangzan101.mika.core.cap.phone.WheelMath
 import com.wangzan101.mika.core.uistate.ElementLocator
 import com.wangzan101.mika.core.uistate.UiElement
 import com.wangzan101.mika.core.uistate.UiStates
@@ -121,6 +122,7 @@ internal object ScreenReader {
                 clickable = n.isClickable, editable = n.isEditable, scrollable = n.isScrollable,
                 checkable = n.isCheckable, checked = n.isChecked, selected = n.isSelected,
                 enabled = n.isEnabled, focused = n.isFocused, secret = n.isPassword,
+                wheel = isWheel(n),
                 children = children,
             ))
         }
@@ -162,6 +164,26 @@ internal object ScreenReader {
             roleOf(n), labelOf(n, own), n.viewIdResourceName, rect.centerX(), rect.centerY(), null,
             hint = own != null && showingHint(n), inList = inList(n),
         )
+    }
+
+    /**
+     * 看上去是滚轮选择器:原版的数字滚轮控件,或能滚、里面是几项在正中竖着等距排开的短值(规则见 [WheelMath.looksLikeWheel],
+     * 宁可漏认)。有一项读不出字就不算。
+     */
+    fun isWheel(n: AccessibilityNodeInfo): Boolean {
+        if (n.className?.toString()?.endsWith("NumberPicker") == true) return true
+        if (!n.isScrollable || n.childCount !in 3..12) return false
+        val box = Rect().also(n::getBoundsInScreen)
+        val r = Rect()
+        val items = mutableListOf<WheelMath.Item>()
+        for (i in 0 until n.childCount) {
+            val c = n.getChild(i) ?: continue
+            if (!c.isVisibleToUser) continue
+            val label = ownLabel(c) ?: c.takeIf { it.childCount == 1 }?.getChild(0)?.let(::ownLabel) ?: return false
+            c.getBoundsInScreen(r)
+            items += WheelMath.Item(label, r.centerX(), r.centerY())
+        }
+        return WheelMath.looksLikeWheel(items.sortedBy { it.centerY }, box.left, box.right)
     }
 
     /** 列表类容器:子项会复用,同一位置可能换成别的条目。 */

@@ -72,8 +72,8 @@ class AgentLoopSkillTest {
         val body = "## 步骤\n" + "很".repeat(4000)
         val r = run("给老妈发消息", personalSkill("lao-ma-msg", body = body, display = "给老妈发消息"))
         val text = r.requests.first().fullTexts().single()
-        assertTrue(text.endsWith("\n…(已截断,可用 skill_read 查看全文)"))
-        assertEquals(body.take(PERSONAL_SKILL_LIMIT), text.substringAfter("\n").substringBefore("\n…(已截断"))
+        assertTrue(text.endsWith("\n…(truncated; use skill_read for the full text)"))
+        assertEquals(body.take(PERSONAL_SKILL_LIMIT), text.substringAfter("\n").substringBefore("\n…(truncated"))
     }
 
     @Test fun skillUsedEventsEmitted() {

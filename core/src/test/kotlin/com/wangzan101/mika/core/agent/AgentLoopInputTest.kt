@@ -94,7 +94,7 @@ class AgentLoopInputTest {
         com.wangzan101.mika.core.testing.assertAnswered(DONE, run.await())
         val r = m.resultFor(c)
         assertEquals("false", r.s("ok")); assertEquals("no_answer", r.s("error"))
-        assertEquals("没有在时限内收到回答", r.s("message")); assertEquals("true", r.s("recoverable"))
+        assertEquals("No answer came within the time limit.", r.s("message")); assertEquals("true", r.s("recoverable"))
         assertEquals("false", r.s("counts_as_failure"))
         assertNull(r["answer"])
         // 超时后才到的回答不算数,界面据此告诉用户来晚了

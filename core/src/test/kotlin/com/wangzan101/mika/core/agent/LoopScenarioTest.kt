@@ -7,6 +7,11 @@ import com.wangzan101.mika.core.model.Role
 import com.wangzan101.mika.core.cap.sandbox.FakeSandbox
 import com.wangzan101.mika.core.uistate.ActionResult
 import com.wangzan101.mika.core.testing.FakeChatModel
+import com.wangzan101.mika.core.testing.InterruptibleStream
+import com.wangzan101.mika.core.run.RunId
+import com.wangzan101.mika.core.run.RunInbox
+import com.wangzan101.mika.core.run.RunInput
+import com.wangzan101.mika.core.run.RunSpec
 import com.wangzan101.mika.core.testing.LoopSnapshot
 import com.wangzan101.mika.core.testing.Screen
 import com.wangzan101.mika.core.testing.ScriptedScreen
@@ -311,7 +316,122 @@ class LoopScenarioTest {
         snapshot("m_irreversible_verified", end, "main" to main, "verifier" to checker)
     }
 
+    // (n) 英文问、回答漂成中文:交出前退回一次,让模型整段改写成用户的语言;改写好的英文回答照常交出
+    @Test fun answerInOtherLanguageIsNudgedOnce() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300),
+            label("@e3", "已使用 250.53 GB / 512 GB", 400)))))
+        val main = fakeModel("main") {
+            call("phone_observe")
+            answer(CHINESE_ANSWER)
+            answer("Android version: 14 (Android 版本). Storage: 250.53 GB of 512 GB is used (已使用), as shown on About phone (关于手机).")
+        }
+        val end = loop(main, toolDispatcher(screen)).run("What Android version is this phone on, and how much storage is used?")
+        end as TaskState.Succeeded
+        assertTrue(end.answer, end.answer.startsWith("Android version: 14"))
+        val notice = main.requests[2].messages.withoutRuntime().last()
+        assertEquals(ContextKind.Notice, ContextBuilder.kindOf(notice))
+        assertTrue("translation (original)" in (notice.parts.single() as Part.Text).text)
+        snapshot("n_answer_language_nudge", end, "main" to main)
+    }
+
+    // 改写后还是别的语言:不再退回,照样交出
+    @Test fun answerLanguageIsNudgedOnlyOnce() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300),
+            label("@e3", "已使用 250.53 GB / 512 GB", 400)))))
+        val main = fakeModel("main") {
+            call("phone_observe")
+            answer(CHINESE_ANSWER)
+            answer(CHINESE_ANSWER)
+        }
+        val end = loop(main, toolDispatcher(screen)).run("What Android version is this phone on, and how much storage is used?")
+        assertEquals(CHINESE_ANSWER, (end as TaskState.Succeeded).answer)
+        assertEquals(0, main.remaining)
+        assertEquals(3, main.requests.size)
+    }
+
+    // (o) 工具调用漏成了文字(服务端没解析成调用):不当回答,退回一次;模型经工具接口重新调用后照常做完
+    @Test fun toolCallLeakedAsTextIsNudgedOnce() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300)))))
+        val main = fakeModel("main") {
+            answer(LEAKED_OBSERVE)
+            call("phone_observe")
+            answer(ANDROID_14)
+        }
+        val end = loop(main, toolDispatcher(screen)).run("这台手机是安卓几?")
+        assertEquals(ANDROID_14, (end as TaskState.Succeeded).answer)
+        val notice = main.requests[1].messages.withoutRuntime().last()
+        assertEquals(ContextKind.Notice, ContextBuilder.kindOf(notice))
+        assertTrue("`phone_observe`" in (notice.parts.single() as Part.Text).text)
+        snapshot("o_tool_call_as_text_nudge", end, "main" to main)
+    }
+
+    // 退回后又漏成文字:结束,不把原样的标记交给用户
+    @Test fun toolCallLeakedTwiceEndsTheTask() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80)))))
+        val main = fakeModel("main") {
+            answer(LEAKED_OBSERVE)
+            answer(LEAKED_OBSERVE)
+        }
+        val end = loop(main, toolDispatcher(screen)).run("这台手机是安卓几?")
+        end as TaskState.Failed
+        assertEquals(FailKind.Model, end.kind)
+        assertFalse(end.reason, "<tool_call>" in end.reason)
+        assertEquals(2, main.requests.size)
+    }
+
+    // 正常调过工具之后又漏一次:每次都还能退回一次(偶发的服务端问题,长任务里不止出一次)
+    @Test fun toolCallLeakAfterARealCallIsNudgedAgain() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "关于手机", 80), label("@e2", "Android 版本 14", 300)))))
+        val main = fakeModel("main") {
+            answer(LEAKED_OBSERVE)
+            call("phone_observe")
+            answer(LEAKED_OBSERVE)
+            answer(ANDROID_14)
+        }
+        val end = loop(main, toolDispatcher(screen)).run("这台手机是安卓几?")
+        assertEquals(ANDROID_14, (end as TaskState.Succeeded).answer)
+        assertEquals(0, main.remaining)
+    }
+
+    // 回答里讲的就是这种格式,但没提到这次的任何工具:正常交出
+    @Test fun answerAboutToolCallMarkupIsDelivered() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "设置", 80)))))
+        val explanation = "有的模型写工具调用时用 <tool_call> 包起来,里面是 <function=工具名> 和若干 <parameter=参数名>。"
+        val main = fakeModel("main") { answer(explanation) }
+        val end = loop(main, toolDispatcher(screen)).run("模型的工具调用格式是什么样的?")
+        assertEquals(explanation, (end as TaskState.Succeeded).answer)
+        assertEquals(1, main.requests.size)
+    }
+
+    // (p) 插话打断正在流式输出的回复:用户看到的那段字作为只有文字的回复记进历史,插话接在它后面,模型带着两者重问
+    @Test fun steerKeepsTheInterruptedReply() = runTest {
+        val screen = ScriptedScreen(listOf(Screen(SETTINGS, listOf(label("@e1", "蓝牙", 80), label("@e2", "已开启", 300)))))
+        val main = fakeModel("main") {
+            call("phone_observe")
+            answer("蓝牙已开启:蓝牙页显示「已开启」。")
+        }
+        val model = InterruptibleStream(main, listOf("我先看看", "我先看看 WLAN 开没开"))
+        val inbox = RunInbox()
+        val running = async {
+            AgentLoop(model, toolDispatcher(screen), SystemPrompt.identity(), clock = { CLOCK }, zone = ZoneOffset.UTC, streamReplies = true)
+                .run(RunSpec(RunId("r1"), "看看 WLAN 开没开", "thread-1"), inbox)
+        }
+        model.entered.await()
+        inbox.send(RunInput.Steer("m1", "不是 WLAN,是蓝牙"))
+        val end = running.await()
+        assertTrue(model.cancelled)
+        assertEquals("蓝牙已开启:蓝牙页显示「已开启」。", (end as TaskState.Succeeded).answer)
+        val seen = main.requests[0].messages
+        val kept = seen.indexOfFirst { it.role == Role.Assistant }
+        assertEquals(listOf(Part.Text("我先看看 WLAN 开没开")), seen[kept].parts)
+        assertTrue((seen[kept + 1].parts.first() as Part.Text).text.startsWith(AgentLoop.STEER_MARKER))
+        snapshot("p_steer_keeps_interrupted_reply", end, "main" to main)
+    }
+
     private companion object {
+        const val LEAKED_OBSERVE = "<tool_call>\n<function=phone_observe>\n</function>\n</tool_call>"
+        const val ANDROID_14 = "这台手机的安卓版本是 14,是在关于手机页面上看到的。"
+        const val CHINESE_ANSWER = "我打开了关于手机页面看过了：这台手机的安卓版本是 14，存储已使用 250.53 GB，总共 512 GB，两个数字都是页面上显示的。"
         const val CLOCK = 1_761_300_000_000L
         const val SETTINGS = "com.android.settings"
         const val CHAT = "com.chat"

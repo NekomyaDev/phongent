@@ -437,7 +437,7 @@ class ChatViewModel(
             val added = list.filter { it.id !in shown }
             ui.copy(exchanges = ui.exchanges.mapIndexed { i, ex ->
                 val updated = if (ex.steers.none { it.id in byId }) ex
-                    else ex.copy(steers = ex.steers.map { n -> byId[n.id]?.let { n.copy(state = it.state) } ?: n })
+                    else ex.copy(steers = ex.steers.map { n -> byId[n.id]?.let { n.copy(state = it.state, interrupted = it.interrupted ?: n.interrupted, finished = it.finished ?: n.finished) } ?: n })
                 if (i == liveIndex && added.isNotEmpty() && ex.status.active()) updated.copy(steers = updated.steers + added) else updated
             })
         }
@@ -1109,7 +1109,10 @@ class ChatViewModel(
             }
             return Exchange(t.userText, emptyList(), status, live = false, runId = t.runId,
                 memoryNotes = t.memoryNotes, usedMemory = t.usedMemory, skillNotes = t.skillNotes,
-                steers = t.steers.mapIndexed { i, text -> SteerNote("turn-$i", text, SteerState.Joined) })
+                steers = t.steers.mapIndexed { i, text ->
+                    SteerNote("turn-$i", text, SteerState.Joined, t.interruptedReplies.getOrNull(i)?.takeIf(String::isNotEmpty),
+                        t.finishedReplies.getOrNull(i)?.takeIf(String::isNotEmpty))
+                })
         }
 
 
@@ -1200,6 +1203,11 @@ class ToolLabels(private val tools: ToolIndex, private val legacy: LegacyNames =
             "查看已装的 App" to R.string.tool_list_apps,
             "打开 App" to R.string.tool_open_app,
             "分享文字到 App" to R.string.tool_share_text,
+            "设闹钟" to R.string.tool_set_alarm,
+            "设计时器" to R.string.tool_set_timer,
+            "查看闹钟" to R.string.tool_show_alarms,
+            "添加日程" to R.string.tool_add_calendar_event,
+            "拨滚轮" to R.string.tool_set_wheel,
             "滚动查找" to R.string.tool_scroll_find,
             "等待界面条件" to R.string.tool_wait_condition,
             "等待界面事件" to R.string.tool_wait_event,

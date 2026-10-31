@@ -4,6 +4,7 @@ import com.wangzan101.mika.core.adb.AdbConnectionException.Reason
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -22,7 +23,7 @@ class AdbConnectPortTest {
         cache = cache,
     )
 
-    private fun opener(vararg ok: Int, unauthorized: Int? = null): (Int) -> String = { port ->
+    private fun opener(vararg ok: Int, unauthorized: Int? = null): (String, Int) -> String = { _, port ->
         attempts += port
         when (port) {
             unauthorized -> throw AdbConnectionException(Reason.UNAUTHORIZED, "no")
@@ -32,12 +33,16 @@ class AdbConnectPortTest {
     }
 
     @Test
-    fun propertyFirstAndMdnsNotAskedWhenItWorks() = runTest {
+    fun cachedFirstThenPropertyAndMdnsNotAskedWhenItWorks() = runTest {
+        // 缓存的旧端口被拒得很快,接着试属性
         val cache = Cache(1111)
         assertEquals("conn@4000", chain(4000, 5000, cache).connect(opener(4000)))
-        assertEquals(listOf(4000), attempts)
+        assertEquals(listOf(1111, 4000), attempts)
         assertEquals(0, mdnsAsked)
         assertEquals(4000, cache.port)
+        attempts.clear()
+        assertEquals("conn@4000", chain(4000, 5000, cache).connect(opener(4000)))
+        assertEquals(listOf(4000), attempts)
     }
 
     @Test
@@ -52,21 +57,21 @@ class AdbConnectPortTest {
 
     @Test
     fun stalePortsAreSkippedAndDuplicatesTriedOnce() = runTest {
-        // 属性和 mDNS 都给了旧端口(都连不上),缓存里是对的
-        val cache = Cache(6000)
-        assertEquals("conn@6000", chain(4000, 4000, cache).connect(opener(6000)))
+        // 缓存、属性都是旧端口(都连不上),mDNS 又给了同一个旧端口,最后一个才对
+        val cache = Cache(4000)
+        assertEquals("conn@6000", chain(4000, null, cache, mdnsAll = listOf(4000, 6000)).connect(opener(6000)))
         assertEquals(listOf(4000, 6000), attempts)
     }
 
     @Test
     fun unauthorizedStopsTheChain() = runTest {
         try {
-            chain(4000, 5000, Cache(6000)).connect(opener(5000, 6000, unauthorized = 4000))
+            chain(4000, 5000, Cache(3000)).connect(opener(5000, 6000, unauthorized = 4000))
             fail("expected UNAUTHORIZED")
         } catch (e: AdbConnectionException) {
             assertEquals(Reason.UNAUTHORIZED, e.reason)
         }
-        assertEquals(listOf(4000), attempts)
+        assertEquals(listOf(3000, 4000), attempts)
     }
 
     @Test
@@ -101,9 +106,9 @@ class AdbConnectPortTest {
     @Test
     fun reportsCandidateCounts() = runTest {
         val seen = mutableListOf<ConnectCandidates>()
-        val ok = AdbConnectPort({ null }, { _, _ -> listOf(5000, 5001) }, Cache(5001), report = { seen += it })
+        val ok = AdbConnectPort({ null }, { _, _ -> listOf(5000, 5001) }, Cache(4999), report = { seen += it })
         assertEquals("conn@5001", ok.connect(opener(5001)))
-        assertEquals(ConnectCandidates(property = 0, mdns = 2, cache = 0, connected = true), seen.single())
+        assertEquals(ConnectCandidates(property = 0, mdns = 2, cache = 1, connected = true), seen.single())
         seen.clear()
         val none = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), report = { seen += it })
         try {
@@ -113,5 +118,104 @@ class AdbConnectPortTest {
             assertEquals(Reason.CONNECT_FAILED, e.reason)
         }
         assertEquals(ConnectCandidates(0, 0, 0, connected = false), seen.single())
+    }
+
+    /** 假扫描:[open] 是各地址上开着的端口,[adb] 里的才回 STLS;记下扫了哪些地址、跳过了哪些端口。 */
+    private class FakeScanner(val open: Map<String, List<Int>>, val adb: Set<AdbEndpoint>) : LocalPortScanner {
+        val swept = mutableListOf<String>()
+        var skipped: Set<Int> = emptySet()
+        override suspend fun openPorts(host: String, ports: IntRange, skip: Set<Int>, budgetMs: Long): List<Int> {
+            swept += host
+            skipped = skip
+            return open[host].orEmpty().filter { it in ports && it !in skip }
+        }
+        override fun speaksAdbTls(host: String, port: Int, timeoutMs: Int) = AdbEndpoint(host, port) in adb
+    }
+
+    private val wifi = "192.0.2.10"
+
+    @Test
+    fun scanRunsOnlyAfterEarlierSourcesFailAndTheHitIsCached() = runTest {
+        val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(40000, 41235)), setOf(AdbEndpoint("127.0.0.1", 41235)))
+        val cache = Cache(39000)
+        val seen = mutableListOf<ConnectCandidates>()
+        val progress = mutableListOf<Boolean>()
+        val port = AdbConnectPort(
+            { null }, { _, _ -> emptyList() }, cache, report = { seen += it },
+            scan = LocalPortScan(scanner, { listOf("127.0.0.1", wifi) }), scanning = { progress += it },
+        )
+        assertEquals("conn@41235", port.connect(opener(41235)))
+        assertEquals(listOf(39000, 41235), attempts)
+        assertEquals(41235, cache.port)
+        // 已经试过的缓存端口不再扫;本机地址上找到了,不再扫 Wi-Fi 地址
+        assertTrue(39000 in scanner.skipped)
+        assertEquals(listOf("127.0.0.1"), scanner.swept)
+        assertEquals(listOf(true, false), progress)
+        assertEquals(ConnectCandidates(0, 0, 1, connected = true, scanned = true, scanOpen = 2, scanAdb = 1), seen.single())
+        // 下次缓存直接连上,不再扫
+        attempts.clear()
+        assertEquals("conn@41235", port.connect(opener(41235)))
+        assertEquals(listOf(41235), attempts)
+        assertEquals(listOf("127.0.0.1"), scanner.swept)
+    }
+
+    @Test
+    fun scanNotRunWhenAnEarlierSourceConnects() = runTest {
+        val scanner = FakeScanner(emptyMap(), emptySet())
+        val port = AdbConnectPort({ 4000 }, { _, _ -> emptyList() }, Cache(), scan = LocalPortScan(scanner, { listOf("127.0.0.1") }))
+        assertEquals("conn@4000", port.connect(opener(4000)))
+        assertTrue(scanner.swept.isEmpty())
+    }
+
+    @Test
+    fun scanFallsToWifiAddressAndConnectsThere() = runTest {
+        val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(40000), wifi to listOf(40000, 45000)), setOf(AdbEndpoint(wifi, 45000)))
+        val hosts = mutableListOf<String>()
+        val port = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), scan = LocalPortScan(scanner, { listOf("127.0.0.1", wifi) }))
+        assertEquals("conn@45000", port.connect { host, p -> hosts += host; opener(45000)(host, p) })
+        assertEquals(listOf("127.0.0.1", wifi), scanner.swept)
+        assertEquals(listOf(wifi), hosts)
+    }
+
+    @Test
+    fun firstVerifiedScanHitWinsAndLaterOnesAreNotTried() = runTest {
+        val hits = setOf(AdbEndpoint("127.0.0.1", 41000), AdbEndpoint("127.0.0.1", 42000))
+        val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(41000, 42000)), hits)
+        val port = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), scan = LocalPortScan(scanner, { listOf("127.0.0.1") }))
+        assertEquals("conn@41000", port.connect(opener(41000, 42000)))
+        assertEquals(listOf(41000), attempts)
+        // 第一个握手失败就试下一个
+        attempts.clear()
+        assertEquals("conn@42000", port.connect(opener(42000)))
+        assertEquals(listOf(41000, 42000), attempts)
+    }
+
+    @Test
+    fun manualPortIsTriedLastWithoutScanningAndCachedOnSuccess() = runTest {
+        val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(41235)), setOf(AdbEndpoint("127.0.0.1", 41235)))
+        val cache = Cache()
+        val seen = mutableListOf<ConnectCandidates>()
+        val port = AdbConnectPort(
+            { null }, { _, _ -> emptyList() }, cache, report = { seen += it },
+            scan = LocalPortScan(scanner, { listOf("127.0.0.1") }), manual = { 43000 },
+        )
+        assertEquals("conn@43000", port.connect(opener(43000)))
+        assertTrue(scanner.swept.isEmpty())
+        assertEquals(43000, cache.port)
+        assertEquals(ConnectCandidates(0, 0, 0, connected = true, manual = true), seen.single())
+    }
+
+    @Test
+    fun scanAndManualBothFailingIsConnectFailed() = runTest {
+        val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(40000)), emptySet())
+        val seen = mutableListOf<ConnectCandidates>()
+        val port = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), report = { seen += it }, scan = LocalPortScan(scanner, { listOf("127.0.0.1") }))
+        try {
+            port.connect(opener())
+            fail()
+        } catch (e: AdbConnectionException) {
+            assertEquals(Reason.CONNECT_FAILED, e.reason)
+        }
+        assertEquals(ConnectCandidates(0, 0, 0, connected = false, scanned = true, scanOpen = 1, scanAdb = 0), seen.single())
     }
 }

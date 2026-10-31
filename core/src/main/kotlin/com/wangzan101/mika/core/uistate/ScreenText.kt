@@ -25,7 +25,7 @@ object ScreenText {
         return out.toString().trimEnd('\n').let { if (it.length > maxChars) it.take(maxChars) else it }
     }
 
-    private fun footer(n: Int) = "…还有 $n 个节点未显示,可滚动或缩小范围"
+    private fun footer(n: Int) = "…$n more nodes not shown; scroll or narrow the range"
 
     private fun line(e: UiElement, s: ScreenSnapshot): String {
         val name = if (e.name.isBlank()) "" else " \"${e.name.replace('\n', ' ')}\""

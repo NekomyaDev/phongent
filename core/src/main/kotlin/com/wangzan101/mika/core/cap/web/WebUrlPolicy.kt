@@ -26,11 +26,11 @@ object WebUrlPolicy {
     /** null = 可以打开;否则是给模型的 invalid_arguments 说明。 */
     fun checkNavigable(url: String): String? {
         val u = url.trim()
-        if (u.isEmpty()) return "网址为空"
-        val scheme = scheme(u) ?: return "网址要带 http:// 或 https://"
-        if (external(u) != null) return "这是打开 App 的链接,不在网页里打开;任务需要这个 App 时在手机上打开它"
-        if (scheme != "http" && scheme != "https") return "只能打开 http/https 网址,不支持 $scheme:"
-        if (host(u) == null) return "网址缺少域名"
+        if (u.isEmpty()) return "the URL is empty"
+        val scheme = scheme(u) ?: return "the URL must start with http:// or https://"
+        if (external(u) != null) return "this is a link that opens an app, so it is not opened in the browser; when the task needs that app, open it on the phone"
+        if (scheme != "http" && scheme != "https") return "only http/https URLs can be opened, not $scheme:"
+        if (host(u) == null) return "the URL has no domain"
         return null
     }
 

@@ -227,7 +227,7 @@ class ContextCompressor(
         // 写操作结果带的屏幕(screen)也有截图编号;没带屏幕时动作后附的画面编号在结果顶层
         val shot = result?.let { parse(it.content) }?.let { o -> if (tools.verb(call.name) in OBSERVATIONS) o["screenshotId"] else (o["screen"] as? JsonObject)?.get("screenshotId") ?: o["screenshotId"] }
             ?.let { it as? JsonPrimitive }?.contentOrNull?.let { " #$it" }.orEmpty()
-        return "第 $step 步 ${clip(call.name)}$target$shot→ ${outcome(result)}"
+        return "Step $step ${clip(call.name)}$target$shot → ${outcome(result)}"
     }
 
     private fun outcome(r: Part.ToolResult?): String {
@@ -267,9 +267,9 @@ class ContextCompressor(
     }
 
     companion object {
-        const val HEADER = "之前的步骤(已压缩):"
-        const val SUMMARY_REMINDER = "只有最新的用户消息是当前任务，工具仍然可用；此前的用户原话仅供参考。"
-        private const val SUMMARY_SOURCE = "之前的步骤"
+        const val HEADER = "Earlier steps (compressed):"
+        const val SUMMARY_REMINDER = "Only the latest user message is the current task, and the tools are still available; earlier user messages are for reference only."
+        private const val SUMMARY_SOURCE = "earlier steps"
         const val AGGRESSIVE_KEEP = 6
         /** 估算越过上下文的这个比例时压缩一次。 */
         const val COMPACT_AT = 0.6
@@ -277,10 +277,10 @@ class ContextCompressor(
         private const val AFTER_COMPACTION = 0.5
         /** 回差推迟的再压缩最多等到上下文的这个比例。 */
         private const val HARD_CAP = 0.9
-        private const val APPLIED = "生效"
-        private const val UNCHANGED = "没变化"
-        private const val FAILED = "失败"
-        private const val NO_RESULT = "无结果"
+        private const val APPLIED = "applied"
+        private const val UNCHANGED = "no change"
+        private const val FAILED = "failed"
+        private const val NO_RESULT = "no result"
         private const val TARGET_LIMIT = 20
         private const val GOAL_LIMIT = 120
         private val CODE = Regex("[a-z][a-z0-9_:]{0,63}")

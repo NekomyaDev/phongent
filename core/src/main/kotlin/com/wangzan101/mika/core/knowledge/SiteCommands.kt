@@ -119,7 +119,7 @@ object SiteCommandFile {
     /** 站点知识块里列出的一行。 */
     fun line(d: SiteCommandDecl): String {
         val sig = d.args.joinToString(", ") { it.name + (if (it.required) "" else "?") + ": " + it.type }
-        val notes = d.args.filter { it.description.isNotEmpty() }.joinToString(";") { "${it.name} ${it.description}" }
-        return "- ${d.name}($sig):${d.description}。返回 ${d.returns}" + (if (notes.isEmpty()) "" else "。参数:$notes")
+        val notes = d.args.filter { it.description.isNotEmpty() }.joinToString("; ") { "${it.name} ${it.description}" }
+        return "- ${d.name}($sig): ${d.description}. Returns ${d.returns}" + (if (notes.isEmpty()) "" else ". Arguments: $notes")
     }
 }

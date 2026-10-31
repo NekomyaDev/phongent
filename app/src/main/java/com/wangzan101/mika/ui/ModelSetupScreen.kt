@@ -7,6 +7,9 @@ import android.net.Uri
 import android.widget.Toast
 import com.wangzan101.mika.R
 import com.wangzan101.mika.core.chatgpt.ChatGptAuth
+import com.wangzan101.mika.core.chatgpt.SignInException
+import com.wangzan101.mika.MikaApp
+import com.wangzan101.mika.settings.ChatGptSignIns
 import com.wangzan101.mika.i18n.tr
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
@@ -84,7 +87,10 @@ import com.wangzan101.mika.ui.theme.MikaType
 fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Unit, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val vm = remember { ModelSetupViewModel(store, scope, chatGptBrowser = AndroidChatGptBrowser(context.applicationContext)) }
+    val vm = remember {
+        val signIns = (context.applicationContext as? MikaApp)?.chatGptSignIn ?: ChatGptSignIns(scope)
+        ModelSetupViewModel(store, scope, chatGptBrowser = AndroidChatGptBrowser(context.applicationContext), signIns = signIns)
+    }
     val ui by vm.state.collectAsState()
     var picking by rememberSaveable { mutableStateOf<ModelRole?>(null) }
     var openProvider by rememberSaveable { mutableStateOf<String?>(null) }
@@ -98,6 +104,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
             remove = { vm.removeProvider(provider.id); openProvider = null; allModels = false },
             use = { role, model -> vm.pick(role, provider.id, model) },
             showAll = { allModels = true },
+            retest = { vm.retest(provider.id) },
             signIn = vm::signInWithChatGpt, signOut = { vm.signOutChatGpt(provider.id) },
             manageUsage = { openInBrowser(context, ChatGptAuth.USAGE_URL) },
         )
@@ -112,11 +119,16 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
     }
     picking?.let { role ->
         BackHandler { picking = null }
-        LaunchedEffect(role) { vm.ensureListed() }
+        LaunchedEffect(role) { vm.ensureListed(); vm.clearManualPick() }
         RolePickerContent(
             ui, role,
             RolePickerActions(
-                pick = { pid, model -> vm.pick(role, pid, model); picking = null },
+                pick = { pid, model ->
+                    // 刚存下、没有一个模型试通过的那家:先试调用,通了才选上、返回
+                    if (ui.probeBeforePick(role, pid)) vm.pickManual(role, pid, model) { picking = null }
+                    else { vm.pick(role, pid, model); picking = null }
+                },
+                pickManual = { pid, model -> vm.pickManual(role, pid, model) { picking = null } },
                 choose = { vm.choose(role, it); picking = null },
                 addProvider = { vm.openForm(); picking = null },
             ),
@@ -131,9 +143,11 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
         ui, onboarding,
         ModelSetupActions(
             selectPreset = vm::selectPreset, setKind = vm::setKind, setBaseUrl = vm::setBaseUrl, setApiKey = vm::setApiKey,
+            setModel = vm::setModel, setName = vm::setName,
             testAndSave = vm::testAndSave, openForm = vm::openForm, closeForm = vm::closeForm,
             openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, next = onDone,
             signInWithChatGpt = vm::signInWithChatGpt, cancelChatGpt = vm::cancelChatGptSignIn,
+            setReasoningEffort = vm::setReasoningEffort,
         ),
         onBack,
     )
@@ -145,6 +159,8 @@ class ModelSetupActions(
     val setKind: (ProviderConfig.Kind) -> Unit = {},
     val setBaseUrl: (String) -> Unit = {},
     val setApiKey: (String) -> Unit = {},
+    val setModel: (String) -> Unit = {},
+    val setName: (String) -> Unit = {},
     val testAndSave: () -> Unit = {},
     val openForm: () -> Unit = {},
     val closeForm: () -> Unit = {},
@@ -153,6 +169,7 @@ class ModelSetupActions(
     val next: () -> Unit = {},
     val signInWithChatGpt: () -> Unit = {},
     val cancelChatGpt: () -> Unit = {},
+    val setReasoningEffort: (ModelRole, String?) -> Unit = { _, _ -> },
 )
 
 /**
@@ -177,10 +194,10 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
                 // 上手时先连服务商再选模型;设置里先看用途
                 if (onboarding) {
                     ProvidersSection(ui, actions)
-                    RolesSection(ui, onPick)
+                    RolesSection(ui, onPick, actions.setReasoningEffort)
                     FooterNote(ModelSetupCopy.ONBOARDING_NOTE)
                 } else {
-                    RolesSection(ui, onPick)
+                    RolesSection(ui, onPick, actions.setReasoningEffort)
                     ProvidersSection(ui, actions)
                 }
                 Spacer(Modifier.height(16.dp))
@@ -206,7 +223,8 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
             ui.providers.forEachIndexed { i, p ->
                 val line = if (p.kind == ProviderConfig.Kind.ChatGpt && ui.chatGptAccount?.signedIn != true) ModelsCopy.CHATGPT_SIGNED_OUT
                     else ModelsCopy.providerLine(p, ui.listing[p.id], ui.rolesOf(p))
-                ProviderRow(p, line, first = i == 0) { actions.openProvider(p.id) }
+                val warning = ModelsCopy.UNVERIFIED.takeIf { ui.unverified(p).isNotEmpty() }
+                ProviderRow(p, line, first = i == 0, warning = warning) { actions.openProvider(p.id) }
             }
             if (!ui.showForm) {
                 ListRow(
@@ -215,6 +233,15 @@ private fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
                 )
             }
         }
+    }
+    ui.probeNote?.let { FooterNote(it, Modifier.testTag("setup-probe-note"), color = c.warn) }
+    // 刚存下的那家一个模型都没试通过:直接去选主模型(选的时候先试调用)
+    if (ui.pickToProbe != null && ui.roles.main == null) {
+        Text(
+            ModelSetupCopy.PICK_MAIN,
+            Modifier.padding(start = 16.dp, bottom = 12.dp).clickable { actions.pickRole(ModelRole.Main) }.testTag("setup-pick-main").padding(vertical = 4.dp),
+            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = c.accent,
+        )
     }
     if (ui.showForm) AddProviderForm(ui, actions)
     FooterNote(ModelsCopy.KEY_NOTE)
@@ -253,24 +280,44 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(ModelSetupCopy.KIND, Modifier.padding(end = 12.dp), style = MikaType.Body, color = c.ink)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // 四种接口一行放不下时折到下一行
+                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     ProviderConfig.Kind.withApiKey.forEach { k -> SelectChip(ModelsCopy.kindLabel(k), f.kind == k, { actions.setKind(k) }, small = true) }
                 }
             }
+        }
+        if (f.urlEditable) {
             InputRow(
-                ModelSetupCopy.BASE_URL, f.baseUrl, actions.setBaseUrl, "https://…",
+                ModelSetupCopy.BASE_URL, f.baseUrl, actions.setBaseUrl, "https://…", first = !f.isCustom,
                 keyboard = KeyboardType.Uri, modifier = Modifier.testTag("setup-base-url"),
+            )
+        }
+        if (f.isCustom) {
+            // 可不填:提示里直接写出不填时用的名字(地址的主机名)
+            InputRow(
+                ModelSetupCopy.NAME, f.name, actions.setName,
+                if (f.urlProblem == null) f.defaultName else ModelSetupCopy.NAME_HINT,
+                modifier = Modifier.testTag("setup-name"),
             )
         }
         InputRow(
             ModelSetupCopy.API_KEY, f.apiKey, actions.setApiKey,
-            if (f.keyRequired) ModelSetupCopy.KEY_HINT else ModelSetupCopy.KEY_OPTIONAL, first = !f.isCustom,
+            if (f.keyRequired) ModelSetupCopy.KEY_HINT else ModelSetupCopy.KEY_OPTIONAL, first = !f.urlEditable,
             keyboard = KeyboardType.Password, secret = !showKey, modifier = Modifier.testTag("setup-api-key"),
         ) {
             Text(if (showKey) stringResource(R.string.hide) else stringResource(R.string.show), Modifier.clickable { showKey = !showKey }, fontSize = 13.sp, color = c.accent)
         }
+        if (f.noList) {
+            InputRow(
+                ModelSetupCopy.MODEL_NAME, f.model, actions.setModel, ModelSetupCopy.modelExample(f.exampleKind),
+                keyboard = KeyboardType.Uri, modifier = Modifier.testTag("setup-model"),
+            )
+        }
     }
-    f.urlProblem?.takeIf { f.isCustom && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    f.urlProblem?.takeIf { f.urlEditable && f.baseUrl.isNotBlank() }?.let { FooterNote(it, color = c.bad) }
+    f.suggestedPreset?.let { preset -> PresetSuggestion(f, preset.label) { actions.selectPreset(preset.label) } }
+    if (f.noList) FooterNote(if (f.isCustom) ModelSetupCopy.NO_LIST_CUSTOM else ModelSetupCopy.NO_LIST_PRESET, Modifier.testTag("setup-no-list"))
+    if (f.isSelfHosted) FooterNote(ModelSetupCopy.SELF_HOSTED_NOTE, Modifier.testTag("setup-self-hosted"))
     f.unencryptedWarning?.let { FooterNote(it, Modifier.testTag("setup-url-unencrypted"), color = c.warn) }
     MikaButton(
         if (f.test == ListState.Running) ModelSetupCopy.TESTING else ModelSetupCopy.TEST_AND_SAVE,
@@ -284,6 +331,18 @@ private fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions) {
         )
     }
     FooterNote(ModelSetupCopy.TEST_NOTE, Modifier.padding(top = 6.dp))
+}
+
+/** 自定义填的是某家的官方地址:建议改用那家的预设(不拦着),接口类型对不上时一并说;点一下就换过去,Key 留着。 */
+@Composable
+private fun PresetSuggestion(f: AddForm, label: String, onUse: () -> Unit) {
+    val c = MikaTheme.colors
+    FooterNote(ModelSetupCopy.presetSuggestion(f), Modifier.padding(top = 2.dp).testTag("setup-preset-hint"), color = c.warn)
+    Text(
+        ModelSetupCopy.usePreset(label),
+        Modifier.padding(start = 16.dp, bottom = 12.dp).clickable(onClick = onUse).testTag("setup-use-preset").padding(vertical = 4.dp),
+        fontSize = 13.sp, fontWeight = FontWeight.Medium, color = c.accent,
+    )
 }
 
 /**
@@ -330,7 +389,7 @@ private fun ChatGptWelcome(onDismiss: () -> Unit) {
 }
 
 /**
- * 登录要用的系统能力:授权页用系统浏览器打开;回调页上放一个回到 Mika 的链接(intent 链接,点了由浏览器打开 Mika);
+ * 登录要用的系统能力:授权页用系统浏览器打开;回调页(换完令牌之后才给出)写成功或失败的原因,再放一个回到 Mika 的链接(intent 链接,点了由浏览器打开 Mika);
  * 登录完(成功或失败)把 Mika 带回前台。安卓限制后台打开界面,带不回来时用户点回调页的链接或从最近任务回来。
  */
 private class AndroidChatGptBrowser(private val context: Context) : ChatGptBrowser {
@@ -352,8 +411,8 @@ private class AndroidChatGptBrowser(private val context: Context) : ChatGptBrows
         }
     }
 
-    override fun page(params: Map<String, String>): String {
-        val text = tr(if (params["error"] != null) R.string.chatgpt_page_cancelled else R.string.chatgpt_page_done)
+    override fun page(failure: SignInException?): String {
+        val text = if (failure == null) tr(R.string.chatgpt_page_done) else ModelsCopy.chatGptFailure(failure.reason, failure.code)
         val back = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${context.packageName};end"
         return ChatGptPage.html(tr(R.string.chatgpt_page_title), text, tr(R.string.chatgpt_page_back), back)
     }
@@ -372,13 +431,14 @@ internal object ChatGptPage {
 
 /** 用途:主模型、看图模型、轻量模型各一张卡,点开是选择页。 */
 @Composable
-private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit) {
+private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReasoning: (ModelRole, String?) -> Unit) {
     GroupLabel(ModelsCopy.ROLES)
     GroupCard {
         ModelRole.entries.forEachIndexed { i, role ->
             RoleCard(ModelsCopy.roleIcon(role), ModelsCopy.roleLabel(role), ModelsCopy.roleLine(ui, role), first = i == 0, tag = "role-${role.name.lowercase()}") {
                 onPick(role)
             }
+            ReasoningControl(ui, role) { onReasoning(role, it) }
         }
     }
 }
@@ -402,12 +462,39 @@ object ModelSetupCopy {
     val CANCEL: String get() = tr(R.string.cancel)
     val KIND: String get() = tr(R.string.model_kind)
     val BASE_URL: String get() = tr(R.string.model_base_url)
+    val NAME: String get() = tr(R.string.model_provider_name)
+    val NAME_HINT: String get() = tr(R.string.model_provider_name_hint)
     const val API_KEY = "API Key"
     val KEY_HINT: String get() = tr(R.string.model_key_hint)
     val KEY_OPTIONAL: String get() = tr(R.string.model_key_optional)
     val TEST_AND_SAVE: String get() = tr(R.string.model_test_save)
     val TESTING: String get() = tr(R.string.model_testing)
+    val PICK_MAIN: String get() = tr(R.string.model_pick_main)
     val TEST_NOTE: String get() = tr(R.string.model_test_note)
+    val SELF_HOSTED_NOTE: String get() = tr(R.string.model_self_hosted_note)
+    val MODEL_NAME: String get() = tr(R.string.model_manual_name)
+    val NO_LIST_CUSTOM: String get() = tr(R.string.model_no_list_custom)
+    val NO_LIST_PRESET: String get() = tr(R.string.model_no_list_preset)
+
+    /** 手填模型名时举的例子,按接口类型(各家模型名的样子不同)。 */
+    fun modelExample(kind: ProviderConfig.Kind): String = tr(
+        when (kind) {
+            ProviderConfig.Kind.Gemini -> R.string.model_example_gemini
+            ProviderConfig.Kind.Anthropic -> R.string.model_example_anthropic
+            ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> R.string.model_example_openai
+            ProviderConfig.Kind.OpenAiCompat -> R.string.model_example_compat
+        },
+    )
+
+    /** 自定义地址是某家官方地址时的建议;接口类型和那家对不上时补一句。 */
+    fun presetSuggestion(f: AddForm): String {
+        val preset = f.suggestedPreset ?: return ""
+        val match = tr(R.string.model_preset_match, preset.label)
+        return if (!f.presetKindMismatch) match
+        else match + tr(R.string.sentence_sep) + tr(R.string.model_preset_kind_mismatch, preset.label, ModelsCopy.kindLabel(preset.kind), ModelsCopy.kindLabel(f.kind))
+    }
+
+    fun usePreset(label: String) = tr(R.string.model_use_preset, label)
     val NEXT: String get() = tr(R.string.next)
 
     fun failed(reason: String) = tr(R.string.model_failed, reason)

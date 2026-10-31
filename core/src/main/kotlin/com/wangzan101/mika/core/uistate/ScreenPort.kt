@@ -200,6 +200,13 @@ interface ScreenPort {
         tapXY(x, y).let { if (it is ActionResult.Ok) clearText(null, null) else it }
     suspend fun scroll(ref: String?, snapshotId: String?, down: Boolean): ActionResult
     suspend fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long = DEFAULT_SWIPE_MS): ActionResult
+
+    /**
+     * 停留时顺手轻轻滚一下([fraction] 个屏幕或视口高度,正为往下),不点任何东西。网页走和往下滚一样的原生输入、不移动指针;
+     * 手机在占了大半屏的那块可滚动内容上慢慢划一小段。这会儿不便滚(有弹框、输入法开着、输入框拿着焦点、看不到可滚的内容)时不滚,
+     * 返回 false;滚了为 true。默认不滚。
+     */
+    suspend fun idleScroll(fraction: Double): Boolean = false
     /** 多点手势；每条路径是按时间先后排列的像素点，所有手指同时移动。 */
     suspend fun gesture(paths: List<List<Pair<Int, Int>>>, durationMs: Long): ActionResult = ActionResult.Failed("unsupported")
     suspend fun back(): ActionResult
@@ -217,6 +224,19 @@ interface ScreenPort {
      * 这个 App 没有收文字分享的页面时失败 cannot_share;其余和 [openApp] 一样(建屏、用户正在用、系统问打开哪一个)。不支持的端口返回 unsupported。
      */
     suspend fun shareText(packageName: String, text: String): ActionResult = ActionResult.Failed("unsupported")
+
+    /**
+     * 经安卓标准接口做一个系统动作(见 [SystemAction]):先查有没有 App 接,没有报 not_supported;有就在 Agent 的屏上交给它
+     * (第一次用时建屏,用户正在主屏用那个 App 时不打开)。不支持的端口返回 unsupported。
+     */
+    suspend fun systemAction(action: SystemAction): SystemActionResult = SystemActionResult(ActionResult.Failed("unsupported"))
+
+    /**
+     * 把编号 [ref] 那个滚轮(或滚轮里的一项)转到显示 [value]:在端口里一次做完(能输入就输入,能无障碍滚就一格格滚,
+     * 都不行就按一格多高拖),每做几下读回一次。不支持的端口报 unsupported。
+     */
+    suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome =
+        WheelOutcome(false, null, null, 0, "none", error = "unsupported")
     suspend fun waitStable(timeoutMs: Long): Boolean
     /**
      * 等这块屏的下一次界面变化,最多 [timeoutMs];等到返回 true。事件驱动的端口在有界面事件(无障碍事件、页面变动)时醒来,

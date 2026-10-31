@@ -17,7 +17,6 @@
     <string name="models_filter_hint">Type part of a model name</string>
     <string name="models_no_match">No model names match.</string>
     <string name="models_model_name">Model name</string>
-    <string name="models_model_name_hint">This provider has no list; enter it from the docs</string>
     <string name="models_use">Use</string>
     <string name="models_role_empty">No models to choose from yet. Add a provider first.</string>
     <string name="models_picker_note">Tags come from the provider and are for reference only; the choice is yours.</string>
@@ -94,13 +93,20 @@
     <string name="chatgpt_fail_mismatch">The sign-in reply didn’t match this attempt. Please try again.</string>
     <string name="chatgpt_fail_no_client">ChatGPT didn’t finish registering Mika. Please try again.</string>
     <string name="chatgpt_fail_timed_out">Sign-in timed out. Please try again.</string>
-    <string name="chatgpt_fail_exchange">ChatGPT didn’t accept this sign-in. Using your plan in Mika needs ChatGPT Plus or Pro; if you have one, please try again.</string>
+    <string name="chatgpt_fail_exchange">ChatGPT rejected this sign-in (error: %1$s). Please try again.</string>
+    <string name="chatgpt_fail_code_expired">The sign-in code expired or was already used. Please sign in again.</string>
+    <string name="chatgpt_fail_region">OpenAI doesn’t support the region your network is in. Try another network.</string>
+    <string name="chatgpt_fail_blocked">OpenAI’s protection blocked the request. Try another network or try again later.</string>
     <string name="chatgpt_fail_id_token">Couldn’t verify your ChatGPT account. Please try again.</string>
     <string name="chatgpt_fail_no_plan">Mika wasn’t allowed to use your ChatGPT plan. Sign in again and allow plan usage (needs Plus or Pro).</string>
     <string name="chatgpt_fail_network">Couldn’t reach ChatGPT. Check your network and try again.</string>
     <string name="chatgpt_page_title">Mika</string>
-    <string name="chatgpt_page_done">Signed in with ChatGPT. You can return to Mika.</string>
-    <string name="chatgpt_page_cancelled">Sign-in cancelled. You can return to Mika.</string>
+    <string name="chatgpt_page_done">Signed in. Return to Mika.</string>
+    <string name="chatgpt_signin_notif_title">Signing in to ChatGPT</string>
+    <string name="chatgpt_signin_notif_body">Waiting for you to sign in to ChatGPT in the browser</string>
     <string name="chatgpt_page_back">Return to Mika</string>
     <string name="chatgpt_no_browser">No browser found to sign in with ChatGPT.</string>
+    <string name="models_unverified">Not tested; tasks may fail</string>
+    <string name="models_unverified_note">This provider has no model list, and %1$s (in use) hasn’t passed a test, so tasks may fail. Tap “Test again” to make one test call with it.</string>
+    <string name="models_retest">Test again</string>
 </resources>

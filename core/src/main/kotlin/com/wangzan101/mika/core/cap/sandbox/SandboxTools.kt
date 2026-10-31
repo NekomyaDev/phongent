@@ -66,7 +66,7 @@ private const val OUTSIDE = "Paths must stay inside /workspace (or /opt/mika/ski
 private const val HINT_TRUNCATED = "The output was clipped to its head and tail. The full output is in fullOutputPath; read it with read_file (offset/limit)."
 private const val HINT_DROPPED = "Only the first 1 MB of output was kept. Write large output to a file instead of printing it."
 private const val HINT_TIMED_OUT = "The command hit its time limit and was stopped. Use a larger timeoutSec (up to 600) or do less per command."
-private const val HINT_KILLED = "被系统终止(内存不足): the system killed the command, most likely for lack of memory. Use a lighter approach (smaller inputs, process in parts)."
+private const val HINT_KILLED = "Killed by the system (out of memory): the system killed the command, most likely for lack of memory. Use a lighter approach (smaller inputs, process in parts)."
 private const val HINT_WORKSPACE_BIG = "The workspace uses more than 2 GB; delete files you no longer need (over 4 GB, writing is refused)."
 
 /** 六个沙箱工具的执行;文件类工具由 Kotlin 直接读写宿主目录,不起沙箱进程。 */

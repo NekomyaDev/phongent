@@ -10,9 +10,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import com.wangzan101.mika.core.tool.Verb
 
-internal const val SKILL_INDEX_HEADER = "可参考的技能(需要时用 skill_read 看全文):"
-internal const val KNOWLEDGE_INDEX_HEADER = "可参考的 App/网站知识(需要时用 knowledge_read 看全文):"
-internal const val PERSONAL_SKILL_HEADER = "用户的个人技能(为这个用户的这类事写的,以当前屏幕为准):"
+internal const val SKILL_INDEX_HEADER = "Skills you can refer to (read the full text with skill_read when needed):"
+internal const val KNOWLEDGE_INDEX_HEADER = "App and website knowledge you can refer to (read the full text with knowledge_read when needed):"
+internal const val PERSONAL_SKILL_HEADER = "The user's personal skill (written for this user's tasks of this kind; the current screen takes precedence):"
 internal const val PERSONAL_SKILL_LIMIT = 3000
 private const val RECOMMEND_COUNT = 3
 

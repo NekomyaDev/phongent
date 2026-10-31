@@ -18,7 +18,7 @@ import org.junit.Test
 class AboutCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    private val r020 = ReleaseInfo("0.2.0", "Mika 0.2.0", "- 新", "2026-11-05", "https://github.com/wangzan101/Mika/releases/tag/v0.2.0", null, null)
+    private val r020 = ReleaseInfo("0.2.0", "Mika 0.2.0", "- 新", "2026-11-05", "https://github.com/wangzan101/Mika/releases/tag/v0.2.0", null)
     private val r010 = r020.copy(version = "0.1.0")
 
     @Test
@@ -66,7 +66,9 @@ class AboutCopyTest {
         assertEquals(AboutCopy.GroupTaskGap.Model, gap(model = false, shell = BuiltinShellStatus.NotPaired))
         assertEquals(AboutCopy.GroupTaskGap.Phone, gap(shell = BuiltinShellStatus.NotPaired))
         assertEquals(AboutCopy.GroupTaskGap.Phone, gap(a11y = AccessibilityState.Off))
-        assertEquals(AboutCopy.GroupTaskGap.TooOld, gap(sdk = 31))
+        assertEquals(AboutCopy.GroupTaskGap.TooOld, gap(sdk = 30))
+        assertNull(gap(sdk = 31))
+        assertNull(gap(sdk = 32))
         assertEquals(Fix.AddModel, AboutCopy.GroupTaskGap.Model.fix)
         assertEquals(Fix.OpenPhoneSetup, AboutCopy.GroupTaskGap.Phone.fix)
     }

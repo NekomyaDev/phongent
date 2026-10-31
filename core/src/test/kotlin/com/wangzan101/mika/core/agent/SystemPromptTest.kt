@@ -133,7 +133,7 @@ class SystemPromptTest {
         val t = tool("hand_to_user")
         // 先核实、核实不了问三选一、零操作也核实、不按时长、跳过/超时不是交回、付款分项、先开页面
         assertTrue("read the screen first and check the result" in t)
-        assertTrue("ask_user" in t && "办完了 / 没办完,再接管一次 / 不办了" in t)
+        assertTrue("ask_user" in t && "\"Done\" / \"Not done, let me take over again\" / \"Stop\"" in t)
         assertTrue("Check even when inputCount is 0" in t && "Never go by durationMs" in t)
         assertTrue("Outcome skipped or timeout means nothing was handed back" in t)
         assertTrue("Say in message exactly what they need to do" in t)

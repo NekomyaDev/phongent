@@ -4,6 +4,8 @@
 
 # Mika
 
+简体中文 | [English](README.en.md)
+
 **你手机上的私人 AI 助理，替你操作 App、上网、把事办成。**
 
 它在一块看不见的后台屏上干活，你照样刷你的手机。
@@ -15,17 +17,46 @@ An on-device AI agent for Android that operates apps and the web to get things d
 <img src="https://img.shields.io/badge/sandbox-arm64-blue" alt="sandbox" />
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
 
-[下载 APK](https://github.com/wangzan101/Mika/releases/latest) · [快速开始](#快速开始) · [能做什么](#能做什么) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
-
-简体中文 | [English](README.en.md)
+[下载 APK](https://github.com/wangzan101/Mika/releases/latest) · [安装](#安装) · [快速开始](#快速开始) · [能做什么](#能做什么) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
 
 </div>
 
+## 安装
+
+**方式一：在手机上自己装**
+
+1. 从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK，安装。
+2. 打开 Mika 设置里的「设置手机操作」向导，配对一次无线调试（[设置指南](docs/setup-guide.md)）。
+3. 在设置里的「模型」添加服务商、填 API Key，或者用 ChatGPT 登录。
+
+每一步的细节见下文的[快速开始](#快速开始)。
+
+**方式二：让电脑上的 AI 助手帮你装**
+
+手机用数据线连上电脑，在手机上打开 USB 调试，然后把下面这句话发给电脑上能执行命令的 AI 助手：
+
+```
+请按 https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.md 的步骤，帮我把 Mika 安装到通过 USB 连着的安卓手机上。
+```
+
+它会检查手机、下载安装、打开需要的权限，需要你在手机上点的时候会停下来告诉你。API Key 由你自己在 Mika 里填，不经过它。
+
+**装好之后：让电脑上的 AI 工具直接用 Mika（MCP）**
+
+手机用数据线连着电脑，在电脑上运行：
+
+```
+adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/connect-computer.sh
+adb forward tcp:8765 tcp:8765
+```
+
+第一条会打开 Mika 的电脑连接，并打印连接信息（地址 `http://127.0.0.1:8765/mcp` 和令牌）；把它们填进电脑上 AI 工具的 MCP 配置，它就能给 Mika 派任务、查进度、拿结果。手机上不用点；只经数据线连接、要令牌，Wi-Fi 上连不到；付款这类确认只能在手机上点。用方式二安装时，AI 助手会顺手帮你接好。详见[电脑连接说明](docs/mcp.md)。
+
 > **English summary**
 >
-> Mika is an Android app that takes a one-sentence request and carries it out on your phone. It drives apps on a private background screen (so you can keep using your phone), browses the web in a built-in desktop-class browser, and runs scripts in a local Linux sandbox. You bring your own model API key (several providers are supported as presets, plus any OpenAI-compatible, Anthropic or Gemini endpoint). There is no Mika server: your requests go only to the model provider you configure.
+> Mika is an Android app that takes a one-sentence request and carries it out on your phone. It drives apps on a private background screen (so you can keep using your phone), browses the web in a built-in desktop-class browser, and runs scripts in a local Linux sandbox. You bring your own model API key (several providers are supported as presets, plus any OpenAI-compatible, Anthropic, Gemini or OpenAI Responses endpoint). There is no Mika server: your requests go only to the model provider you configure.
 >
-> Status: **public beta**, changing quickly (see [Releases](https://github.com/wangzan101/Mika/releases) for versions and changes). Install on Android 11+, tasks need Android 13+, Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI is available in English and Chinese (follows your system language; switch in Settings › Language); see the [full English README](README.en.md). Licensed under Apache-2.0.
+> Status: **public beta**, changing quickly (see [Releases](https://github.com/wangzan101/Mika/releases) for versions and changes). Chat, web and sandbox tasks work on Android 11+; phone app control needs Android 12+, with Android 14+ recommended. The sandbox runs on arm64 devices only. The app UI is available in Simplified Chinese, Traditional Chinese and English (follows your system language; switch in Settings › Language); see the [full English README](README.en.md). Licensed under Apache-2.0.
 
 ## Beta 说明
 
@@ -35,10 +66,21 @@ An on-device AI agent for Android that operates apps and the web to get things d
 
 ## 演示
 
+<p align="center"><img src="docs/media/wechat-send-side.gif" alt="后台操作微信，给文件传输助手发消息" width="520" /><br/>后台发微信：左边是 Mika 的对话页，右边是 Mika 在后台屏上的每一步<br/><sub>（加速 4 倍；聊天列表已打码）</sub></p>
+
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="260" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>
-<td align="center" width="50%"><img src="docs/media/xhs-summary.gif" alt="打开小红书，总结一位博主的内容" width="260" /><br/>打开小红书，总结一位博主的内容<br/><sub>（加速播放）</sub></td>
+<td align="center" width="33%"><img src="docs/media/wechat-group.gif" alt="后台翻完微信群，总结今天聊了啥" width="230" /><br/>后台翻完微信群，总结今天聊了啥<br/><sub>（加速播放；总结正文涉及群友发言，已打码）</sub></td>
+<td align="center" width="33%"><img src="docs/media/xhs-summary.gif" alt="打开小红书，总结一位博主的内容" width="230" /><br/>打开小红书，总结一位博主的内容<br/><sub>（加速播放）</sub></td>
+<td align="center" width="33%"><img src="docs/media/boss-greet.gif" alt="在 BOSS 直聘网页上给 3 个岗位打招呼" width="230" /><br/>在 BOSS 直聘网页上给 3 个岗位打招呼<br/><sub>（加速播放）</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/media/hacker-news.gif" alt="打开 Hacker News，读出首页前 5 条和分数" width="230" /><br/>打开 Hacker News，读出首页前 5 条和分数<br/><sub>（加速 1.5 倍）</sub></td>
+<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="在 Google Flights 上找旧金山到纽约最便宜的直飞" width="230" /><br/>在 Google Flights 上找旧金山到纽约最便宜的直飞<br/><sub>（加速 3 倍；价格按网络所在地区显示为港币）</sub></td>
+<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="在 Amazon 上找 30 美元以内、4.5 星以上的 USB-C 充电器，加进购物车，停在结账前" width="230" /><br/>在 Amazon 上找 30 美元以内、4.5 星以上的 USB-C 充电器，加进购物车，停在结账前<br/><sub>（加速 3.5 倍）</sub></td>
 </tr>
 </table>
 
@@ -105,8 +147,8 @@ An on-device AI agent for Android that operates apps and the web to get things d
 <!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
 | 类别 | 内置 |
 |---|---|
-| **App** | Android 设置、百家号、哔哩哔哩、BOSS直聘、得到、抖音、飞书、Gmail、即刻、快手、领英、QQ邮箱、今日头条、微信、微博、闲鱼、小红书、知乎 |
-| **网站** | 哔哩哔哩、豆瓣、抖音、Instagram、百度贴吧、微博、搜狗微信、小红书、小宇宙、YouTube、知乎、BOSS直聘 |
+| **App** | Android 设置、百家号、哔哩哔哩、BOSS直聘、Chrome、得到、抖音、飞书、Gmail、即刻、快手、领英、QQ邮箱、Telegram、今日头条、Uber、Uber Eats、微信、微博、WhatsApp、闲鱼、小红书、知乎 |
+| **网站** | Amazon、哔哩哔哩、Google Calendar、豆瓣、抖音、Instagram、Gmail、Google Maps、Telegram、百度贴吧、微博、搜狗微信、WhatsApp、小红书、小宇宙、YouTube、知乎、BOSS直聘 |
 | **通用做法**（技能） | 把内容整理成文字、处理 PDF 文档、查清一件事、消息与邮件 |
 <!-- generated:knowledge:end -->
 
@@ -124,21 +166,25 @@ An on-device AI agent for Android that operates apps and the web to get things d
 - 每个对话一个工作区，可以跑 Python、Node 和 shell 命令，处理你发来的文件，把结果存到手机的「下载/Mika」。
 - 默认断网，需要时在设置里的「文件与计算环境」打开「允许脚本联网」。只支持 arm64 设备。
 
+### 电脑上的 AI 工具也能用（MCP）
+
+手机连着电脑时，电脑上的 AI 工具可以通过 MCP 把任务交给 Mika，在手机上办完把结果拿回去。一条命令打开，只经数据线、要令牌；也可以在设置里打开局域网连接（默认关）。见[电脑连接说明](docs/mcp.md)。
+
 ## 快速开始
 
 ### 系统要求
 
 | 项目 | 要求 |
 |---|---|
-| 安装 | 安卓 11 及以上 |
-| 执行任务 | 安卓 13 及以上（后台屏和内置手机助手的要求） |
+| 安装、聊天、网页与沙箱任务 | 安卓 11 及以上（沙箱仅支持 arm64） |
+| 操作手机 App | 安卓 12 及以上；安卓 12、13 上后台操作可能影响主屏焦点 |
 | 推荐 | 安卓 14 及以上：后台屏有自己的焦点，不影响你在主屏打字；不同对话的任务同时进行也需要它 |
 | Linux 沙箱 | 仅 arm64 设备；其他设备照常安装，沙箱显示「此设备不支持」 |
 | 模型 | 一个支持工具调用的大模型 API Key |
 
 ### 1. 下载安装
 
-从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。国内下载慢的话，发布说明里有「国内备用下载」网盘链接。
+从 [Releases](https://github.com/wangzan101/Mika/releases/latest) 下载最新的 APK 安装。
 
 ### 2. 无障碍（可以先跳过）
 
@@ -152,6 +198,8 @@ Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成
 
 为什么要这一步：Mika 有一个内置的手机助手，要在后台屏上启动和操作 App，需要借用安卓自带的无线调试来启动它。全程在手机上完成，不需要电脑和数据线。配对过后，如果无线调试被系统关掉了（换 Wi-Fi、重启手机后安卓会关掉它），Mika 在你允许的前提下会自己把它重新打开。
 
+手边有电脑和数据线的话，也可以不配对：先打开一次 Mika，插着线在电脑上运行 `adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/usb-start.sh` 启动手机助手；但每次重启手机后都要再运行一次。这些也可以交给电脑上的 AI 助手，见[用电脑上的 AI 助手安装](docs/install-with-agent.md)。
+
 只用上网、文件和聊天的话，这一步可以先跳过。
 
 ### 4. 添加模型
@@ -160,14 +208,16 @@ Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成
 
 <!-- generated:providers:start -->
 <!-- 这一段由 ./gradlew updateReadme 生成，不要手改 -->
-内置 DeepSeek、通义千问、Kimi、智谱、OpenRouter、OpenCode Go、Anthropic、Gemini 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini 接口都能接。
+内置 DeepSeek、通义千问、Kimi、智谱、硅基流动、火山方舟、MiniMax、阶跃星辰、腾讯混元、百度千帆、OpenRouter、OpenCode Go、Anthropic、Gemini、OpenAI、xAI、Mistral、Groq、Ollama、LM Studio 等服务商预设；其他服务商选「自定义」，OpenAI 兼容、Anthropic、Gemini、OpenAI Responses 接口都能接。
 <!-- generated:providers:end -->
 
 也可以不填 Key，直接用 ChatGPT 登录（Plus 或 Pro，用你的套餐额度）：在添加服务商那里点「使用 ChatGPT 继续」，在浏览器里登录后回到 Mika。
 
-1. 添加服务商：选一个预设，或选「自定义」填接口地址；填 API Key。
+1. 添加服务商：选一个预设，或选「自定义」填接口地址；填 API Key。Ollama、LM Studio 这类自己机器上跑的服务，地址预填了默认端口，改成那台机器的地址即可，Key 可不填。
 2. 点「测试并保存」，连上第一家时会自动选一个主模型。
 3. 主模型要支持工具调用。可选：看图模型（看懂界面、看图找按钮）、轻量模型（便宜快的即可，处理判断结局、提取记忆等小事）。
+
+用 ChatGPT 登录或 Responses 接口的模型，可在各用途卡片下调整「思考强度」。默认用服务商默认值；选「用主模型」时也跟随它的强度，明确选同一个模型则可分别设置。档位优先采用服务商报告的列表；没报告时提供手动选项，实际支持情况以服务端为准。更高强度通常更慢、消耗更多 token。
 
 ### 5. 试一试
 
@@ -215,14 +265,14 @@ Mika 靠无障碍读界面、做点按。不用手动去开：下一步配对成
 **有的 App 页面读不到、截不到？**
 有些页面（比如付款、输密码）禁止截屏，Mika 看不到画面，也不会去识别上面的字。这类页面需要你接管处理，处理好交还给 Mika。
 
-**为什么要安卓 13？**
-Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏需要安卓 13 及以上。安卓 14 起后台屏有自己的焦点，不会影响你在主屏打字，所以更推荐。只用网页、沙箱和聊天，安卓 11、12 也能用。
+**为什么推荐安卓 14？旧系统能用吗？**
+Mika 在一块单独的后台屏上操作 App，安卓 12 起可以使用手机操作能力；安卓 12、13 上操作后台屏可能影响主屏焦点。安卓 14 起后台屏有自己的焦点，不会影响你在主屏打字，所以更推荐。只用网页、沙箱和聊天，安卓 11 也能用。
 
 **能用自己电脑或局域网里跑的模型吗？**
 可以。添加服务商时选「自定义」，接口地址填 `http://` 开头的也行，比如 `http://192.168.1.10:11434/v1`（手机和那台电脑在同一个 Wi-Fi 下）。本机和局域网的地址不加提示；不加密又不在局域网里的地址会提醒一句：API Key 和对话内容可能被同一网络里的人看到，能用 `https://` 就用。
 
 **APK 更新从哪来？**
-只从本仓库的 [GitHub Releases](https://github.com/wangzan101/Mika/releases) 发布。每个版本改了什么、国内备用下载链接，都写在那个版本的发布说明里。
+只从本仓库的 [GitHub Releases](https://github.com/wangzan101/Mika/releases) 发布。每个版本改了什么，都写在那个版本的发布说明里。
 
 ## 参与贡献
 
@@ -259,7 +309,7 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
 ### 模型配置细节
 
 - 三个用途：**主模型**（办事，要支持工具调用）、**看图模型**（描述界面、看图定位；新装默认不用，可选「用主模型」）、**轻量模型**（判断结局、提取记忆、理解意图等小事，默认用主模型）。
-- 「测试并保存」先调一次服务商公开的列模型接口，再让会当主模型的那个模型回一句很短的话（不带工具，用掉几个 token）；都成了才保存，哪一步不成当场说原因（服务端的报错原样显示）。服务不提供列表时只看能不能连上。不提供列表的服务可以手动填模型名。
+- 「测试并保存」先调一次服务商公开的列模型接口，再带一个试用的工具，请会当主模型的那个模型调用它（用掉几十个 token）；都成了才保存，哪一步不成当场说原因（服务端的报错原样显示）。先试哪个：这家自己的模型在前（例如通义千问先试名字里有 qwen 的），再是列表明说能调用工具的，向量、重排、语音、画图这类不试。试的模型是它自己的问题（这个账号没开通或没权限、没有这个模型、不会调用工具）时接着试下一个，至多 3 个：通过的当主模型，并说一句先试的哪个没通过；都没通过也保存服务商（Key 是对的），不定主模型，说明原因、请你从列表里选一个开通了的，选的时候先试调用。Key、网络、地址不对照旧不保存。没列出模型时（可能这家不提供列表，也可能地址或接口类型填错了），先填一个模型名，再测试就用它试调用，通了才保存；找不到这个模型时说清是哪个、模型名大概长什么样。自定义填的是某家的官方地址时，提醒改用那家的预设（一点就换，Key 留着）。不提供列表的服务商，在选用途时手填的模型名同样先试调用；以前没试过的，服务商那一行提醒「没测试通过」，点进去可以「重新测试」。
 - 模型列表上的能力标签（工具调用、看图、上下文长度）：接口给了的照实显示，没给的沿用预设初值并标「未确认」，只作参考，不拦。
 - 「看图定位已验证」在设置里的「开发者选项」（调试版可见），对当前看图模型生效。
 
@@ -273,13 +323,17 @@ Mika 在一块单独的后台屏上操作 App，内置手机助手和这块屏�
 ### 发布与更新（维护者）
 
 - 发布在 GitHub Releases，tag 用 `vX.Y.Z`，APK 作为附件挂在这个版本上。
-- 发布说明里单独一行写国内备用下载，格式固定：
-
-  ```
-  国内备用下载: <url>
-  ```
-
 - 检查更新：每次打开 App 查一次 `https://api.github.com/repos/wangzan101/Mika/releases/latest`，不经别的地址。
+- 关于页点「下载更新」后由系统下载服务在后台下载 APK，可查看进度、删除下载或失败后重试，重开应用仍可继续查看。下载完成后点「安装更新」，首次按提示允许 Mika 安装未知应用，再在系统安装页确认。安装前检查 APK 大小、发布附件提供的 SHA-256、包名、版本号和签名证书，系统安装器还会再验一次签名；自行编译、签名不同的版本不能直接覆盖成官方版，要先卸载。发布未包含 APK 时仍打开发布页。
+
+## Star 增长
+
+<a href="https://star-history.com/#wangzan101/Mika&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&theme=dark&v=20261031-1500" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&v=20261031-1500" width="600" />
+  </picture>
+</a>
 
 ## 联系作者
 

@@ -85,12 +85,12 @@ class AnthropicModel(
             .build()
     }
 
-    private fun mapError(status: Int, retryAfter: String?, body: String): ModelError = when {
+    private fun mapError(status: Int, retryAfter: String?, body: String): ModelError = ModelAccessErrors.of(status, body, model) ?: when {
         status == 401 || status == 403 -> ModelError.Auth()
         status == 402 || body.contains("credit balance is too low") -> ModelError.QuotaExceeded()
         status == 429 -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))
         status == 413 || body.contains("prompt is too long") -> ModelError.ContextTooLong()
-        status == 404 -> ModelError.ModelNotFound()
+        status == 404 -> ModelError.ModelNotFound(model)
         status == 529 || body.contains("overloaded_error") -> ModelError.Server(529)
         status in 500..599 -> ModelError.Server(status)
         else -> ModelError.BadResponse("HTTP $status ${body.take(200)}")
@@ -115,9 +115,12 @@ class AnthropicModel(
             if (blocks.isEmpty()) continue
             if (merged.lastOrNull()?.first == role) merged.last().second += blocks else merged += role to blocks.toMutableList()
         }
+        // 对话缓存到最后一条 user 消息为止,下一步的开头与它相同就从缓存取;助手消息可能以思考块结尾,不标
+        val lastUser = merged.indexOfLast { it.first == "user" }
         return buildJsonArray {
-            merged.forEach { (role, blocks) ->
-                add(buildJsonObject { put("role", role); put("content", JsonArray(blocks)) })
+            merged.forEachIndexed { i, (role, blocks) ->
+                val content = if (i == lastUser) blocks.dropLast(1) + JsonObject(blocks.last() + ("cache_control" to ephemeral)) else blocks
+                add(buildJsonObject { put("role", role); put("content", JsonArray(content)) })
             }
         }
     }
@@ -140,7 +143,7 @@ class AnthropicModel(
                     }
                 }
                 p is Part.Image -> buildJsonObject {
-                    put("type", "text"); put("text", "[截图已省略:当前模型不支持看图]")
+                    put("type", "text"); put("text", "[screenshot omitted: the current model cannot see images]")
                 }
                 else -> null
             }

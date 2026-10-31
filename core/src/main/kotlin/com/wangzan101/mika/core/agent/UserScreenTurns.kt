@@ -43,7 +43,7 @@ internal class UserScreenTurns(
             if (s == null || s.blocked) null else read { source?.image(id) }?.let(image)
         }
         val details = screens.mapNotNull { (_, s) ->
-            s?.let { "用户的屏幕 · ${it.app}" to UserScreenPrompt.detail(it, p.words.isEmpty(), canAskVision && !it.blocked, zone) }
+            s?.let { "user's screen · ${it.app}" to UserScreenPrompt.detail(it, p.words.isEmpty(), canAskVision && !it.blocked, zone) }
         }
         return Rendered(said, images, details, p.words)
     }

@@ -34,10 +34,37 @@ class StreamingModelsTest {
         val model = OpenAiCompatModel(server.url("/v1").toString().trimEnd('/'), "k", "m", caps, OkHttpClient())
         val reply = model.completeStreaming("s", user, emptyList(), updates::add)
         assertEquals(listOf("先", "先看"), updates)
-        assertEquals(listOf(Part.Thinking("private"), Part.Text("先看"), Part.ToolCall("c1", "phone_tap", """{"ref":"a1"}""")), reply.parts)
+        val thinking = Part.Thinking("private", ReasoningVia.ReasoningContent.tag(server.url("/v1/chat/completions").toString()))
+        assertEquals(listOf(thinking, Part.Text("先看"), Part.ToolCall("c1", "phone_tap", """{"ref":"a1"}""")), reply.parts)
         assertEquals(StopReason.ToolUse, reply.stopReason)
         assertEquals(Usage(10, 3), reply.usage)
         assertTrue(server.takeRequest().body.readUtf8().contains("\"stream\":true"))
+    }
+
+    /** 流式里思考在 `reasoning` 字段、或 `content` 是分块数组的,都认出来,记下收到的位置。 */
+    @Test fun openAiStreamReadsReasoningFieldAndChunkedContent() = runTest {
+        val model = OpenAiCompatModel(server.url("/v1").toString().trimEnd('/'), "k", "m", caps, OkHttpClient())
+        val endpoint = server.url("/v1/chat/completions").toString()
+        server.enqueue(stream(
+            """{"choices":[{"delta":{"reasoning":"想"}}]}""",
+            """{"choices":[{"delta":{"reasoning":"好了","content":"答"}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"stop"}]}""",
+            "[DONE]",
+        ))
+        val reply = model.completeStreaming("s", user, emptyList()) {}
+        assertEquals(listOf(Part.Thinking("想好了", ReasoningVia.Reasoning.tag(endpoint)), Part.Text("答")), reply.parts)
+
+        server.enqueue(stream(
+            """{"choices":[{"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"先"}]}]}}]}""",
+            """{"choices":[{"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"想"}]}]}}]}""",
+            """{"choices":[{"delta":{"content":"答案"}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"stop"}]}""",
+            "[DONE]",
+        ))
+        val updates = mutableListOf<String>()
+        val chunked = model.completeStreaming("s", user, emptyList(), updates::add)
+        assertEquals(listOf(Part.Thinking("先想", ReasoningVia.ThinkingChunks.tag(endpoint)), Part.Text("答案")), chunked.parts)
+        assertEquals(listOf("答案"), updates)
     }
 
     @Test fun anthropicStreamsTextAndToolInput() = runTest {

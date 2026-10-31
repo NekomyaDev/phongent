@@ -41,6 +41,7 @@ object UiTreeJson {
         if (!n.enabled) put("enabled", false)
         if (n.focused) put("focused", true)
         if (n.secret) put("secret", true)
+        if (n.wheel) put("wheel", true)
     }
 
     /** 路径按窗口和子节点序号定位;同一路径的属性变化只发该节点,新增节点发完整子树。 */

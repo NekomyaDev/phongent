@@ -11,7 +11,8 @@ import com.wangzan101.mika.ui.components.ValueTone
 
 /**
  * 「手机操作」引导、设置页和通知上的文字(纯函数,便于测试)。
- * 用大白话:只出现手机设置里本来就有的词(开发者选项、USB 调试、无线调试、配对码),不说 adb、端口、shell 这类说法。
+ * 用大白话:只出现手机设置里本来就有的词(开发者选项、USB 调试、无线调试、配对码),不说 adb、端口、shell 这类说法;
+ * 例外是连不上时请用户照着「无线调试」页面填端口的那几句。
  */
 object PhoneSetupCopy {
     val TITLE: String get() = tr(R.string.phone_title)
@@ -105,11 +106,23 @@ object PhoneSetupCopy {
     val PORT_INVALID: String get() = tr(R.string.phone_port_invalid)
 
     val WORKING: String get() = tr(R.string.phone_working)
+    /** 前面几种办法都没找到端口,正在扫本机。 */
+    val SCANNING_PORTS: String get() = tr(R.string.phone_scanning_ports)
+    /** 连接没成功时让用户自己填「无线调试」页面上的端口。 */
+    val CONNECT_PORT_LABEL: String get() = tr(R.string.phone_connect_port_label)
+    val CONNECT_PORT_HINT: String get() = tr(R.string.phone_connect_port_hint)
+    val CONNECT_PORT_SUBMIT: String get() = tr(R.string.phone_connect_port_submit)
     val SUCCESS_LINE: String get() = tr(R.string.phone_success)
     val SUCCESS_NOTE: String get() = tr(R.string.phone_success_note)
     /** 首次上手最后一步成功后的底部按钮;从设置进来的是 [SUCCESS_DONE]。 */
     val START_USING: String get() = tr(R.string.phone_start_using)
     val SUCCESS_DONE: String get() = tr(R.string.done)
+
+    /** 引导页底下的另一条路:用电脑经 USB 数据线起助手(命令本身不翻译)。 */
+    val USB_TOGGLE: String get() = tr(R.string.phone_usb_toggle)
+    val USB_BODY: String get() = tr(R.string.phone_usb_body)
+    val USB_COPY: String get() = tr(R.string.phone_usb_copy)
+    val USB_COPIED: String get() = tr(R.string.phone_usb_copied)
 
     data class FailureCopy(val title: String, val body: String)
 
@@ -141,6 +154,10 @@ object PhoneSetupCopy {
         BuiltinShellFailure.HelperStartFailed -> FailureCopy(
             tr(R.string.fail_helper),
             tr(R.string.fail_helper_body),
+        )
+        BuiltinShellFailure.UsbHelperStopped -> FailureCopy(
+            tr(R.string.fail_usb_stopped),
+            tr(R.string.fail_usb_stopped_body),
         )
         BuiltinShellFailure.Unknown -> FailureCopy(
             tr(R.string.fail_unknown),
@@ -186,6 +203,8 @@ object PhoneSetupCopy {
         is BuiltinShellStatus.Failed -> when (s.reason) {
             BuiltinShellFailure.NoWifi -> NO_WIFI_LINE
             BuiltinShellFailure.WifiNotAllowed -> tr(R.string.phone_line_joined, failure(s.reason).title, WIFI_NOT_ALLOWED_LINE)
+            // 停了要用户动手:直接说怎么再起
+            BuiltinShellFailure.UsbHelperStopped -> failure(s.reason).body
             else -> failure(s.reason).title
         }
     }

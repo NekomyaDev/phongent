@@ -137,8 +137,8 @@ class AgentLoopGateTest {
         val r = m.result(3)
         assertEquals("false", r.s("ok")); assertEquals("confirmation_required", r.s("error"))
         assertEquals("order", r.s("action")); assertEquals("提交订单", r.s("matched"))
-        assertTrue(r.s("message").startsWith("这一步要花钱(下单),没有执行。先调用 request_confirmation"))
-        assertTrue(r.s("message"), "无论它成功与否都会用掉" in r.s("message"))
+        assertTrue(r.s("message").startsWith("This step spends money (order), so it was not run. First call request_confirmation"))
+        assertTrue(r.s("message"), "uses it up whether it succeeds or not" in r.s("message"))
         // 打字后回车是发送:发消息不花钱,屏上有金额也照常做
         assertEquals(null, m.result(4)["error"])
         assertTrue("request_confirmation" in m.offeredTools[0])
@@ -165,7 +165,7 @@ class AgentLoopGateTest {
         l.answerConfirmation(true)
         com.wangzan101.mika.core.testing.assertAnswered(DONE, run.await())
         assertEquals("true", m.result(3).s("approved"))
-        assertTrue("无论成功与否都会用掉" in m.result(3).s("message"))
+        assertTrue("uses it up whether it succeeds or not" in m.result(3).s("message"))
         assertEquals(listOf("@e3"), s.taps)
         assertEquals("confirmation_required", m.result(5).s("error"))
         assertEquals(listOf(null, "approved", "required"), sink.events.filterIsInstance<RunEvent.Confirmation>().map { it.decision })
@@ -182,7 +182,7 @@ class AgentLoopGateTest {
         run.await()
         val r = m.result(4)
         assertEquals("confirmation_mismatch", r.s("error"))
-        assertTrue(r.s("message"), "重新调用 request_confirmation" in r.s("message"))
+        assertTrue(r.s("message"), "call request_confirmation again" in r.s("message"))
         // 第二次同意后先点了标题(放行执行),同意作废,再点发送又要确认
         assertEquals("confirmation_required", m.result(7).s("error"))
         assertEquals(1, s.taps.size)
@@ -197,7 +197,7 @@ class AgentLoopGateTest {
         l.answerConfirmation(false)
         assertEquals(TaskState.Failed("用户没同意,没有发送", FailKind.GaveUp), run.await())
         assertEquals("confirmation_declined", m.result(3).s("error"))
-        assertEquals("用户没有同意,不要再尝试这个操作;汇报现状后结束", m.result(3).s("message"))
+        assertEquals("The user did not approve. Do not try this action again; report where things stand, then end.", m.result(3).s("message"))
         assertEquals("confirmation_required", m.result(4).s("error"))
         // M2:同一 App 同类操作不再问,直接拒
         assertEquals("confirmation_declined", m.result(5).s("error"))
@@ -247,7 +247,7 @@ class AgentLoopGateTest {
         assertEquals("confirmation_required", r.s("error")); assertEquals("pay", r.s("action"))
         val msg = r.s("message")
         // 付款单说一条路:不叫先申请确认再说付款不用它
-        assertTrue(msg, "先调用 request_confirmation" !in msg)
+        assertTrue(msg, "First call request_confirmation" !in msg)
         assertTrue(msg, "hand_to_user" in msg && "reason=payment" in msg)
         assertTrue(msg, "item" in msg && "amount" in msg && "address" in msg)
     }
@@ -416,7 +416,7 @@ class AgentLoopGateTest {
         l.answerConfirmation(true)
         com.wangzan101.mika.core.testing.assertAnswered(DONE, run.await())
         assertEquals("approved_step_first", m.result(4).s("error"))
-        assertTrue(m.result(4).s("message").startsWith("先单独执行已同意的那一步"))
+        assertTrue(m.result(4).s("message").startsWith("Do the approved step on its own first"))
         assertEquals(listOf("@e3"), s.taps)
     }
 }

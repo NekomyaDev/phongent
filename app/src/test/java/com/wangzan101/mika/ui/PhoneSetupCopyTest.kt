@@ -36,7 +36,7 @@ class PhoneSetupCopyTest {
                 PhoneSetupCopy.NOTIFY_CODE_INVALID, PhoneSetupCopy.PAIRING_CHANNEL_OFF, PhoneSetupCopy.OPEN_PAIRING_CHANNEL,
                 PhoneSetupCopy.PAIRING_LOWERED, PhoneSetupCopy.NOTIFY_DONE_TITLE, PhoneSetupCopy.NOTIFY_DONE_TEXT,
                 PhoneSetupCopy.ACCESSIBILITY_SKIPPED, PhoneSetupCopy.APP_INFO, PhoneSetupCopy.TURNED_ON_NEXT,
-                PhoneSetupCopy.REVISIT_BACK, PhoneSetupCopy.REVISIT_NOTE,
+                PhoneSetupCopy.REVISIT_BACK, PhoneSetupCopy.REVISIT_NOTE, PhoneSetupCopy.CONNECT_PORT_SUBMIT,
             ),
         )
         suspects.forEach { add(PhoneSetupCopy.suspect(it)); add(PhoneSetupCopy.goBackTo(it.step)) }
@@ -56,12 +56,38 @@ class PhoneSetupCopyTest {
 
     @Test
     fun copyIsPlainChinese() {
+        // 连不上时要用户照着「无线调试」页面填端口:只有这一句直说「端口」
+        val portAllowed = PhoneSetupCopy.failure(BuiltinShellFailure.ConnectFailed).body
         allText().forEach { t ->
             assertTrue("empty copy", t.isNotBlank())
-            jargon.forEach { j -> assertFalse("「$j」 in: $t", t.contains(j, ignoreCase = true)) }
+            jargon.forEach { j -> if (!(j == "端口" && t == portAllowed)) assertFalse("「$j」 in: $t", t.contains(j, ignoreCase = true)) }
             // 只有系统里那个选项名本身带 adb
             if (t.contains("adb")) assertTrue(t, t.contains("「停用 adb 授权超时功能」"))
         }
+    }
+
+    /** 自动找不到端口时说清楚能做什么,并照着「无线调试」页面填端口。 */
+    @Test
+    fun connectFailureSaysWhatToTryAndHowToFindThePort() {
+        val body = PhoneSetupCopy.failure(BuiltinShellFailure.ConnectFailed).body
+        assertEquals("找不到无线调试的端口。可以：关掉再打开「无线调试」后重试；换用手机热点或家里的 Wi-Fi；或在下面手动填端口。", body)
+        assertEquals("填无线调试的端口", PhoneSetupCopy.CONNECT_PORT_LABEL)
+        assertTrue(PhoneSetupCopy.CONNECT_PORT_HINT.contains("「IP 地址和端口」冒号后面的数字"))
+        assertEquals("连接", PhoneSetupCopy.CONNECT_PORT_SUBMIT)
+        assertEquals("正在本机查找无线调试端口…", PhoneSetupCopy.SCANNING_PORTS)
+    }
+
+    @Test
+    fun connectPortInputAcceptsOnlyValidPorts() {
+        assertEquals(41235, ConnectPortInput.parse("41235"))
+        assertEquals(41235, ConnectPortInput.parse(" 41 235 "))
+        assertEquals(41235, ConnectPortInput.parse("４１２３５"))
+        // 整段粘了「IP 地址和端口」也行
+        assertEquals(41235, ConnectPortInput.parse("192.0.2.10:41235"))
+        assertEquals(41235, ConnectPortInput.parse("192.0.2.10：41235"))
+        assertEquals(1, ConnectPortInput.parse("1"))
+        assertEquals(65535, ConnectPortInput.parse("65535"))
+        for (bad in listOf("", " ", "0", "65536", "70000", "abc", "41a35", "-1", "192.0.2.10:")) assertNull(bad, ConnectPortInput.parse(bad))
     }
 
     @Test
@@ -146,6 +172,21 @@ class PhoneSetupCopyTest {
         assertEquals("已就绪" to ValueTone.Ok, PhoneSetupCopy.statusValue(BuiltinShellStatus.Running))
         assertEquals("已连接,能操作手机 App", PhoneSetupCopy.statusLine(BuiltinShellStatus.Running))
         assertTrue(PhoneSetupCopy.statusLine(BuiltinShellStatus.Running, usbDebugging = false).contains("Wi-Fi 断开后会停止"))
+    }
+
+    /** 电脑起的助手停了:设置页、横幅都直说停了,以及两条再起的路。 */
+    @Test
+    fun usbHelperStoppedSaysHowToStartItAgain() {
+        val stopped = BuiltinShellStatus.Failed(BuiltinShellFailure.UsbHelperStopped)
+        assertEquals("手机助手已停止", PhoneSetupCopy.failure(BuiltinShellFailure.UsbHelperStopped).title)
+        val line = PhoneSetupCopy.statusLine(stopped)
+        assertTrue(line, line.contains("USB 启动命令") && line.contains("配对无线调试"))
+        val banner = StatusCopy.banner(Problem.PhoneHelper(stopped))
+        assertEquals("手机助手已停止", banner.title)
+        assertEquals(line, banner.detail)
+        assertEquals("用电脑启动(USB 数据线)", PhoneSetupCopy.USB_TOGGLE)
+        assertTrue(PhoneSetupCopy.USB_BODY.contains("「USB 调试」"))
+        assertTrue(PhoneSetupCopy.USB_BODY.contains("重启后"))
     }
 
     @Test

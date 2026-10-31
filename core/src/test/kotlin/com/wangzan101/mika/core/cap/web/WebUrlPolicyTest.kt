@@ -85,11 +85,11 @@ class WebUrlPolicyTest {
     }
 
     @Test fun schemelessHostWithPortGetsSchemeMessage() {
-        assertEquals("网址要带 http:// 或 https://", WebUrlPolicy.checkNavigable("example.com:8080/a"))
-        assertEquals("网址要带 http:// 或 https://", WebUrlPolicy.checkNavigable("localhost:3000"))
+        assertEquals("the URL must start with http:// or https://", WebUrlPolicy.checkNavigable("example.com:8080/a"))
+        assertEquals("the URL must start with http:// or https://", WebUrlPolicy.checkNavigable("localhost:3000"))
         assertNull(WebUrlPolicy.external("example.com:8080"))
         assertNotNull(WebUrlPolicy.checkNavigable("ｈttp://example.com"))
-        assertTrue(WebUrlPolicy.checkNavigable("weixin://dl/scan")!!.contains("在手机上打开它"))
+        assertTrue(WebUrlPolicy.checkNavigable("weixin://dl/scan")!!.contains("open it on the phone"))
         assertTrue(WebUrlPolicy.checkNavigable("file:///a")!!.contains("http/https"))
     }
 

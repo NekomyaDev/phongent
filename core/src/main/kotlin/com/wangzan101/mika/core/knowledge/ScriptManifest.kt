@@ -14,7 +14,7 @@ data class ScriptEntry(val file: String, val runnable: Boolean, val needs: List<
  * run_bundled_script 与 knowledge_read、skill_read 都以它为准。
  */
 object ScriptManifest {
-    const val NEEDS_NETWORK = "需要联网:请在设置 → 高级里打开「允许脚本联网」"
+    const val NEEDS_NETWORK = "needs network access: the user can turn on \"Allow scripts to go online\" (允许脚本联网) in Mika's settings"
     private val json = Json { ignoreUnknownKeys = true }
     private val INTERPRETERS = mapOf("py" to "/usr/bin/python3", "mjs" to "/usr/bin/node", "js" to "/usr/bin/node", "sh" to "/bin/sh")
 
@@ -32,8 +32,8 @@ object ScriptManifest {
 
     /** 此刻能不能跑,不能时给出原因:标为不可运行的用它自己的原因;需要联网而联网关着的,提示去设置里打开。 */
     fun effectiveRunnable(e: ScriptEntry, networkAllowed: Boolean): Pair<Boolean, String?> = when {
-        !e.runnable -> false to (e.reason ?: "暂不可运行")
-        interpreterFor(e.file) == null -> false to "不支持的脚本类型"
+        !e.runnable -> false to (e.reason ?: "cannot be run for now")
+        interpreterFor(e.file) == null -> false to "unsupported script type"
         e.network && !networkAllowed -> false to NEEDS_NETWORK
         else -> true to null
     }

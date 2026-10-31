@@ -60,7 +60,7 @@ class ModelRouter(private val main: ChatModel, private val light: ChatModel?) {
         /** 这些动作之后的一步算恢复(等过用户)。 */
         internal val RECOVERY_VERBS = setOf(Verb.HandToUser, Verb.AskUser, Verb.RequestConfirmation)
         /** 这些动作会换前台 App 或网页(打开网址、换标签);之后的一步不算同一个地方。 */
-        internal val APP_SWITCH_VERBS = setOf(Verb.LaunchApp, Verb.OpenLink, Verb.ShareText, Verb.Navigate, Verb.Tabs)
+        internal val APP_SWITCH_VERBS = setOf(Verb.LaunchApp, Verb.OpenLink, Verb.ShareText, Verb.ShowAlarms, Verb.AddCalendarEvent, Verb.Navigate, Verb.Tabs)
     }
 }
 

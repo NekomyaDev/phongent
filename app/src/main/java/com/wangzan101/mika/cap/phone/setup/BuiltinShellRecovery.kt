@@ -10,7 +10,9 @@ import android.database.ContentObserver
 import android.os.Build
 import android.provider.Settings
 import com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility
+import com.wangzan101.mika.core.shell.A11yLossRecord
 import com.wangzan101.mika.core.shell.A11yObservation
+import com.wangzan101.mika.core.shell.A11yStartCheck
 import com.wangzan101.mika.core.shell.AccessibilityList
 import com.wangzan101.mika.core.shell.AccessibilityRepair
 import com.wangzan101.mika.core.shell.BootRestore
@@ -33,12 +35,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 内置助手的自动恢复和那几项能力。跑 shell 命令用已配对的连接 [runner](没配对时不给);
+ * 内置助手的自动恢复和那几项能力。跑 shell 命令用 [runner](经助手或已配对的连接;两样都没有时不给);
  * 能力与开机结果记在 [settings];[control] 是内置助手本身。由 [com.wangzan101.mika.cap.phone.PhoneServices] 建一份,
  * App 启动时由 [start] 开始看着连接。
  */
@@ -54,7 +57,8 @@ class BuiltinShellRecovery(
     private var started = false
 
     val permissions: RecoveryPermissions by lazy {
-        RecoveryPermissions({ runner.takeIf { control.status.value != BuiltinShellStatus.NotPaired } }, settings, app.packageName)
+        // 助手在运行(不论怎么起的)或配对过,命令就有路可走
+        RecoveryPermissions({ runner.takeIf { control.status.value == BuiltinShellStatus.Running || control.paired } }, settings, app.packageName)
     }
 
     /**
@@ -108,10 +112,23 @@ class BuiltinShellRecovery(
         if (started) return
         started = true
         scope.launch { permissions.applyWhenRunning(control.status) }
-        scope.launch { accessibilityRepair.watch(serviceObservations(), control.status) }
+        val service = accessibility
+        // 启动时看一眼:被强行停止后系统会把服务从列表里拿掉,或者在列表里却迟迟不绑定;记下来给诊断信息
+        val initial = service.value
+        val seen = settings.accessibilitySeen
+        scope.launch {
+            val connected = withTimeoutOrNull(A11yStartCheck.CONNECT_WAIT_MS) { service.first { it.connected } } != null
+            A11yStartCheck.loss(initial, connected, seen)?.let {
+                settings.recordA11yLoss(A11yLossRecord(it, System.currentTimeMillis()))
+            }
+        }
+        scope.launch { service.collect { if (it.connected) settings.accessibilitySeen = true } }
+        scope.launch { accessibilityRepair.watch(service, control.status) }
     }
 
-    /** 系统列表里有没有 Mika(跟着系统设置的变化)和服务实例是否连着(跟着连上、断开)。 */
+    /** 系统列表里有没有 Mika(跟着系统设置的变化)和服务实例是否连着(跟着连上、断开)。整个进程一份。 */
+    val accessibility: StateFlow<A11yObservation> by lazy { serviceObservations() }
+
     private fun serviceObservations(): StateFlow<A11yObservation> {
         val cr = app.contentResolver
         val me = PermissionCommands.accessibilityService(app.packageName)
@@ -141,6 +158,8 @@ class BuiltinShellRecovery(
 
     /** 开机后按已生效的「重启后自动恢复」重新打开无线调试并重起助手;不需要动手时返回 null。 */
     suspend fun restoreAfterBoot(): RestoreOutcome? {
+        // 没配对过(助手是电脑经 USB 起的):Mika 自己起不来助手,不去动无线调试
+        if (!control.paired) return null
         val holds = app.checkSelfPermission(PermissionCommands.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
         when (BootRestore.gate(Build.VERSION.SDK_INT, settings.consent.value, holds)) {
             BootRestore.Gate.Skip -> return null
@@ -156,7 +175,7 @@ class BuiltinShellRecovery(
             RecoveryPolicy.recover(
                 inputs = {
                     RecoveryInputs(
-                        paired = control.status.value != BuiltinShellStatus.NotPaired,
+                        paired = control.paired,
                         // 不在信任的 Wi-Fi 上时系统会把开关拨回去:每轮重读,拨回去就停
                         wirelessDebugging = DeveloperSettings.wirelessDebugging(cr),
                         status = control.status.value,

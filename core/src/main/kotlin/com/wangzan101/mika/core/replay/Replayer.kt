@@ -59,28 +59,28 @@ class Replayer(
         for ((i, step) in steps.withIndex()) {
             fun diverged(why: String, seen: String, executed: Boolean = false, error: String? = null): ReplayOutcome {
                 event(i, false, why)
-                return ReplayOutcome.Diverged(i, describe(step, choice.slots) + "($why)", seen, executed, error)
+                return ReplayOutcome.Diverged(i, describe(step, choice.slots) + " ($why)", seen, executed, error)
             }
-            val verb = tools.index[step.tool]?.takeIf { it.routable }?.verb ?: return diverged("不是可回放的动作", "")
+            val verb = tools.index[step.tool]?.takeIf { it.routable }?.verb ?: return diverged("not a replayable action", "")
             // 锁屏、被拿走时先等;等完再读屏,核对和执行都按等完之后的一屏(执行入口不再等第二次)
             gate()
-            val snap = read() ?: return diverged("读不到屏幕", "")
-            if (snap.protected) return diverged("页面受保护", PROTECTED_SEEN)
+            val snap = read() ?: return diverged("the screen could not be read", "")
+            if (snap.protected) return diverged("the page is protected", PROTECTED_SEEN)
             val seen = summary(snap)
-            step.before.packageName?.let { if (snap.packageName != it) return diverged("前台不是 $it", seen) }
+            step.before.packageName?.let { if (snap.packageName != it) return diverged("the foreground app is not $it", seen) }
             val names = snap.elements.map { it.name.trim() }.toSet()
             val need = minOf(2, step.before.texts.size)
-            if (step.before.texts.count { it in names } < need) return diverged("动作前的页面对不上", seen)
+            if (step.before.texts.count { it in names } < need) return diverged("the page before the action does not match", seen)
 
-            val args = build(step, choice.slots) ?: return diverged("参数里的槽填不上", seen)
+            val args = build(step, choice.slots) ?: return diverged("the slots in the arguments cannot be filled", seen)
             val target = step.target?.let { sel ->
-                find(snap, sel, choice.slots) ?: return diverged("目标元素不唯一或找不到", seen)
+                find(snap, sel, choice.slots) ?: return diverged("the target element is not unique or not found", seen)
             }
-            if (verb == Verb.Tap && target == null) return diverged("点击没有可核对的目标", seen)
+            if (verb == Verb.Tap && target == null) return diverged("the tap has no target to check", seen)
             // 链接只开参考资料里此刻还在的:资料改过,路线里记着的链接就不再放行
             if (verb == Verb.OpenLink) {
                 fun arg(k: String) = (args[k] as? JsonPrimitive)?.contentOrNull
-                if (!tools.linkAllowed(arg("action"), arg("uri"), arg("package"))) return diverged("链接现在不在参考资料里", seen)
+                if (!tools.linkAllowed(arg("action"), arg("uri"), arg("package"))) return diverged("the link is no longer in the reference material", seen)
             }
             val call = target?.let { JsonObject(args + mapOf("ref" to JsonPrimitive(it.ref), "snapshotId" to JsonPrimitive(snap.snapshotId))) } ?: args
 
@@ -88,16 +88,16 @@ class Replayer(
             val out = when (val o = executor.run(Part.ToolCall(id, step.tool, call.toString()), Origin.Replay)) {
                 is ActionOutcome.Ran -> o
                 is ActionOutcome.Refused -> when (o.code) {
-                    "guard_stopped", "guard_warning" -> return diverged("操作守卫提示", seen)
+                    "guard_stopped", "guard_warning" -> return diverged("the action guard raised a warning", seen)
                     "confirmation_required", "confirmation_mismatch" -> {
-                        event(i, false, "不可逆操作,交还模型确认")
+                        event(i, false, "irreversible action, handed back to the model for confirmation")
                         return ReplayOutcome.StoppedForConfirmation(i)
                     }
-                    "target_unresolved" -> return diverged("判不清点下去的是哪个元素", seen)
-                    "own_app" -> return diverged("作用在 Mika 自己身上", seen)
+                    "target_unresolved" -> return diverged("cannot tell which element the tap would hit", seen)
+                    "own_app" -> return diverged("it acts on Mika itself", seen)
                     else -> error("unexpected refusal ${o.code}")
                 }
-                is ActionOutcome.Cancelled -> return diverged("已取消", seen)
+                is ActionOutcome.Cancelled -> return diverged("cancelled", seen)
             }
             val exec = out.exec
             // 动作后只读一屏:路线锚点和「有没有出现预期文字」都用它
@@ -106,13 +106,13 @@ class Replayer(
             val now = fresh?.let { if (it.protected) PROTECTED_SEEN else summary(it) } ?: seen
             if (exec.outcome != null || exec.content["ok"] != JsonPrimitive(true)) {
                 val error = (exec.content["error"] as? JsonPrimitive)?.contentOrNull
-                return diverged("动作失败" + error?.let { ":$it" }.orEmpty(), now, executed = exec.outcome != null || error !in NOT_EXECUTED, error = error)
+                return diverged("the action failed" + error?.let { ": $it" }.orEmpty(), now, executed = exec.outcome != null || error !in NOT_EXECUTED, error = error)
             }
             val shown = fresh?.elements?.map { it.name.trim() }?.toSet().orEmpty()
             val landed = exec.content["changed"] == JsonPrimitive(true) || exec.content["verification"] == JsonPrimitive("match") ||
                 (effective && verb in OPENS) ||
                 step.after.texts.any { it in shown }
-            if (!landed) return diverged("动作后没有预期的变化", now, executed = true)
+            if (!landed) return diverged("no expected change after the action", now, executed = true)
             event(i, true, describe(step, choice.slots))
         }
         return ReplayOutcome.Completed(total)
@@ -163,7 +163,7 @@ class Replayer(
     private fun cy(b: List<Int>) = (b[1] + b[3]) / 2.0
 
     private fun summary(s: ScreenSnapshot): String =
-        "${s.packageName ?: "未知 App"}:" + s.elements.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct().take(8).joinToString("、")
+        "${s.packageName ?: "unknown app"}: " + s.elements.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct().take(8).joinToString(", ")
 
     private fun emit(e: RunEvent) {
         try { sink.event(e) } catch (x: CancellationException) { throw x } catch (x: Exception) { /* 记录失败不影响回放 */ }
@@ -178,7 +178,7 @@ class Replayer(
 
         /** 屏宽 15%(0–999 坐标)。 */
         private const val NEAR = 150.0
-        private const val PROTECTED_SEEN = "受保护页面"
+        private const val PROTECTED_SEEN = "a protected page"
         private val SLOT = Regex("\\{(\\d+)\\}")
 
         /** 把 `{n}` 换成第 n 个槽值;槽号不存在为 null。 */
@@ -193,7 +193,7 @@ class Replayer(
             val o = try { Json.parseToJsonElement(step.argsJson) as? JsonObject } catch (e: Exception) { null }
             val what = listOfNotNull(
                 step.target?.name?.let { fill(it, slots) }?.takeIf { it.isNotEmpty() }?.let { "「$it」" },
-                (o?.get("text") as? JsonPrimitive)?.contentOrNull?.let { fill(it, slots) }?.let { "输入「$it」" },
+                (o?.get("text") as? JsonPrimitive)?.contentOrNull?.let { fill(it, slots) }?.let { "type 「$it」" },
                 (o?.get("package") as? JsonPrimitive)?.contentOrNull,
                 (o?.get("direction") as? JsonPrimitive)?.contentOrNull,
                 (o?.get("key") as? JsonPrimitive)?.contentOrNull,

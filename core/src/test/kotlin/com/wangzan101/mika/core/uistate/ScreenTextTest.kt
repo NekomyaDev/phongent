@@ -26,7 +26,7 @@ class ScreenTextTest {
         val s = snap(*(1..500).map { el(it) }.toTypedArray())
         val out = ScreenText.render(s, 1000)
         assertTrue(out.length <= 1000)
-        val m = Regex("…还有 (\\d+) 个节点未显示,可滚动或缩小范围$").find(out)!!
+        val m = Regex("…(\\d+) more nodes not shown; scroll or narrow the range$").find(out)!!
         assertEquals(500, out.lines().size - 1 + m.groupValues[1].toInt())
     }
 

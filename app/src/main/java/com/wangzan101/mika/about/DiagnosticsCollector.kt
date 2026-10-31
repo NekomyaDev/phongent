@@ -79,6 +79,8 @@ object DiagnosticsCollector {
                     app.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(app.packageName)
                 }.getOrNull(),
                 lastRestore = phone.recoverySettings.lastRestore.value?.name,
+                helperRestores = phone.hub.restores.value,
+                lastA11yLoss = phone.recoverySettings.lastA11yLoss.value,
             ),
             models = models(app),
             runs = runs(app),
@@ -124,6 +126,7 @@ object DiagnosticsCollector {
             vision = role(ModelRole.Vision),
             light = role(ModelRole.Light),
             chatGptSignedIn = chatGpt != null && store.hasKey(chatGpt.id),
+            chatGptLastFailure = app.chatGptSignIn.lastFailure,
         )
     }
 

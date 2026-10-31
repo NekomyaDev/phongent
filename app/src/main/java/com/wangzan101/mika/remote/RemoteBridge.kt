@@ -230,7 +230,7 @@ class RemoteBridge(private val app: MikaApp) {
                                                 val conversation = selected ?: com.wangzan101.mika.chat.ConversationStore.shared(app).newConversation().also { app.chat.openConversation(it) }
                                                 check(app.chat.ui.value.conversationId == conversation) { "conversation_not_selected" }
                                                 prefs.edit().putString("conversation:$id", conversation).commit()
-                                                TaskService.startMcp(app, text, "ios", id, Attendance.Reachable, conversation)
+                                                TaskService.startMcp(app, text, conversation, id, Attendance.Reachable)
                                             } else {
                                                 val key = command.getString("runId")
                                                 val run = app.taskState.runs.value.firstOrNull { it.key == key } ?: error("stale_run")

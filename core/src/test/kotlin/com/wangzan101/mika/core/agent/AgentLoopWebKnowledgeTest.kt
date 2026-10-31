@@ -79,13 +79,13 @@ class AgentLoopWebKnowledgeTest {
         val m = run("搜小红书上的露营攻略", KnowledgeStore(listOf(xhs)), finish,
             facts = { ChannelFacts(setOf("com.xingin.xhs"), emptySet(), true) })
         val texts = m.requests[0].userTexts()
-        val line = texts.single { it.startsWith("可用渠道:") }
-        assertEquals("可用渠道:小红书 — App:已安装(com.xingin.xhs);网页:xiaohongshu.com", line)
+        val line = texts.single { it.startsWith("Available channels: ") }
+        assertEquals("Available channels: 小红书 — app: installed (com.xingin.xhs); web: xiaohongshu.com", line)
         // 渠道行在第一次调用模型时就在,且排在参考资料前面
         val kinds = m.requests[0].map { ContextBuilder.kindOf(it) }
         assertTrue(kinds.indexOf(ContextKind.Channel) in 0 until kinds.indexOf(ContextKind.AppKnowledge))
         val none = run("搜小红书上的露营攻略", KnowledgeStore(listOf(xhs)), finish)
-        assertTrue(none.requests[0].userTexts().none { it.startsWith("可用渠道:") })
+        assertTrue(none.requests[0].userTexts().none { it.startsWith("Available channels: ") })
     }
 
     @Test fun webPromptOnlyWhenWebAvailable() = runTest {
@@ -94,12 +94,12 @@ class AgentLoopWebKnowledgeTest {
         val web = SystemPrompt.read("web").lines().filterNot { "<!-- needs: share_file -->" in it || "<!-- needs: web_run_site_command -->" in it }.joinToString("\n")
         // 两组都收着:只有入口一段和选渠道一段
         val collapsed = run("t", KnowledgeStore(emptyList()), finish)
-        val entries = groups(setOf("phone_launch_app", "web_read_page", "web_navigate"))
+        val entries = groups(setOf("phone_launch_app", "phone_set_alarm", "web_read_page", "web_navigate"))
         assertEquals("BASE\n\n$entries\n\n" + SystemPrompt.read("channels"), collapsed.system)
         // 打开网页、再打开 App:两组都展开,段落按固定的先后
         val withWeb = run("t", KnowledgeStore(emptyList()), go("https://shop.example.com/a"), reply(call("phone_launch_app", """{"package":"com.x"}""")), finish)
         assertEquals("BASE\n\n$entries\n\n" + SystemPrompt.read("channels") + "\n\n" + SystemPrompt.read("handover") + "\n\n" + phone + "\n\n" + web, withWeb.system)
         val phoneOnly = run("t", KnowledgeStore(emptyList()), reply(call("phone_launch_app", """{"package":"com.x"}""")), finish, web = null)
-        assertEquals("BASE\n\n" + groups(setOf("phone_launch_app")) + "\n\n" + SystemPrompt.read("handover") + "\n\n" + phone, phoneOnly.system)
+        assertEquals("BASE\n\n" + groups(setOf("phone_launch_app", "phone_set_alarm")) + "\n\n" + SystemPrompt.read("handover") + "\n\n" + phone, phoneOnly.system)
     }
 }

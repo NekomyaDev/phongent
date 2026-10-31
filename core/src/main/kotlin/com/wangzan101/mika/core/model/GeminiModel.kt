@@ -92,11 +92,12 @@ class GeminiModel(
         val st = (err?.get("status") as? JsonPrimitive)?.contentOrNull.orEmpty()
         val msg = (err?.get("message") as? JsonPrimitive)?.contentOrNull ?: body
         val lower = msg.lowercase()
+        ModelAccessErrors.of(status, body, model)?.let { return it }
         return when {
             status == 401 || status == 403 -> ModelError.Auth()
-            // Gemini 的 429 一律按可重试限流处理(其限流与额度文案混用,无法可靠区分)
+            // 这个模型额度为零的 429 上面已认成用不了;其余 429 按可重试限流处理(其限流与额度文案混用,无法可靠区分)
             status == 429 || st == "RESOURCE_EXHAUSTED" -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter))
-            status == 404 -> ModelError.ModelNotFound()
+            status == 404 -> ModelError.ModelNotFound(model)
             status == 413 || (status == 400 && lower.contains("token") &&
                 (lower.contains("exceed") || lower.contains("too long") || lower.contains("maximum"))) -> ModelError.ContextTooLong()
             status in 500..599 -> ModelError.Server(status)
@@ -165,7 +166,7 @@ class GeminiModel(
                 p is Part.Image && capabilities.vision -> buildJsonObject {
                     putJsonObject("inlineData") { put("mimeType", p.mime); put("data", p.pngBase64) }
                 }
-                p is Part.Image -> buildJsonObject { put("text", "[截图已省略:当前模型不支持看图]") }
+                p is Part.Image -> buildJsonObject { put("text", "[screenshot omitted: the current model cannot see images]") }
                 else -> null
             }
         }

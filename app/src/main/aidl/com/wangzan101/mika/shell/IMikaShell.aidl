@@ -1,5 +1,7 @@
 package com.wangzan101.mika.shell;
 
+import android.app.PendingIntent;
+import android.content.Intent;
 import android.os.ParcelFileDescriptor;
 import android.os.Bundle;
 import android.view.Surface;
@@ -72,6 +74,16 @@ interface IMikaShell {
     // 在 Mika 自己的屏上按一根手指的一笔触摸:times[i] 毫秒(相对按下)时手指在 (xs[i], ys[i]);第一个点按下,最后一个点抬起。
     // 按时间逐个注入,注完才返回(至多约 10 秒);不是 Mika 的屏、参数不对或按下没注入成功返回 false
     boolean injectStroke(int displayId, in int[] xs, in int[] ys, in long[] times) = 34;
+    // 系统动作(设闹钟、计时器、打开闹钟列表、打开预填的新日程,见 SystemIntents;别的 intent 一律不启动),启动到这块屏。
+    // 先以 shell 身份启动;接手的页面要求 Mika 有的权限(如设闹钟)而 shell 没有时,改为发出 Mika 做好的 asMika(以 Mika 的身份启动、
+    // 屏仍是这块)。返回值同 startView:5=没有页面接,6=不在放行之列;接手的 App 在主屏有任务时不启动、返回 1
+    int startSystemAction(int displayId, in Intent intent, in PendingIntent asMika) = 35;
+    // 以 shell 身份跑一条设置用的命令(授权、无障碍列表等;和经已配对的无线调试跑一样),不限于某块屏;返回 exitCode 和 output。
+    // 助手是电脑经 USB 起的、没配对过无线调试时,Mika 的这类命令只能经这里
+    Bundle runCommand(String command) = 36;
+    // Mika 的进程被杀后助手要不要把它拉起来(RestoreWish.flags:1=拉起来 2=拉起来前写回无障碍服务)。
+    // 助手读不到 Mika 的设置,只记最后交来的这一份;Mika 每次交接后和心愿变了时都交一次
+    void setRestoreWish(int flags) = 37;
 
     // 沿用早先定下的销毁事务号;AIDL 要求要么全部方法编号要么都不编号
     void destroy() = 16777114;

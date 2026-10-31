@@ -4,6 +4,8 @@
 
 # Mika
 
+[简体中文](README.md) | English
+
 **A personal AI assistant on your phone that operates apps, browses the web and gets things done for you.**
 
 It works on a hidden background screen, so you can keep using your phone.
@@ -13,15 +15,44 @@ It works on a hidden background screen, so you can keep using your phone.
 <img src="https://img.shields.io/badge/sandbox-arm64-blue" alt="sandbox" />
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license" /></a>
 
-[Download APK](https://github.com/wangzan101/Mika/releases/latest) · [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [FAQ](#faq) · [Contributing](#contributing)
-
-[简体中文](README.md) | English
+[Download APK](https://github.com/wangzan101/Mika/releases/latest) · [Install](#install) · [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [FAQ](#faq) · [Contributing](#contributing)
 
 </div>
 
+## Install
+
+**Option 1: on the phone**
+
+1. Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it.
+2. Open the "Set up phone control" (设置手机操作) wizard in Mika's Settings and pair wireless debugging once ([setup guide](docs/setup-guide.en.md)).
+3. In "Models" (模型) in Settings, add a provider and enter your API key, or sign in with ChatGPT.
+
+Details for each step are in [Quick start](#quick-start) below.
+
+**Option 2: let an AI agent on your computer do it**
+
+Connect the phone to your computer with a USB cable, turn on USB debugging on the phone, and send this sentence to an AI agent on the computer that can run commands:
+
+```
+Follow https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.en.md to install Mika on the Android phone connected over USB.
+```
+
+It checks the phone, downloads and installs Mika, turns on the permissions it needs, and stops to tell you whenever something needs a tap on the phone. You enter your API key in Mika yourself; it never goes through the agent.
+
+**After installing: let AI tools on your computer use Mika (MCP)**
+
+With the phone connected by USB, run on the computer:
+
+```
+adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/connect-computer.sh
+adb forward tcp:8765 tcp:8765
+```
+
+The first command turns on Mika's computer access and prints the connection info (URL `http://127.0.0.1:8765/mcp` and a token). Add them to your AI tool's MCP config, and it can hand Mika tasks, check progress and get results. No tapping on the phone; USB only and token-protected, not reachable over Wi-Fi; confirmations such as payments can only be approved on the phone. With option 2, the AI agent can set this up for you. See the [computer access guide](docs/mcp.en.md).
+
 > **Language**
 >
-> - The app UI is in English and Chinese. It follows your system language (Chinese on a Chinese system, English otherwise), and you can switch in Settings › Language. Setting names below are given in English with the Chinese label in parentheses, e.g. 「设置手机操作」.
+> - The app UI is in Simplified Chinese, Traditional Chinese and English. It follows your system language (Simplified or Traditional Chinese to match a Chinese system, English otherwise), and you can switch in Settings › Language. Setting names below are given in English with the Chinese label in parentheses, e.g. 「设置手机操作」.
 > - The built-in knowledge about apps and websites is written in Chinese. That does not limit you: the model reads it fine, and you can talk to Mika in English.
 > - Many demos and built-in knowledge cover apps popular in China, but Mika is not tied to them: it can operate any app or website on your phone.
 
@@ -33,10 +64,21 @@ It works on a hidden background screen, so you can keep using your phone.
 
 ## Demo
 
+<p align="center"><img src="docs/media/wechat-send-side.gif" alt="Operating WeChat in the background to send a message to File Transfer" width="520" /><br/>Sending a WeChat message in the background: Mika's chat page on the left, each step on Mika's background screen on the right<br/><sub>(4× speed; the chat list is blurred)</sub></p>
+
 <table>
 <tr>
-<td align="center" width="50%"><img src="docs/media/wechat-group.gif" alt="Reads through a WeChat group in the background and summarizes today's chat" width="260" /><br/>Reads through a WeChat group in the background and summarizes today's chat<br/><sub>(sped up; the summary quotes group members, so its text is blurred)</sub></td>
-<td align="center" width="50%"><img src="docs/media/xhs-summary.gif" alt="Opens Xiaohongshu and summarizes a creator's posts" width="260" /><br/>Opens Xiaohongshu and summarizes a creator's posts<br/><sub>(sped up)</sub></td>
+<td align="center" width="33%"><img src="docs/media/hacker-news.gif" alt="Reads the top 5 Hacker News stories with their points" width="230" /><br/>Reads the top 5 Hacker News stories with their points<br/><sub>(1.5× speed)</sub></td>
+<td align="center" width="33%"><img src="docs/media/google-flights.gif" alt="Finds the cheapest nonstop SFO → New York flight on Google Flights" width="230" /><br/>Finds the cheapest nonstop SFO → New York flight on Google Flights<br/><sub>(3× speed; prices show in HKD because of the network region)</sub></td>
+<td align="center" width="33%"><img src="docs/media/amazon-cart.gif" alt="Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout" width="230" /><br/>Finds a USB-C charger under $30 rated 4.5★+ on Amazon, adds it to the cart and stops before checkout<br/><sub>(3.5× speed)</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/media/wechat-group.gif" alt="Reads through a WeChat group in the background and summarizes today's chat" width="230" /><br/>Reads through a WeChat group in the background and summarizes today's chat<br/><sub>(sped up; the summary quotes group members, so its text is blurred)</sub></td>
+<td align="center" width="33%"><img src="docs/media/xhs-summary.gif" alt="Opens Xiaohongshu and summarizes a creator's posts" width="230" /><br/>Opens Xiaohongshu and summarizes a creator's posts<br/><sub>(sped up)</sub></td>
+<td align="center" width="33%"><img src="docs/media/boss-greet.gif" alt="Greets recruiters for 3 jobs on the BOSS Zhipin website" width="230" /><br/>Greets recruiters for 3 jobs on the BOSS Zhipin website<br/><sub>(sped up)</sub></td>
 </tr>
 </table>
 
@@ -105,8 +147,8 @@ Apps and websites that already have usage knowledge (names as they appear in the
 <!-- Generated by ./gradlew updateReadme; do not edit by hand -->
 | Category | Built in |
 |---|---|
-| **Apps** | Android 设置, 百家号, 哔哩哔哩, BOSS直聘, 得到, 抖音, 飞书, Gmail, 即刻, 快手, 领英, QQ邮箱, 今日头条, 微信, 微博, 闲鱼, 小红书, 知乎 |
-| **Websites** | 哔哩哔哩, 豆瓣, 抖音, Instagram, 百度贴吧, 微博, 搜狗微信, 小红书, 小宇宙, YouTube, 知乎, BOSS直聘 |
+| **Apps** | Android 设置, 百家号, 哔哩哔哩, BOSS直聘, Chrome, 得到, 抖音, 飞书, Gmail, 即刻, 快手, 领英, QQ邮箱, Telegram, 今日头条, Uber, Uber Eats, 微信, 微博, WhatsApp, 闲鱼, 小红书, 知乎 |
+| **Websites** | Amazon, 哔哩哔哩, Google Calendar, 豆瓣, 抖音, Instagram, Gmail, Google Maps, Telegram, 百度贴吧, 微博, 搜狗微信, WhatsApp, 小红书, 小宇宙, YouTube, 知乎, BOSS直聘 |
 | **How-to skills** | 把内容整理成文字, 处理 PDF 文档, 查清一件事, 消息与邮件 |
 <!-- generated:knowledge:end -->
 
@@ -124,21 +166,25 @@ Apps and websites that already have usage knowledge (names as they appear in the
 - Each conversation gets a workspace that can run Python, Node and shell commands, process files you send, and save results to your phone's Download/Mika folder.
 - Offline by default; when needed, turn on "Allow scripts to access the network" (允许脚本联网) under "Files & compute" (文件与计算环境) in Settings. arm64 devices only.
 
+### AI tools on your computer can use it (MCP)
+
+With the phone connected to a computer, AI tools there can hand Mika tasks over MCP and get the results back. One command turns it on; USB only and token-protected. A LAN option is in Settings, off by default. See the [computer access guide](docs/mcp.en.md).
+
 ## Quick start
 
 ### Requirements
 
 | Item | Requirement |
 |---|---|
-| Install | Android 11 or later |
-| Run tasks | Android 13 or later (required by the background screen and the built-in phone helper) |
+| Install, chat, web and sandbox tasks | Android 11 or later (sandbox requires arm64) |
+| Phone app control | Android 12 or later; background work may affect main-screen focus on Android 12–13 |
 | Recommended | Android 14 or later: the background screen has its own focus, so it does not interfere with your typing on the main screen; running tasks from different conversations at the same time also needs it |
 | Linux sandbox | arm64 devices only; on other devices the app installs normally and the sandbox shows "not supported on this device" |
 | Model | An API key for an LLM that supports tool calling |
 
 ### 1. Download and install
 
-Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it. If downloads are slow in mainland China, the release notes include a mirror link (国内备用下载).
+Download the latest APK from [Releases](https://github.com/wangzan101/Mika/releases/latest) and install it.
 
 ### 2. Accessibility (you can skip it for now)
 
@@ -152,6 +198,8 @@ First time, stuck on a step, or not sure where the pairing code goes? See the [p
 
 Why this step: Mika has a built-in phone helper that launches and operates apps on the background screen, and it uses Android's own wireless debugging to start that helper. Everything happens on the phone; no computer or cable needed. After pairing, if the system turns wireless debugging off (Android does this when you change Wi-Fi or reboot), Mika turns it back on by itself, with your permission.
 
+If you have a computer and a USB cable at hand, you can skip pairing: open Mika once, then with the cable plugged in run `adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/usb-start.sh` on the computer to start the phone helper; this has to be run again after every phone restart. An AI agent on your computer can do this for you; see [Installing Mika with an AI agent](docs/install-with-agent.en.md).
+
 If you only want web browsing, files and chat, you can skip this step for now.
 
 ### 4. Add a model
@@ -160,14 +208,16 @@ Open "Models" (模型) in Settings (the app also walks you through this on first
 
 <!-- generated:providers:start -->
 <!-- Generated by ./gradlew updateReadme; do not edit by hand -->
-Presets for DeepSeek, 通义千问, Kimi, 智谱, OpenRouter, OpenCode Go, Anthropic, Gemini and more; for any other provider pick Custom (自定义), which takes any OpenAI-compatible, Anthropic or Gemini endpoint.
+Presets for DeepSeek, 通义千问, Kimi, 智谱, 硅基流动, 火山方舟, MiniMax, 阶跃星辰, 腾讯混元, 百度千帆, OpenRouter, OpenCode Go, Anthropic, Gemini, OpenAI, xAI, Mistral, Groq, Ollama, LM Studio and more; for any other provider pick Custom (自定义), which takes any OpenAI-compatible, Anthropic, Gemini or OpenAI Responses endpoint.
 <!-- generated:providers:end -->
 
 You can also skip the API key and sign in with ChatGPT (Plus or Pro, uses your plan's usage): tap "Continue with ChatGPT" when adding a provider, sign in in the browser, then come back to Mika.
 
-1. Add a provider: pick a preset, or pick Custom and enter the endpoint URL; enter your API key.
+1. Add a provider: pick a preset, or pick Custom and enter the endpoint URL; enter your API key. For servers you run yourself, such as Ollama or LM Studio, the address is prefilled with the default port; change it to that machine’s address, and the key is optional.
 2. Tap "Test and save" (测试并保存). When you connect your first provider, a main model is picked automatically.
 3. The main model must support tool calling. Optional: a vision model (understands the UI and finds buttons in screenshots) and a light model (anything cheap and fast; handles small jobs like judging task outcomes and extracting memories).
+
+For ChatGPT sign-in and Responses models, adjust **Reasoning effort** below each role card. The default leaves the choice to the provider. "Use main model" inherits its effort; explicitly picking the same model lets each role use a different effort. Options come from the provider's model list when available; otherwise manual options are offered, subject to server support. Higher effort usually takes longer and uses more tokens.
 
 ### 5. Try it
 
@@ -215,14 +265,14 @@ The system sometimes stops accessibility services (e.g. after the process is cle
 **Some app screens cannot be read or captured?**
 Some screens (e.g. payment or password entry) block screenshots, so Mika cannot see them and will not try to read text on them. You need to take over on those screens and hand back to Mika when done.
 
-**Why Android 13?**
-Mika operates apps on a separate background screen, and the built-in phone helper and that screen need Android 13 or later. From Android 14 the background screen has its own focus and does not interfere with your typing on the main screen, so it is recommended. Web, sandbox and chat also work on Android 11 and 12.
+**Why recommend Android 14? What about older systems?**
+Mika operates apps on a separate background screen. Phone control is available from Android 12, but background work can affect main-screen focus on Android 12–13. From Android 14 the background screen has its own focus and does not interfere with your typing on the main screen, so it is recommended. Web, sandbox and chat also work on Android 11.
 
 **Can I use a model running on my own computer or LAN?**
 Yes. When adding a provider choose "Custom" (自定义); the base URL may start with `http://`, e.g. `http://192.168.1.10:11434/v1` (with the phone on the same Wi-Fi). Local and LAN addresses show no warning; an unencrypted address outside your LAN shows a short warning, since your API key and chats could be seen by others on the network. Use `https://` when you can.
 
 **Where do APK updates come from?**
-Only from this repository's [GitHub Releases](https://github.com/wangzan101/Mika/releases). Each release's notes list what changed and the mainland China mirror link.
+Only from this repository's [GitHub Releases](https://github.com/wangzan101/Mika/releases). Each release's notes list what changed.
 
 ## Contributing
 
@@ -259,7 +309,7 @@ The debug build is not precompiled and its UI is several times slower; use the p
 ### Model configuration details
 
 - Three roles: the **main model** (does the work; must support tool calling), the **vision model** (describes the UI and locates things in screenshots; off by default on a fresh install, or choose "use main model"), and the **light model** (small jobs like judging outcomes, extracting memories and understanding intent; defaults to the main model).
-- "Test and save" calls the provider’s public list-models endpoint once, then asks the model that would become your main model for a very short reply (no tools, a few tokens). Only if both work is the provider saved; otherwise you see why right away, including the server’s own error message. For providers without a list endpoint only the connection is checked. For providers without a list endpoint you can type the model name by hand.
+- "Test and save" calls the provider’s public list-models endpoint once, then gives the model that would become your main model a test tool and asks it to call it (a few dozen tokens). Only if both work is the provider saved; otherwise you see why right away, including the server’s own error message. Which model is tried first: the provider’s own models (for Qwen, ones with “qwen” in the name), then ones the list says can call tools; embedding, rerank, speech and image models are skipped. If the tried model fails for a reason of its own (your account hasn’t activated it or has no access, there is no such model, or it doesn’t call tools), the next one is tried, up to 3: the one that passes becomes your main model and you’re told which ones didn’t; if none passes, the provider is still saved (the key works) without a main model, and you’re asked to pick an activated one from the list, which is tested before it’s used. Key, network and address problems still stop the save. If no models are listed (the provider may not offer a list, or the address or interface type may be wrong), you enter a model name and the test call uses it; it’s saved only if that works, and a missing model is reported by name with an example of what model names look like. If a custom address is a known provider’s official one, you’re offered that provider’s preset (one tap, your key is kept). For providers without a list, a model name typed when picking a role is tested the same way first; ones that were never tested show “Not tested” on the provider row, with “Test again” on its page.
 - Capability tags on the model list (tool calling, vision, context length) show what the API reports; anything it does not report falls back to the preset's initial values and is marked "unconfirmed". They are for reference only and never block anything.
 - "Vision grounding verified" lives in "Developer options" in Settings (visible in debug builds) and applies to the current vision model.
 
@@ -273,13 +323,16 @@ The debug build is not precompiled and its UI is several times slower; use the p
 ### Releases and updates (maintainers)
 
 - Releases are published on GitHub Releases with tags `vX.Y.Z`, with the APK attached to the release.
-- The release notes carry the mainland China mirror on its own line, in a fixed format:
-
-  ```
-  国内备用下载: <url>
-  ```
-
 - Update checks: each time you open the app it queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
+
+## Star history
+
+<a href="https://star-history.com/#wangzan101/Mika&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&theme=dark&v=20261031-1500" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=wangzan101/Mika&type=Date&v=20261031-1500" width="600" />
+  </picture>
+</a>
 
 ## Contact
 
