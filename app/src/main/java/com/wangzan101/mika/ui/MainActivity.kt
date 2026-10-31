@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG && intent.getBooleanExtra("agent_model_probe", false)) com.wangzan101.mika.remote.ModelDiagnostics.run(this)
         requestedConversation = intent.getStringExtra(EXTRA_OPEN_CONVERSATION)
         monitor = SystemStatusMonitor(this, PhoneServices.of(this).shellControl)
         val store = ProviderStore.get(this)
@@ -95,11 +96,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (BuildConfig.DEBUG && intent.getBooleanExtra("agent_model_probe", false)) com.wangzan101.mika.remote.ModelDiagnostics.run(this)
         requestedConversation = intent.getStringExtra(EXTRA_OPEN_CONVERSATION)
     }
 
     override fun onStart() {
         super.onStart()
+        com.wangzan101.mika.remote.LanService.start(this)
         monitor.start()
         // 每次打开都悄悄查一次新版本(两分钟内连着打开的只查一次),失败不吭声
         (application as MikaApp).updates.autoCheckInBackground()

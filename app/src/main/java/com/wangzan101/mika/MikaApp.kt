@@ -238,6 +238,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) com.wangzan101.mika.remote.RemoteBridge(this).start()
         // 界面以外的文字(通知、服务、悬浮胶囊)按 App 语言取
         AppLanguage.applyDefaultLocale(this)
         UiText.source = ResourceTexts { AppLanguage.resources(this) }

@@ -751,6 +751,8 @@ class ChatViewModel(
     }
 
     /** 这个对话存下的轮次,连同各轮导出的文件和此刻的记忆与技能提示。 */
+    fun remoteExchanges(conversationId: String): List<Exchange> = if (_ui.value.conversationId == conversationId) _ui.value.exchanges else saved(conversationId)
+
     private fun saved(conversationId: String): List<Exchange> =
         runCatching { store.records(conversationId) }.getOrDefault(emptyList()).map { (t, files) -> withSummarizing(withNotes(fromTurn(t).copy(files = files), runNotes.value)) }
 

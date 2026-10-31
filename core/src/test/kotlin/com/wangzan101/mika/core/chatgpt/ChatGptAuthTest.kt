@@ -218,6 +218,18 @@ class ChatGptAuthTest {
         try { tokens.get(false); fail() } catch (e: ModelError.SignInExpired) { }
     }
 
+    @Test fun regionRejectionIsNotMisreportedAsInvalidKeyAndKeepsSession() = runTest {
+        var stored: ChatGptSession? = session(expiresAt = 0)
+        val original = stored
+        val tokens = ChatGptTokens(auth, { stored }, { stored = it }, now = { clock })
+        server.enqueue(MockResponse().setResponseCode(403).setBody("""{"error":{"code":"unsupported_country_region_territory"}}"""))
+        try { tokens.get(false); fail() } catch (e: ModelError.ChatGptNotEligible) {
+            assertTrue(e.message.orEmpty().contains("unsupported_country_region_territory"))
+        }
+        assertEquals(original, stored)
+        assertEquals(1, server.requestCount)
+    }
+
     @Test fun sessionRoundTripsThroughJson() {
         val s = session()
         assertEquals(s, ChatGptSession.fromJson(s.toJson()))

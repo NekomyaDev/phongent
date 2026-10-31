@@ -792,8 +792,8 @@ class TaskService : Service() {
                 .apply { if (checking) putExtra(EXTRA_TRIGGER_ACTION, goal) })
         }
 
-        fun startMcp(context: Context, goal: String, threadId: String, externalId: String, attendance: Attendance) {
-            val conversation = java.util.UUID.nameUUIDFromBytes("mcp:$threadId:$externalId".toByteArray(Charsets.UTF_8)).toString()
+        fun startMcp(context: Context, goal: String, threadId: String, externalId: String, attendance: Attendance, conversationId: String? = null) {
+            val conversation = conversationId ?: java.util.UUID.nameUUIDFromBytes("mcp:$threadId:$externalId".toByteArray(Charsets.UTF_8)).toString()
             context.startForegroundService(Intent(context, TaskService::class.java).setAction(ACTION_START_MCP)
                 .putExtra(EXTRA_GOAL, goal).putExtra(EXTRA_CONVERSATION, conversation)
                 .putExtra(EXTRA_MCP_ID, externalId).putExtra(EXTRA_ATTENDANCE, attendance.name))

@@ -76,6 +76,9 @@ class ChatGptTokens(
                 next.accessToken
             }
             is TokenResult.Rejected -> {
+                if (r.code == "unsupported_country_region_territory") {
+                    throw ModelError.ChatGptNotEligible("OpenAI 拒绝当前网络出口所在地区，登录令牌无法刷新（unsupported_country_region_territory）")
+                }
                 if (r.terminal) {
                     save(s.signedOut())
                     throw ModelError.SignInExpired()

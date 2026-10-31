@@ -173,6 +173,7 @@ class ResponsesModel(
 
     /** 流里的 `response.failed` / `error`,以及 HTTP 出错时内容里的 `error.code`。认不出的代码为 null。 */
     private fun errorOf(code: String?, message: String, param: String?): ModelError? = when (code) {
+        "unsupported_country_region_territory" -> ModelError.ChatGptNotEligible("OpenAI 拒绝当前网络出口所在地区（unsupported_country_region_territory）")
         "subscription_sharing_usage_limit_exceeded" -> ModelError.ChatGptLimitReached()
         "subscription_sharing_user_not_eligible" -> ModelError.ChatGptNotEligible(message.take(200))
         // 服务端一时不可用:保留登录,过一会儿再试

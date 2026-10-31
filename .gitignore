@@ -16,3 +16,10 @@ dist/
 
 # 给 AI 编程助手的本地规则,只留在本机
 CLAUDE.md
+
+# Remote bridge local secrets and build metadata
+relay/.local/
+ios/*.xcodeproj/xcuserdata/
+*.p8
+*.jks
+*.pem

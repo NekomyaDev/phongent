@@ -69,6 +69,8 @@ class ChatGptAuth(
     private val random: SecureRandom = SecureRandom(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    @Volatile var lastTokenDiagnostic: String = "not_requested"
+        private set
     private val tokenUrl = "$issuer/api/accounts/oauth/token"
     private val revokeUrl = "$issuer/api/accounts/oauth/revoke"
     private val jwksUrl = "$issuer/.well-known/jwks.json"
@@ -138,18 +140,22 @@ class ChatGptAuth(
     }
 
     private suspend fun token(form: FormBody): TokenResult {
+        lastTokenDiagnostic = "requesting"
         val raw = try {
             HttpSupport.execute(http, Request.Builder().url(tokenUrl).post(form).build())
         } catch (e: CancellationException) {
             throw e
         } catch (e: ModelError) {
+            lastTokenDiagnostic = "network_or_transport:" + e.javaClass.simpleName
             return TokenResult.Failed(e)
         }
+        lastTokenDiagnostic = "http_" + raw.status
         val root = runCatching { json.parseToJsonElement(raw.body) as? JsonObject }.getOrNull()
         if (raw.status in 500..599) return TokenResult.Failed(ModelError.Server(raw.status))
         if (raw.status != 200) {
             val code = root?.let { (it["error"] as? JsonObject)?.str("code") ?: it.str("error") ?: it.str("code") } ?: "http_${raw.status}"
             val detail = root?.let { it.str("error_description") ?: (it["error"] as? JsonObject)?.str("message") }
+            lastTokenDiagnostic = "http_${raw.status}:" + code.takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,80}")) }.orEmpty()
             return TokenResult.Rejected(code, code in TERMINAL_REFRESH_ERRORS, detail)
         }
         val access = root?.str("access_token") ?: return TokenResult.Failed(ModelError.BadResponse("换令牌的返回里没有 access_token"))

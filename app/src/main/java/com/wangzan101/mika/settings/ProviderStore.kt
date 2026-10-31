@@ -87,7 +87,7 @@ data class ProviderConfig(
             }
 
             /** 添加自定义服务商时可选的接口类型(填地址和 API Key 的)。 */
-            val withApiKey: List<Kind> = listOf(OpenAiCompat, Anthropic, Gemini)
+            val withApiKey: List<Kind> = listOf(OpenAiCompat, OpenAiResponses, Anthropic, Gemini)
         }
     }
 }
