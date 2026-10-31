@@ -55,8 +55,8 @@ adb shell getprop ro.build.version.sdk
 ```
 
 - Below 30 (older than Android 11): Mika cannot be installed. Tell the user the system is too old and stop.
-- 30 to 32 (Android 11 and 12): Mika installs, but cannot operate apps (the background screen needs Android 13). Only web, files and chat work. Tell the user and ask whether to continue.
-- 33 or higher (Android 13+): tasks work. 34 or higher (Android 14+) is best.
+- 30 (Android 11): Mika installs, but cannot operate apps (phone control needs Android 12). Only web, files and chat work. Tell the user and ask whether to continue.
+- 31 to 33 (Android 12 and 13): tasks work, but background work may briefly take input focus away from the main screen. 34 or higher (Android 14+) is best.
 
 ### 1.4 CPU architecture
 

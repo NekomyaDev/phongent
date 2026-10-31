@@ -6,7 +6,7 @@ This guide walks you through "Set up phone control" in Mika. No technical knowle
 
 ## Before you start
 
-- **What you need**: an Android phone running Android 13 or later (Mika installs on older versions but can't use apps there), connected to any Wi-Fi network (internet access not required, just being connected is enough).
+- **What you need**: an Android phone running Android 12 or later (Mika installs on Android 11 but can't use apps there; Android 14 or later recommended), connected to any Wi-Fi network (internet access not required, just being connected is enough).
 - **Why this is needed**: Mika uses apps for you on an invisible "background screen", so you can keep using your own screen. To do that, Mika borrows Android's built-in "Wireless debugging" to start a small built-in helper.
 - **Everything happens on the phone**: no computer, no cable.
 - **You do it once**: after pairing once, Mika connects by itself. Even if the system later turns wireless debugging off, Mika turns it back on, with your permission.
