@@ -301,6 +301,7 @@ adb shell settings get secure enabled_accessibility_services
 | 连不上 GitHub | 请用户在浏览器里打开 [Releases](https://github.com/wangzan101/Mika/releases/latest) 手动下载 APK，然后 `adb install -r <APK 文件路径>`。 |
 | 无线调试打不开 | 手机要连着 Wi-Fi；在弹框里允许在此网络上使用无线调试。实在不行就用 B。 |
 | AI 工具经 USB 连不上 Mika（第 10 步） | 再运行一次 `adb forward tcp:8765 tcp:8765`（每次拔插数据线后都要）。手机重启过的话，再运行一次第 10 步打开的那条命令，并换上新令牌。 |
+| 转发报 `cannot bind`，或连上后返回的不是 Mika 的内容（第 10 步） | 电脑上 8765 端口被别的程序占了。换一个空闲端口转发，比如 `adb forward tcp:18765 tcp:8765`，配置里的地址改成 `http://127.0.0.1:18765/mcp`；手机那边不用改。 |
 
 ## 最后：给用户一份小结
 

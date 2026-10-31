@@ -159,6 +159,7 @@ Suggested flow: `mika_run_task` → `mika_wait_task` repeatedly → on `waiting_
 - **Status says "Couldn't start"**: another app may be using the port; turn the switch off and on again.
 - **The USB script says the file doesn't exist**: open Mika once, wait a few seconds, and try again. If it's still missing, the Mika on the phone doesn't have this feature yet.
 - **Can't connect over USB** (`curl` reports connection refused or reset): run `adb forward tcp:8765 tcp:8765` again; if the phone restarted, run the command that turns it on again first.
+- **Port 8765 is already used on the computer** (the forward fails with `cannot bind`, or you get a response that isn't from Mika): pick another free port on the computer, e.g. `adb forward tcp:18765 tcp:8765`, and use `http://127.0.0.1:18765/mcp` in the config. Nothing changes on the phone.
 - **HTTP 429**: too many wrong tokens from one address; wait a minute. Over USB, everything on the phone that connects to the local port counts as the same address.
 - **The computer can't connect**: make sure both are on the same network; some Wi-Fi networks (guest networks, for example) block devices from reaching each other.
 - **The task never starts** (the call fails right away, or the task turns `failed` after two minutes): open Mika on the phone and try again. Android sometimes stops a background app from starting work on its own; once you've opened Mika it works.
