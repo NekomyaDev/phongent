@@ -191,23 +191,27 @@
 
 ### MCP
 
-两个方向。**Mika 作为 MCP 服务器**(电脑连接)已经接上,用户在设置里打开;**Mika 作为 MCP 客户端**去用别的服务器(`core/cap/mcp/McpClient.kt`,按注解定风险、工具列表开局冻结)和低层工具会话(`core/mcp/McpServer.kt`)还只有骨架和测试。用户文档见 [mcp.md](mcp.md)。
+两个方向。**Mika 作为 MCP 服务器**(电脑连接)已经接上,两种连法:经 USB(电脑用 adb 打开,只听回环)和经局域网(用户在设置里打开,默认关);**Mika 作为 MCP 客户端**去用别的服务器(`core/cap/mcp/McpClient.kt`,按注解定风险、工具列表开局冻结)和低层工具会话(`core/mcp/McpServer.kt`)还只有骨架和测试。用户文档见 [mcp.md](mcp.md)。
 
 **服务器**的分层都在 `:core`,可以在电脑上整套测:
 
 - `MiniHttpServer`(`core/mcp/HttpServer.kt`):自己写的极简 HTTP/1.1,只为这一个端点。每个连接一个线程,连接数、请求头、正文都有上限,认 Content-Length 和 chunked,连接可以复用。没有用现成的服务器库:要的只是「一个路径上收 POST、回 JSON」,框架带来的体积和依赖不值得。不做 TLS,靠只收私有地址和访问令牌把关。
-- `McpAccess`(`core/mcp/McpAccess.kt`):门口,顺序固定:带 `Origin` 头(浏览器)的 403;同一地址一分钟内认证失败 5 次封一分钟(429,带 `Retry-After`);`Authorization: Bearer` 令牌按常量时间比较(先各自摘要成等长再比),不对 401;路径不是 `/mcp` 的 404。`privateAddress` 判定私有地址:回环、10/8、172.16/12、192.168/16、私有组网常用的 100.64/10、链路本地、IPv6 唯一本地;`McpHost` 绑所有网卡,但连接两端有一端不是私有地址就当场断开(手机走移动数据时也就不对外)。
+- `McpAccess`(`core/mcp/McpAccess.kt`):门口,顺序固定:带 `Origin` 头(浏览器)的 403;同一地址一分钟内认证失败 5 次封一分钟(429,带 `Retry-After`);`Authorization: Bearer` 令牌按常量时间比较(先各自摘要成等长再比),不对 401;路径不是 `/mcp` 的 404。`privateAddress` 判定私有地址:回环、10/8、172.16/12、192.168/16、私有组网常用的 100.64/10、链路本地、IPv6 唯一本地;`McpHost` 绑所有网卡,但连接两端有一端不是私有地址就当场断开(手机走移动数据时也就不对外)。令牌有两个来源:`token` 哪里来的连接都认(局域网那种),`loopbackToken` 只认回环来的连接(USB 那种),两个都比、不短路。
 - `McpRpc`(`core/mcp/McpRpc.kt`):Streamable HTTP 上的 JSON-RPC,只回单个 JSON、不开 SSE 流(规范允许),GET / DELETE 回 405,不发会话编号,服务端不发请求。两代协议都认:新一代(2026-07-28)每个请求在 `_meta` 里带版本和客户端能力,HTTP 头里的 `MCP-Protocol-Version`、`Mcp-Method`、`Mcp-Name` 要和正文一致(不一致 -32020),不认的版本回 -32022 并列出认的版本,支持 `server/discover`;老一代(2025-03-26 到 2025-11-25)先 `initialize` 握手,选双方都认的版本。工具参数不对、任务找不到是工具执行出错(`isError`),交回给对面的模型看;工具名不认得是协议错误。
 - `McpTaskTools`(`core/mcp/McpTaskTools.kt`):只给高层工具,电脑说要办成什么,手机上的 Mika 自己跑主循环。`mika_run_task` / `mika_task_status` / `mika_wait_task` / `mika_answer` / `mika_cancel_task` / `mika_list_tasks`。`RemoteStatus` 把 `TaskState` 翻成对电脑的状态:starting、running、paused(`Held` 且不要人动手)、waiting_for_answer(`WaitingInput`,只有它能用 `mika_answer` 回答)、waiting_on_phone(`WaitingConfirmation`、`WaitingTakeover`、要人动手的 `Held`)、done、failed、cancelled。等待按状态变化返回(进度说明变了不算),最多 50 秒。电脑开的对话编号是 `mcp-<uuid>`,`conversation` 参数只收这种,电脑接不上手机上的对话。
-- `McpHost`(`core/mcp/McpHost.kt`):把上面几层接起来,记最近连过的客户端(地址加自报的名字,十分钟内算最近)和最后一次请求的时间,给设置页显示。
+- `McpHost`(`core/mcp/McpHost.kt`):把上面几层接起来,记最近连过的客户端(地址加自报的名字,十分钟内算最近)和最后一次请求的时间,给设置页显示。`bindAddress` 决定监听地址:所有网卡,或只有 IPv4 回环 127.0.0.1(写死 IPv4,`adb forward` 连的是它)。
+- `McpUsb`(`core/mcp/McpUsb.kt`):和电脑之间经 USB 的约定。连接信息 `mcp-usb.json` 的内容(Streamable HTTP 的地址、`Authorization` 头、令牌、端口、`adb forward` 命令、这次开机的编号 `boot`);电脑上跑的 「connect-computer.sh」:不是 shell(uid 2000)就不跑,先跑一次 「usb-start.sh」 起手机助手,再 `am start-foreground-service` 起 `McpService`(动作 `USB_ON`,带 `off` 参数时是 `USB_OFF`),等到 `boot` 和 `settings get global boot_count` 对得上的连接信息写好(认出不是上次开机留下的),把它打出来;关掉时等文件被删。脚本不带秘密。
 
 **App 一侧**:
 
-- 开关、端口存在 `files/settings/mcp.json`,访问令牌(32 字节随机数)和服务商的 Key 一样经 `KeyCipher` 加密存在 `mcp-token.bin`(`settings/McpSettings.kt`),默认关。
-- `McpRuntime`(`app/mcp/McpRuntime.kt`)整个进程一份:开关打开就起 `McpService`(`app/mcp/McpService.kt`,specialUse 前台服务,常驻一条低优先级通知,上面能直接关掉),服务在才监听;关掉开关就停服务、关端口。任务服务没任务时会自己退出,所以监听不放在 `TaskService` 里。服务被系统回收会重建(START_STICKY);开机时、打开 Mika 的界面时,开关开着却没在跑就补起来。
+- 局域网那种:开关、端口存在 `files/settings/mcp.json`,访问令牌(32 字节随机数)和服务商的 Key 一样经 `KeyCipher` 加密存在 `mcp-token.bin`(`settings/McpSettings.kt`),默认关。
+- USB 那种(`settings/McpUsbSettings.kt`):另一个开关、另一个令牌,存在 `files/settings/mcp-usb.json`(连同打开时的开机编号 `Settings.Global.BOOT_COUNT`)。打开时生成令牌,已开着再打开沿用;监听起来后把连接信息写到外部文件目录的 `mcp-usb.json`(安卓 11 起别的 App 读不到,shell 读得到;令牌本来就要明文交给电脑,所以私有目录里也存明文);没开起来就删掉。关掉时忘掉令牌(下次换新的)、删掉两个文件。不跨重启:开机编号变了就按关着算,顺手清掉上次的文件。
+- `McpModes`(`app/mcp/McpModes.kt`):两个开关怎么合起来。端口只开一个:局域网开着绑所有网卡(回环在内,USB 照样能连),只有 USB 开着只绑回环,都关就不听;服务收到的动作 `USB_ON` / `USB_OFF` / `TURN_OFF`(通知上的「关闭」,两种都关)改哪个开关。
+- `McpRuntime`(`app/mcp/McpRuntime.kt`)整个进程一份:有一种开着就起 `McpService`(`app/mcp/McpService.kt`,specialUse 前台服务,常驻一条低优先级通知,上面能直接关掉),服务在才监听;服务每次收到启动都 `sync` 一遍:监听方式变了(局域网开了、关了)就换一个监听,USB 开着就写连接信息;都关了就停服务、关端口。App 启动时写一次 「connect-computer.sh」。
+- `McpService` 对外开放、要求调用方持有 `INTERACT_ACROSS_USERS_FULL`:shell 有,普通 App 拿不到、adb 也授不了(和助手交接的 provider 用的同一道门),所以 `adb shell am start-foreground-service -n <包名>/.mcp.McpService -a com.wangzan101.mika.mcp.USB_ON` 只有电脑经 USB 调试才发得出。用前台服务而不用广播:安卓 12 起后台 App 一般不能自己开前台服务,而 shell 发起的前台服务启动按系统 uid 一类放行;进前台被拒时服务退出,不崩。清单测试(`ManifestProvidersTest`)守着这道权限。任务服务没任务时会自己退出,所以监听不放在 `TaskService` 里。服务被系统回收会重建(START_STICKY);开机时、打开 Mika 的界面时,开关开着却没在跑就补起来。
 - `McpTaskHub`(`app/task/McpTaskHub.kt`)实现 `RemoteTasks`:`TaskService.startMcp` 开始任务,和对话界面同一条路,来源记成 `RunOrigin.Mcp`、在场情况 `Reachable`(追问照常等,到时限当作没回答;交给用户的一步也有同样的时限,过时没人处理任务就停下)。同一对话里还有任务时排在后面,不丢。状态读任务自己的(`TaskRun.state`),这里只记电脑给的编号对应哪个对话、原话,和收尾时的终态(含排队时被取消、服务被停);交出去两分钟还没登记上的按没开始成算。回答直接交给 `TaskRun.answer`,只在任务正等着回答追问时;停止经 `TaskService` 的 `ACTION_CANCEL_MCP`(排队中的直接移出)。只认这里登记过的编号,手机上发起的任务电脑看不到也动不了。新对话照常请模型起标题。
 - 安全上的几道保证:付款和确认永远不能从电脑放行——`mika_answer` 只把回答交给等着追问的任务;`request_confirmation` 在非手机发起的运行里直接拒绝(`declined_remote`),`ApprovalPolicy` 对非手机发起的付款一律 Deny;MCP 发起的运行不管自主开关都按询问开工(`ApprovalControl.start(remote = true)`),所以自主模式也放不行付款。手机上照常弹出提问、接管的通知。运行记录的开始事件写明来源(`RunEvent.TaskStarted.origin` = `mcp`,手机上发起的不写),概要里也有。
-- 设置页(`ui/McpScreen.kt`):开关;打开时列状态(监听的端口或没开起来的原因、最近客户端数、最后一次请求)、连接地址(开着的网卡上的私有 IPv4,点了复制)、访问令牌(复制、换一个)、客户端配置片段(复制)。地址和动静两秒重读一次。
+- 设置页(`ui/McpScreen.kt`):先是 USB 那种(开着显示「正经 USB 连接(由电脑打开)」,能关;下面写出电脑上要跑的命令,点了复制),再是局域网那种的开关;有一种开着就列状态(监听的端口或没开起来的原因、最近客户端数、最后一次请求),局域网那种打开时再列连接地址(开着的网卡上的私有 IPv4,点了复制)、访问令牌(复制、换一个)、客户端配置片段(复制)。地址和动静两秒重读一次。
 
 ## 7. 上下文与压缩
 
