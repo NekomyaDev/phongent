@@ -147,6 +147,7 @@ fun ModelSetupScreen(store: ProviderStore, onboarding: Boolean, onBack: () -> Un
             testAndSave = vm::testAndSave, openForm = vm::openForm, closeForm = vm::closeForm,
             openProvider = { openProvider = it; allModels = false }, pickRole = { picking = it }, next = onDone,
             signInWithChatGpt = vm::signInWithChatGpt, cancelChatGpt = vm::cancelChatGptSignIn,
+            setReasoningEffort = vm::setReasoningEffort,
         ),
         onBack,
     )
@@ -168,6 +169,7 @@ class ModelSetupActions(
     val next: () -> Unit = {},
     val signInWithChatGpt: () -> Unit = {},
     val cancelChatGpt: () -> Unit = {},
+    val setReasoningEffort: (ModelRole, String?) -> Unit = { _, _ -> },
 )
 
 /**
@@ -192,10 +194,10 @@ fun ModelSetupContent(ui: ModelSetupUi, onboarding: Boolean, actions: ModelSetup
                 // 上手时先连服务商再选模型;设置里先看用途
                 if (onboarding) {
                     ProvidersSection(ui, actions)
-                    RolesSection(ui, onPick)
+                    RolesSection(ui, onPick, actions.setReasoningEffort)
                     FooterNote(ModelSetupCopy.ONBOARDING_NOTE)
                 } else {
-                    RolesSection(ui, onPick)
+                    RolesSection(ui, onPick, actions.setReasoningEffort)
                     ProvidersSection(ui, actions)
                 }
                 Spacer(Modifier.height(16.dp))
@@ -429,13 +431,14 @@ internal object ChatGptPage {
 
 /** 用途:主模型、看图模型、轻量模型各一张卡,点开是选择页。 */
 @Composable
-private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit) {
+private fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReasoning: (ModelRole, String?) -> Unit) {
     GroupLabel(ModelsCopy.ROLES)
     GroupCard {
         ModelRole.entries.forEachIndexed { i, role ->
             RoleCard(ModelsCopy.roleIcon(role), ModelsCopy.roleLabel(role), ModelsCopy.roleLine(ui, role), first = i == 0, tag = "role-${role.name.lowercase()}") {
                 onPick(role)
             }
+            ReasoningControl(ui, role) { onReasoning(role, it) }
         }
     }
 }
