@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -48,23 +49,26 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * 设置 › 电脑连接(MCP):开关;打开时列出连接地址、访问令牌(复制、换一个)、客户端配置片段,
- * 和一点点动静(最近连过几个客户端、最后一次请求的时间)。地址和动静每两秒重读一次。
+ * 设置 › 电脑连接(MCP):先是经 USB 的那种(电脑用 adb 打开,这里显示开着没有、能关掉,并写出电脑上要跑的命令),
+ * 再是局域网那种的开关;局域网那种打开时列出连接地址、访问令牌(复制、换一个)、客户端配置片段。
+ * 有一种开着就显示一点点动静(最近连过几个客户端、最后一次请求的时间)。地址和动静每两秒重读一次。
  */
 @Composable
 fun McpScreen(runtime: McpRuntime, onBack: () -> Unit) {
     val context = LocalContext.current
     val enabled by runtime.settings.enabled.collectAsState()
+    val usbOn by runtime.usb.enabled.collectAsState()
+    val usbCommand = remember { runtime.usbCommand() }
     val state by runtime.state.collectAsState()
     var addresses by remember { mutableStateOf<List<String>>(emptyList()) }
     var activity by remember { mutableStateOf(McpActivity()) }
     var token by remember { mutableStateOf<String?>(null) }
     var confirmRegenerate by remember { mutableStateOf(false) }
-    LaunchedEffect(enabled) {
-        if (!enabled) return@LaunchedEffect
-        token = withContext(Dispatchers.IO) { runCatching { runtime.settings.token() }.getOrNull() }
+    LaunchedEffect(enabled, usbOn) {
+        if (!enabled && !usbOn) return@LaunchedEffect
+        if (enabled) token = withContext(Dispatchers.IO) { runCatching { runtime.settings.token() }.getOrNull() }
         while (true) {
-            addresses = withContext(Dispatchers.IO) { McpRuntime.addresses() }
+            if (enabled) addresses = withContext(Dispatchers.IO) { McpRuntime.addresses() }
             activity = runtime.activity
             delay(2_000)
         }
@@ -72,14 +76,25 @@ fun McpScreen(runtime: McpRuntime, onBack: () -> Unit) {
     val port = (state as? McpServerState.Listening)?.port ?: runtime.settings.port
 
     PageScaffold(stringResource(R.string.mcp_title), onBack) {
+        GroupLabel(stringResource(R.string.mcp_usb_group))
         GroupCard {
-            ListRow(MikaIcons.Desktop, stringResource(R.string.mcp_title), stringResource(R.string.mcp_sub), first = true,
+            ListRow(MikaIcons.Link, stringResource(if (usbOn) R.string.mcp_usb_on else R.string.mcp_usb_title),
+                stringResource(if (usbOn) R.string.mcp_usb_on_sub else R.string.mcp_usb_off_sub), first = true,
+                tone = if (usbOn) TileTone.Ok else TileTone.Neutral, onClick = { runtime.setUsbEnabled(!usbOn) }) {
+                MikaSwitch(usbOn, { runtime.setUsbEnabled(it) }, Modifier.testTag("mcp-usb"))
+            }
+        }
+        FooterNote(stringResource(R.string.mcp_usb_foot, usbCommand), Modifier.clickable { copy(context, usbCommand) })
+
+        GroupLabel(stringResource(R.string.mcp_network_group))
+        GroupCard {
+            ListRow(MikaIcons.Desktop, stringResource(R.string.mcp_network_title), stringResource(R.string.mcp_sub), first = true,
                 onClick = { runtime.setEnabled(!enabled) }) {
                 MikaSwitch(enabled, { runtime.setEnabled(it) }, Modifier.testTag("mcp-enabled"))
             }
         }
         FooterNote(stringResource(R.string.mcp_foot))
-        if (enabled) {
+        if (enabled || usbOn) {
             GroupLabel(stringResource(R.string.mcp_status))
             GroupCard {
                 val (title, tone) = when (val s = state) {
@@ -91,6 +106,8 @@ fun McpScreen(runtime: McpRuntime, onBack: () -> Unit) {
                     ?: stringResource(R.string.mcp_no_requests)
                 ListRow(MikaIcons.Check.takeIf { tone == TileTone.Ok } ?: MikaIcons.Exclaim, title, detail, first = true, tone = tone)
             }
+        }
+        if (enabled) {
 
             GroupLabel(stringResource(R.string.mcp_address))
             GroupCard {

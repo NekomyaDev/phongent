@@ -115,7 +115,9 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { routeCount = withContext(Dispatchers.IO) { runCatching { routeStore.count() }.getOrNull() } }
     val sandboxStatus by remember { SandboxState.get(context) }.status.collectAsState()
     val mcp = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).mcp }
-    val mcpOn by mcp.settings.enabled.collectAsState()
+    val mcpNetworkOn by mcp.settings.enabled.collectAsState()
+    val mcpUsbOn by mcp.usb.enabled.collectAsState()
+    val mcpOn = mcpNetworkOn || mcpUsbOn
     // 「Token 用量」一行的值:近 7 天的合计,账本每记一笔就重算
     val usage = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).usage }
     val usageVersion by usage.version.collectAsState()

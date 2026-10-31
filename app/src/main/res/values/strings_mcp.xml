@@ -25,4 +25,14 @@
     <string name="mcp_notif_title">Computer access is on</string>
     <string name="mcp_notif_body">Listening on port %1$d on Wi-Fi and private networks</string>
     <string name="mcp_turn_off">Turn off</string>
+    <string name="mcp_usb_group">Over USB (recommended)</string>
+    <string name="mcp_usb_title">Connect through USB</string>
+    <string name="mcp_usb_off_sub">Off. A computer with USB debugging can turn it on</string>
+    <string name="mcp_usb_on">Connected through USB (started from a computer)</string>
+    <string name="mcp_usb_on_sub">Listens on this phone only; the computer reaches it over the cable</string>
+    <string name="mcp_usb_foot">On a computer connected with USB debugging, run %1$s (tap to copy). It turns this on and prints the address and access token for AI tools on the computer; only the computer can read the token. Add “off” at the end to turn it off. It also turns off here, from the notification, and when the phone restarts.</string>
+    <string name="mcp_network_group">Over Wi-Fi and private networks</string>
+    <string name="mcp_network_title">Wi-Fi and private networks</string>
+    <string name="mcp_notif_body_usb">Connected through USB on port %1$d (this phone only)</string>
+    <string name="mcp_notif_body_both">Port %1$d: over USB, and on Wi-Fi and private networks</string>
 </resources>

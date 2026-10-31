@@ -11,8 +11,9 @@ data class McpActivity(val recentClients: Int = 0, val lastRequestAtMs: Long? = 
 
 /**
  * 电脑连接的整套服务:HTTP 监听 → 门口([McpAccess])→ 协议([McpRpc])→ 任务工具([McpTaskTools])。
- * 只监听 [port];[allowAllInterfaces] 为 false 时只绑本机回环(测试用),为 true 时绑所有网卡,
+ * 只监听 [port];[allowAllInterfaces] 为 false 时只绑本机回环 127.0.0.1(经 USB 的电脑连接、测试),为 true 时绑所有网卡,
  * 但只收两端都是私有地址的连接(局域网、私有组网),公网来的当场断开。
+ * [token] 哪里来的连接都认;[loopbackToken] 只认本机回环来的(电脑经 `adb forward` 进来就是回环)。
  */
 class McpHost(
     tasks: RemoteTasks,
@@ -22,8 +23,9 @@ class McpHost(
     serverVersion: String,
     private val clock: () -> Long = System::currentTimeMillis,
     private val onError: (Throwable) -> Unit = {},
+    loopbackToken: () -> String? = { null },
 ) {
-    private val access = McpAccess(token, clock)
+    private val access = McpAccess(token, clock, loopbackToken = loopbackToken)
     private val clients = LinkedHashMap<String, Long>()
     private val _activity = MutableStateFlow(McpActivity())
     val activity: StateFlow<McpActivity> = _activity.asStateFlow()
@@ -53,8 +55,7 @@ class McpHost(
 
     /** 开始监听;端口被占等绑定失败时抛出异常。 */
     fun start() {
-        val addr = if (allowAllInterfaces) InetSocketAddress(port) else InetSocketAddress(InetAddress.getLoopbackAddress(), port)
-        val s = MiniHttpServer(addr, ::handle, accept = { local, remote ->
+        val s = MiniHttpServer(bindAddress(allowAllInterfaces, port), ::handle, accept = { local, remote ->
             McpAccess.privateAddress(local) && McpAccess.privateAddress(remote)
         }, onError = onError)
         s.start()
@@ -68,5 +69,12 @@ class McpHost(
 
     companion object {
         const val RECENT_MS = 10 * 60_000L
+
+        /**
+         * 监听的地址:所有网卡,或只有 IPv4 回环 127.0.0.1。回环写死成 IPv4:安卓上 `InetAddress.getLoopbackAddress()` 可能给 ::1,
+         * 而 `adb forward` 连的是 127.0.0.1。
+         */
+        fun bindAddress(allowAllInterfaces: Boolean, port: Int): InetSocketAddress =
+            if (allowAllInterfaces) InetSocketAddress(port) else InetSocketAddress(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), port)
     }
 }

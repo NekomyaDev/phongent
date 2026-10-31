@@ -9,6 +9,7 @@ import java.security.MessageDigest
  * 电脑连接的门口:每个请求先过这里,过了才交给协议层。顺序固定:
  * 浏览器来的(带 Origin)一律 403;同一地址认证失败太多次先 429;访问令牌不对 401;路径不对 404。
  * 令牌按常量时间比较;失败次数按对方地址记,[clock] 可换,测试里拨时间。
+ * [token] 从哪里来的连接都认;[loopbackToken](经 USB 的电脑连接用的那个)只认本机回环来的连接。
  */
 class McpAccess(
     private val token: () -> String?,
@@ -16,6 +17,7 @@ class McpAccess(
     private val maxFailures: Int = 5,
     private val windowMs: Long = 60_000,
     private val lockMs: Long = 60_000,
+    private val loopbackToken: () -> String? = { null },
 ) {
     sealed interface Verdict {
         data object Pass : Verdict
@@ -37,11 +39,12 @@ class McpAccess(
                 return Verdict.Reject(McpRpc.transportError(429, "Too many failed attempts", mapOf("Retry-After" to wait.toString())))
             }
         }
-        val expected = token()
         val given = req.header("authorization")?.let { h ->
             if (h.length > 7 && h.substring(0, 7).equals("Bearer ", ignoreCase = true)) h.substring(7).trim() else null
         }
-        if (expected.isNullOrEmpty() || given == null || !same(given, expected)) {
+        val loopback = if (req.remote.isLoopbackAddress) loopbackToken() else null
+        // 两个都比,不因对上了第一个就少比一次
+        if (given == null || !(matches(given, token()) or matches(given, loopback))) {
             fail(who, now)
             return Verdict.Reject(McpRpc.transportError(401, "Missing or wrong access token", mapOf("WWW-Authenticate" to "Bearer")))
         }
@@ -49,6 +52,8 @@ class McpAccess(
         if (req.path != PATH) return Verdict.Reject(McpRpc.transportError(404, "Not found; the endpoint is $PATH"))
         return Verdict.Pass
     }
+
+    private fun matches(given: String, expected: String?) = !expected.isNullOrEmpty() && same(given, expected)
 
     private fun fail(who: String, now: Long) = synchronized(failures) {
         val f = failures.getOrPut(who) { Failures(0, now, 0) }

@@ -25,4 +25,14 @@
     <string name="mcp_notif_title">电脑连接已打开</string>
     <string name="mcp_notif_body">正在 Wi-Fi 和私有网络上监听端口 %1$d</string>
     <string name="mcp_turn_off">关闭</string>
+    <string name="mcp_usb_group">经 USB(推荐)</string>
+    <string name="mcp_usb_title">经 USB 连接</string>
+    <string name="mcp_usb_off_sub">关着。用 USB 调试连着的电脑可以打开它</string>
+    <string name="mcp_usb_on">正经 USB 连接(由电脑打开)</string>
+    <string name="mcp_usb_on_sub">只在这台手机上监听,电脑经数据线连进来</string>
+    <string name="mcp_usb_foot">在用 USB 调试连着的电脑上运行 %1$s(点一下复制)。它会打开这个开关,并把连接地址和访问令牌告诉电脑上的 AI 工具;令牌只有电脑读得到。命令末尾加上 off 就关掉。在这里、在通知上也能关;手机重启后自动关掉。</string>
+    <string name="mcp_network_group">经 Wi-Fi 和私有网络</string>
+    <string name="mcp_network_title">Wi-Fi 和私有网络</string>
+    <string name="mcp_notif_body_usb">经 USB 连接,端口 %1$d(只在本机监听)</string>
+    <string name="mcp_notif_body_both">端口 %1$d:经 USB,也在 Wi-Fi 和私有网络上</string>
 </resources>
