@@ -4,12 +4,12 @@ struct NearbyRadar:View {
     @ObservedObject var hub:NearbyHub
     @State private var selected:NearbyAgent?
     @State private var page=0
-    @State private var onlyDisconnected=false
     @State private var batchBusy=false
     @State private var error:String?
     @State private var editingGroups=false
     @State private var checked:Set<String>=[]
     @State private var groupName=""
+    @State private var targetGroup="默认组"
     @State private var renameDevice:NearbyAgent?
     @State private var deviceName=""
     @State private var showRename=false
@@ -26,13 +26,13 @@ struct NearbyRadar:View {
     private func connectAll(){
         batchBusy=true
         let targets=devices.filter{!$0.client.connected && ($0.approved || $0.available) && !hub.connecting.contains($0.id)}
-        Task{@MainActor in defer{batchBusy=false};let failed=await hub.connectAll(targets);if !failed.isEmpty{error="连接失败："+failed.joined(separator:"、")+"。可在状态列表点击重试。"}}
+        Task{@MainActor in defer{batchBusy=false};let failed=await hub.connectAll(targets);if !failed.isEmpty{error="连接失败："+failed.joined(separator:"、")+"。可点击上方设备重试。"}}
     }
     var body:some View {
         NavigationStack{
             ScrollView{
                 VStack(spacing:16){
-                    HStack{Button(batchBusy ? "连接中…":"一键连接",systemImage:"link",action:connectAll).disabled(batchBusy || devices.isEmpty);Spacer();Button("分组",systemImage:"folder"){checked=[];groupName="";editingGroups=true}}
+                    HStack{Button(batchBusy ? "连接中…":"一键连接",systemImage:"link",action:connectAll).disabled(batchBusy || devices.isEmpty);Spacer();Button("分组",systemImage:"folder"){checked=[];groupName="";targetGroup="默认组";editingGroups=true}}
                     GeometryReader{geo in
                         let center=CGPoint(x:geo.size.width/2,y:170)
                         ZStack{
@@ -46,22 +46,54 @@ struct NearbyRadar:View {
                             }
                         }
                     }.frame(height:345)
-                    if pages>1{HStack{Button("上一组"){page=max(0,page-1)}.disabled(page==0);Spacer();Text("\(min(page,pages-1)+1) / \(pages)");Spacer();Button("下一组"){page+=1}.disabled(page>=pages-1)}}
+                    if pages>1{HStack{Button("上一页"){page=max(0,page-1)}.disabled(page==0);Spacer();Text("\(min(page,pages-1)+1) / \(pages)");Spacer();Button("下一页"){page+=1}.disabled(page>=pages-1)}}
                     HStack{Text("\(devices.filter{$0.client.connected}.count) 已连接 · \(hub.connecting.count) 连接中");Spacer();Text("\(devices.filter{!$0.client.connected}.count) 未连接")}.font(.caption).foregroundStyle(.secondary)
-                    Toggle("只显示未连接设备",isOn:$onlyDisconnected)
-                    LazyVStack(spacing:8){ForEach(devices.filter{!onlyDisconnected || !$0.client.connected}){agent in
-                        Button{open(agent)}label:{HStack{Circle().fill(agent.client.connected ? Color.green:Color.orange).frame(width:8,height:8);VStack(alignment:.leading){Text(agent.name);Text(hub.group(of:agent.id)).font(.caption).foregroundStyle(.secondary)};Spacer();Text(hub.connecting.contains(agent.id) ? "连接中…":agent.client.connected ? "已连接":agent.connection).font(.caption).foregroundStyle(.secondary);Image(systemName:"chevron.right").font(.caption)}}.buttonStyle(.plain).padding(12).background(Color(uiColor:.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:12))
-                    }}
+                    HStack{Text("已连接设备").font(.headline);Spacer()}
+                    if devices.filter({$0.client.connected}).isEmpty{Text("暂无已连接设备").foregroundStyle(.secondary)}
+                    LazyVGrid(columns:[GridItem(.adaptive(minimum:90),spacing:8)],spacing:8){
+                        ForEach(devices.filter{$0.client.connected}){agent in
+                            Button{open(agent)}label:{
+                                VStack(spacing:6){
+                                    AoraAnimatedAvatar(phase:agent.phase,active:scenePhase == .active,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:38,height:38)
+                                    Text(agent.name).font(.caption.weight(.medium)).lineLimit(1)
+                                    Text(hub.group(of:agent.id)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                }.frame(maxWidth:.infinity).padding(.vertical,10).background(Color(uiColor:.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:12))
+                            }.buttonStyle(.plain)
+                        }
+                    }
                 }.padding(18)
             }.background(Color(uiColor:.systemGroupedBackground)).navigationTitle("设备").navigationBarTitleDisplayMode(.inline)
             .onChange(of:pages){_,value in page=min(page,value-1)}
             .sheet(item:$selected){agent in AgentPanel(agent:agent,hub:hub)}
             .sheet(isPresented:$editingGroups){NavigationStack{Form{
-                TextField("组名，留空为默认组",text:$groupName)
-                if !hub.groupNames.isEmpty{Picker("已有分组",selection:$groupName){Text("新建分组").tag("");ForEach(hub.groupNames,id:\.self){Text($0).tag($0)}}}
-                Button("全选已连接设备"){checked=Set(devices.filter{$0.client.connected}.map(\.id))}
-                ForEach(devices.filter{$0.client.connected}){agent in Toggle(agent.name,isOn:Binding(get:{checked.contains(agent.id)},set:{if $0{checked.insert(agent.id)}else{checked.remove(agent.id)}}))}
-            }.navigationTitle("批量分组").toolbar{ToolbarItem(placement:.cancellationAction){Button("取消"){editingGroups=false}};ToolbarItem(placement:.confirmationAction){Button("保存"){for id in checked{hub.setGroup(id,name:groupName)};editingGroups=false}.disabled(checked.isEmpty)}}}}
+                Section("1 · 勾选要移动的设备"){
+                    Button(checked.count == devices.filter{$0.client.connected}.count ? "取消全选":"全选"){
+                        let ids=Set(devices.filter{$0.client.connected}.map(\.id));checked=checked == ids ? []:ids
+                    }
+                    ForEach(devices.filter{$0.client.connected}){agent in
+                        Button{if checked.contains(agent.id){checked.remove(agent.id)}else{checked.insert(agent.id)}}label:{
+                            HStack{Image(systemName:checked.contains(agent.id) ? "checkmark.circle.fill":"circle");VStack(alignment:.leading){Text(agent.name);Text(hub.group(of:agent.id)).font(.caption).foregroundStyle(.secondary)}}
+                        }.foregroundStyle(.primary)
+                    }
+                }
+                Section("2 · 选择目标组"){
+                    Picker("移动到",selection:$targetGroup){
+                        Text("默认组").tag("默认组")
+                        ForEach(hub.groupNames.filter{$0 != "默认组"},id:\.self){Text($0).tag($0)}
+                        Text("新建分组…").tag("__new__")
+                    }
+                    if targetGroup == "__new__"{TextField("输入新组名",text:$groupName)}
+                    Text("每台设备属于一个组。移动后，原组不再包含该设备。").font(.caption).foregroundStyle(.secondary)
+                }
+            }.navigationTitle("设备分组").toolbar{
+                ToolbarItem(placement:.cancellationAction){Button("取消"){editingGroups=false}}
+                ToolbarItem(placement:.confirmationAction){Button("移动 \(checked.count) 台"){
+                    let name=targetGroup == "__new__" ? groupName.trimmingCharacters(in:.whitespacesAndNewlines):targetGroup
+                    for id in checked where devices.contains(where:{$0.id==id && $0.client.connected}){hub.setGroup(id,name:name)}
+                    editingGroups=false
+                }.disabled(checked.isEmpty || (targetGroup == "__new__" && groupName.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty))}
+            }}}
+
             .alert("连接提醒",isPresented:Binding(get:{error != nil},set:{if !$0{error=nil}})){Button("好",role:.cancel){error=nil}}message:{Text(error ?? "")}
             .alert("修改设备名称",isPresented:$showRename){TextField("名称",text:$deviceName);Button("取消",role:.cancel){};Button("保存"){if let agent=renameDevice{hub.rename(agent,to:deviceName)}}}
             .onChange(of:hub.requestedDevice){_,id in if let id,let agent=devices.first(where:{$0.id==id}){open(agent);hub.requestedDevice=nil}}

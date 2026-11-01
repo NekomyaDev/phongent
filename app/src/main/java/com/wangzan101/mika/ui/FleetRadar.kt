@@ -28,7 +28,8 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
     var groupEditor by remember{mutableStateOf(false)}
     var checked by remember{mutableStateOf(setOf<String>())}
     var groupName by remember{mutableStateOf("")}
-    var onlyDisconnected by remember{mutableStateOf(false)}
+    var targetGroup by remember{mutableStateOf("默认组")}
+    var groupMenu by remember{mutableStateOf(false)}
     val remotes=devices.filter{it.id!="local"}
     val pageSize=if(remotes.size>6)10 else 6
     val avatarSize=if(remotes.size>6)44.dp else 66.dp
@@ -40,7 +41,7 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=22.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
         Text("agent",style=MaterialTheme.typography.titleLarge,modifier=Modifier.align(Alignment.CenterHorizontally))
         Row(Modifier.fillMaxWidth()){Text("附近",style=MaterialTheme.typography.labelMedium,color=color);Spacer(Modifier.weight(1f));Text("局域网",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        Row(Modifier.fillMaxWidth()){Button(enabled=!busy && remotes.any{!it.connected},onClick={onConnectAll(remotes.filter{!it.connected && it.id !in connecting})}){Text(if(busy)"连接中…" else "一键连接")};Spacer(Modifier.weight(1f));TextButton(onClick={checked=emptySet();groupName="";groupEditor=true}){Text("批量分组")}}
+        Row(Modifier.fillMaxWidth()){Button(enabled=!busy && remotes.any{!it.connected},onClick={onConnectAll(remotes.filter{!it.connected && it.id !in connecting})}){Text(if(busy)"连接中…" else "一键连接")};Spacer(Modifier.weight(1f));TextButton(onClick={checked=emptySet();groupName="";targetGroup="默认组";groupEditor=true}){Text("批量分组")}}
         BoxWithConstraints(Modifier.fillMaxWidth().height(425.dp)){
             val centerX=maxWidth/2
             val radius=min(maxWidth.value*.36f,143f)
@@ -72,22 +73,52 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
             }
             if(remotes.isEmpty())Text("暂无附近 agent",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.TopCenter).padding(top=36.dp))
         }
-        if(pages>1)Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){TextButton(enabled=page>0,onClick={page--}){Text("上一组")};Spacer(Modifier.weight(1f));Text("${page+1} / $pages");Spacer(Modifier.weight(1f));TextButton(enabled=page+1<pages,onClick={page++}){Text("下一组")}}
+        if(pages>1)Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){TextButton(enabled=page>0,onClick={page--}){Text("上一页")};Spacer(Modifier.weight(1f));Text("${page+1} / $pages");Spacer(Modifier.weight(1f));TextButton(enabled=page+1<pages,onClick={page++}){Text("下一页")}}
         Row(Modifier.fillMaxWidth()){Text("${remotes.count{it.connected}} 已连接",style=MaterialTheme.typography.labelMedium);Spacer(Modifier.weight(1f));Text("${remotes.size} 附近设备",style=MaterialTheme.typography.labelMedium)}
         Text("${connecting.size} 连接中 · ${remotes.count{!it.connected}} 未连接",style=MaterialTheme.typography.labelSmall)
-        Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=onlyDisconnected,onCheckedChange={onlyDisconnected=it});Text("只显示未连接设备")}
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max=360.dp)){
-            items(remotes.filter{!onlyDisconnected || !it.connected},key={it.id}){device->
-                ListItem(headlineContent={Text(device.name)},supportingContent={Text((groups[device.id] ?: "默认组")+" · "+if(device.id in connecting)"连接中…" else if(device.connected)"已连接" else device.error ?: "未连接")},trailingContent={TextButton(enabled=device.connected || (!busy && device.id !in connecting),onClick={if(device.connected)onChat(device)else onConnect(device)}){Text(if(device.connected)"打开" else "连接")}})
+        Text("已连接设备",style=MaterialTheme.typography.titleMedium)
+        if(remotes.none{it.connected})Text("暂无已连接设备",style=MaterialTheme.typography.bodySmall)
+        BoxWithConstraints(Modifier.fillMaxWidth()){
+            val columns=max(3,(maxWidth.value/100).toInt())
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                remotes.filter{it.connected}.chunked(columns).forEach{row->
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        row.forEach{device->
+                            Surface(onClick={onChat(device)},modifier=Modifier.weight(1f),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainer){
+                                Column(Modifier.padding(8.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)){
+                                    FleetAvatar(device.id,Modifier.size(38.dp))
+                                    Text(device.name,style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                                    Text(groups[device.id] ?: "默认组",style=MaterialTheme.typography.labelSmall,maxLines=1,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        repeat(columns-row.size){Spacer(Modifier.weight(1f))}
+                    }
+                }
             }
         }
         if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall)
     }
-    if(groupEditor)AlertDialog(onDismissRequest={groupEditor=false},title={Text("批量分组")},text={Column{
-        OutlinedTextField(value=groupName,onValueChange={groupName=it},label={Text("组名，留空为默认组")})
-        TextButton(onClick={checked=devices.filter{it.connected}.map{it.id}.toSet()}){Text("全选已连接设备")}
-        LazyColumn(Modifier.heightIn(max=300.dp)){items(devices.filter{it.connected},key={it.id}){device->Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=device.id in checked,onCheckedChange={checked=if(it)checked+device.id else checked-device.id});Text(device.name)}}}
-    }},confirmButton={TextButton(enabled=checked.isNotEmpty(),onClick={onGroup(checked,groupName);groupEditor=false}){Text("保存")}},dismissButton={TextButton(onClick={groupEditor=false}){Text("取消")}})
+    if(groupEditor)AlertDialog(onDismissRequest={groupEditor=false},title={Text("设备分组")},text={Column{
+        Text("1 · 勾选要移动的设备",style=MaterialTheme.typography.titleSmall)
+        TextButton(onClick={val ids=remotes.filter{it.connected}.map{it.id}.toSet();checked=if(checked==ids)emptySet()else ids}){Text("全选 / 取消全选")}
+        LazyColumn(Modifier.heightIn(max=220.dp)){items(remotes.filter{it.connected},key={it.id}){device->Row(verticalAlignment=Alignment.CenterVertically){
+            Checkbox(checked=device.id in checked,onCheckedChange={checked=if(it)checked+device.id else checked-device.id})
+            Column{Text(device.name);Text(groups[device.id] ?: "默认组",style=MaterialTheme.typography.labelSmall)}
+        }}}
+        Text("2 · 选择目标组",style=MaterialTheme.typography.titleSmall)
+        Box{
+            TextButton(onClick={groupMenu=true}){Text("移动到："+if(targetGroup=="__new__")"新建分组…" else targetGroup)}
+            DropdownMenu(expanded=groupMenu,onDismissRequest={groupMenu=false}){
+                (listOf("默认组")+groups.values.distinct().filter{it!="默认组"}).forEach{group->DropdownMenuItem(text={Text(group)},onClick={targetGroup=group;groupMenu=false})}
+                DropdownMenuItem(text={Text("新建分组…")},onClick={targetGroup="__new__";groupMenu=false})
+            }
+        }
+        if(targetGroup=="__new__")OutlinedTextField(value=groupName,onValueChange={groupName=it},label={Text("输入新组名")})
+        Text("每台设备属于一个组，移动后将离开原组。",style=MaterialTheme.typography.bodySmall)
+    }},confirmButton={TextButton(enabled=checked.isNotEmpty() && (targetGroup!="__new__" || groupName.isNotBlank()),onClick={
+        onGroup(checked.intersect(remotes.filter{it.connected}.map{it.id}.toSet()),if(targetGroup=="__new__")groupName.trim()else targetGroup);groupEditor=false
+    }){Text("移动 ${checked.size} 台")}},dismissButton={TextButton(onClick={groupEditor=false}){Text("取消")}})
     selected?.let{id->devices.firstOrNull{it.id==id}?.let{device->
         ModalBottomSheet(onDismissRequest={selected=null}){
             Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp),horizontalAlignment=Alignment.CenterHorizontally){
