@@ -118,7 +118,35 @@ struct FleetWorkspace:View {
     private var composer:some View {
 
                 VStack(alignment:.leading,spacing:8){
-                    if !photos.isEmpty {ScrollView(.horizontal){HStack{ForEach(Array(photos.enumerated()),id:\.offset){index,data in if let image=UIImage(data:data){Image(uiImage:image).resizable().scaledToFill().frame(width:56,height:56).clipped().clipShape(RoundedRectangle(cornerRadius:8))}};Button("移除图片"){photos=[];photoItems=[]}}}}
+                    if !photos.isEmpty {
+                        ScrollView(.horizontal){
+                            HStack(spacing:10){
+                                ForEach(Array(photos.enumerated()),id:\.offset){index,data in
+                                    if let image=UIImage(data:data){
+                                        Image(uiImage:image).resizable().scaledToFill()
+                                            .frame(width:56,height:56).clipped()
+                                            .clipShape(RoundedRectangle(cornerRadius:8))
+                                            .overlay(alignment:.topTrailing){
+                                                Button{
+                                                    guard photos.indices.contains(index),photoItems.indices.contains(index) else{return}
+                                                    photos.remove(at:index)
+                                                    photoItems.remove(at:index)
+                                                }label:{
+                                                    Image(systemName:"minus.circle.fill")
+                                                        .font(.system(size:20,weight:.semibold))
+                                                        .symbolRenderingMode(.palette)
+                                                        .foregroundStyle(.white,Color.black.opacity(0.7))
+                                                        .frame(width:32,height:32)
+                                                        .contentShape(Rectangle())
+                                                }.buttonStyle(.plain)
+                                                .disabled(planning || loadingPhotos || store.sending)
+                                                .accessibilityLabel("移除第\(index+1)张图片")
+                                            }
+                                    }
+                                }
+                            }
+                        }.scrollIndicators(.hidden)
+                    }
                     if planning {Label("正在分配任务…",systemImage:"sparkles").font(.caption)}
                 HStack(alignment:.bottom,spacing:10){
                     TextField("发消息或描述各设备的任务",text:$input,axis:.vertical).lineLimit(1...5).focused($focused).disabled(planning).padding(.horizontal,14).padding(.vertical,12).background(Color(uiColor:.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:20))

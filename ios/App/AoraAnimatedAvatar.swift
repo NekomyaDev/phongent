@@ -31,7 +31,7 @@ struct AoraAnimatedAvatar: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { ready = true; apply(webView) }
         func apply(_ view: WKWebView) {
             let signature = id + String(active) + shape + String(describing:hue); guard ready, signature != last else { return }; last = signature
-            let filter=hue.map{"sepia(1) saturate(3) hue-rotate(\($0)deg)"} ?? "none"
+            let filter=hue.map{"sepia(1) saturate(2) hue-rotate(\($0)deg) brightness(0.84)"} ?? "saturate(0.85) brightness(0.84)"
             view.evaluateJavaScript("document.getElementById('bot').style.filter='\(filter)';window.setMikaShape('\(shape)');window.setMikaState('\(id)',\(active ? "true" : "false"))", completionHandler: nil)
         }
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) { decisionHandler(navigationAction.request.url?.isFileURL == true ? .allow : .cancel) }

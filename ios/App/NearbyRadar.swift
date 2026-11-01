@@ -49,7 +49,6 @@ struct NearbyRadar: View {
                     }.frame(height:425)
                     if hub.agents.count>6 {HStack{Button("上一组"){page=max(0,page-1)}.disabled(page==0);Spacer();Text("\(page+1) / \((hub.agents.count+5)/6)").font(.caption);Spacer();Button("下一组"){page+=1}.disabled((page+1)*6>=hub.agents.count)}.font(.caption)}
                     HStack{Label("\(hub.agents.filter{$0.approved && $0.available && $0.client.connected}.count) 已连接",systemImage:"link");Spacer();Text("\(hub.agents.filter{!$0.demo}.count) 附近设备")}.font(.caption).foregroundStyle(.secondary)
-                    Button(hub.showingDemo ? "退出演示":"演示",systemImage:"sparkles"){Task{if hub.showingDemo{await hub.hideDemo();page=0}else{await hub.showDemo()}}}.font(.caption).tint(.secondary)
                 }.padding(.horizontal,22).padding(.vertical,12)
             }.background(Color(uiColor:.systemGroupedBackground))
                 .navigationTitle("agent").navigationBarTitleDisplayMode(.inline)

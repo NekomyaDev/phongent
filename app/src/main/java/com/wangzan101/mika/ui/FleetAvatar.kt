@@ -21,7 +21,7 @@ fun FleetAvatar(id:String,modifier:Modifier=Modifier,active:Boolean=true) {
     val index=stableId.lowercase(java.util.Locale.ROOT).toByteArray(Charsets.UTF_8).fold(2166136261L){hash,byte->((hash xor (byte.toInt() and 255).toLong())*16777619L) and 0xffffffffL}
     val shape=listOf("blob","wedge","gem")[(index%3).toInt()]
     val hue=(index%360000)/1000.0
-    fun script()="var element=document.getElementById('bot');element.style.width=(innerWidth*0.8)+'px';element.style.height=(innerHeight*0.8)+'px';element.style.top=(innerHeight*0.1)+'px';window.setMikaShape('$shape');document.getElementById('bot').style.filter='sepia(1) saturate(3) hue-rotate(${hue}deg)';window.setMikaState('02',false);window.setMikaState('02',$active)"
+    fun script()="var element=document.getElementById('bot');element.style.width=(innerWidth*0.8)+'px';element.style.height=(innerHeight*0.8)+'px';element.style.top=(innerHeight*0.1)+'px';window.setMikaShape('$shape');document.getElementById('bot').style.filter='sepia(1) saturate(2) hue-rotate(${hue}deg) brightness(0.84)';window.setMikaState('02',false);window.setMikaState('02',$active)"
     AndroidView(modifier=modifier,factory={context->WebView(context).apply{
         setBackgroundColor(android.graphics.Color.TRANSPARENT);settings.javaScriptEnabled=true;settings.allowFileAccess=true;webChromeClient=android.webkit.WebChromeClient()
         settings.allowContentAccess=false;isClickable=false;isFocusable=false;setOnTouchListener{_,_->true}
