@@ -19,8 +19,8 @@ struct ModelProvider: Codable, Identifiable {
     var models:[ProviderModel]=[]
 }
 struct ModelSelection:Codable,Equatable {var providerId:String;var model:String}
-enum ModelRole:String,CaseIterable {case main,vision,lightweight
-    var title:String{switch self{case .main:return "主模型";case .vision:return "看图模型";case .lightweight:return "轻量模型"}}
+enum ModelRole:String,CaseIterable {case main,dispatch,vision,lightweight
+    var title:String{switch self{case .dispatch:return "任务下发模型";case .main:return "主控对话模型";case .vision:return "看图模型";case .lightweight:return "轻量模型"}}
 }
 struct ProviderPreset: Identifiable {
     var id:String{name};var name:String;var kind:ModelProtocol;var baseURL:String;var sessionHeader:String?=nil

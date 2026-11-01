@@ -20,9 +20,17 @@ object VirtualVideo {
         app.taskState.frames.value?.let{last=it}
         return last?.takeUnless{it.isRecycled}
     }
-    fun status(app:MikaApp):JSONObject {
+    fun status(app:MikaApp,peer:String=""):JSONObject {
         val f=frame(app)
+        val run=app.taskState.shownRun?.key ?: ""
+        val owned=RemoteScreen.controlLease.owns(run,peer,true)
         return JSONObject().put("active",f!=null).put("width",f?.width ?: 0).put("height",f?.height ?: 0).put("error","")
+            .put("conversationId",app.chat.ui.value.conversationId ?: "")
+            .put("runId",app.taskState.shownRun?.key ?: "")
+            .put("displayId",app.tasks.agentDisplayId.value)
+            .put("canControl",f!=null && app.tasks.agentDisplayId.value>=0 && !app.tasks.webScreenOpen.value)
+            .put("controlledByOther",RemoteScreen.controlLease.occupiedByOther(run,peer))
+            .put("controlled",owned && (app.taskState.shownRun?.state?.value as? com.wangzan101.mika.core.agent.TaskState.Held)?.reason?.code=="remote_control")
     }
     fun serve(app:MikaApp,out:DataOutputStream) {
         val first=frame(app) ?: return

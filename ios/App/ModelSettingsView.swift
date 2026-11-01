@@ -8,7 +8,7 @@ struct ModelSettingsView:View {
     var body:some View {
         NavigationStack {
             List {
-                Section("模型用途") {
+                Section("本机主控模型") {
                     ForEach(ModelRole.allCases,id:\.self){role in
                         NavigationLink {ModelRolePicker(role:role)} label:{HStack{Text(role.title);Spacer();Text(catalog.label(role)).foregroundStyle(.secondary).lineLimit(1)}}
                     }
@@ -50,12 +50,13 @@ struct ModelRolePicker:View {
     @State private var search=""
     var body:some View {
         List {
-            if role != .main {
+            if role != .main && role != .dispatch {
                 Section {
                     Button("用主模型"){catalog.inherit(role);dismiss()}
                     if role == .vision{Button("不用"){catalog.inherit(role,disabled:true);dismiss()}}
                 }
             }
+            if role == .dispatch {Section{Text("仅当前主控端调用，用于拆分和分配任务；不下发到设备执行模型。").font(.footnote)}}
             ForEach(catalog.saved.providers){provider in
                 Section(provider.name) {
                     ForEach(provider.models.filter{search.isEmpty || $0.id.localizedCaseInsensitiveContains(search) || $0.name.localizedCaseInsensitiveContains(search)}){model in

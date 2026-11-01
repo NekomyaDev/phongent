@@ -1,19 +1,26 @@
 import SwiftUI
+import PhotosUI
 
 struct Dashboard:View {
     var showConnectionButton=false
     var onShowSidebar:(()->Void)?=nil
     var agentName="agent"
+    var avatarShape="blob"
+    var avatarHue:Double?=nil
+    var compactHeader=false
     var onRename:(()->Void)?=nil
     @EnvironmentObject var bridge:BridgeClient
     @Environment(\.dismiss) private var dismiss
     @State private var input=""
+    @State private var photoItems:[PhotosPickerItem]=[]
+    @State private var uploading=false
+    @State private var imageError:String?
     @State private var reply=""
     @State private var replyTarget:MessagePreview?
     @FocusState private var inputFocused:Bool
     @FocusState private var replyFocused:Bool
     private var canSend:Bool {
-        bridge.connected && !bridge.demoMode && !bridge.sending && (!bridge.snapshot.busy || bridge.snapshot.phase=="waiting") && !input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+        !uploading && bridge.connected && !bridge.demoMode && !bridge.sending && (!bridge.snapshot.busy || bridge.snapshot.phase=="waiting") && !input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
     }
     var body:some View {
         NavigationStack {
@@ -22,7 +29,7 @@ struct Dashboard:View {
                     LazyVStack(alignment:.leading,spacing:18) {
                         if let exchanges=bridge.snapshot.exchanges {
                             ForEach(exchanges){exchange in
-                                NativeExchangeView(exchange:exchange,answer:exchange.id==exchanges.last?.id && bridge.snapshot.phase=="waiting" ? {text in Task{await bridge.command("answer",text:text)}}:nil)
+                                NativeExchangeView(exchange:exchange,client:bridge,answer:exchange.id==exchanges.last?.id && bridge.snapshot.phase=="waiting" ? {text in Task{await bridge.command("answer",text:text)}}:nil)
                             }
                             ForEach(bridge.chatMessages.filter{$0.role=="user" && ["提交中","提交结果不确定"].contains($0.status)}){pending in Text(pending.text).padding(14).frame(maxWidth:.infinity,alignment:.trailing)}
                         } else {
@@ -33,7 +40,7 @@ struct Dashboard:View {
                                     Text(message.text).textSelection(.enabled)
                                     Text(message.status).font(.caption2).foregroundStyle(.secondary)
                                 }.padding(14)
-                                    .background(message.role=="user" ? Color.mint.opacity(0.16) : Color.white.opacity(0.065),in:RoundedRectangle(cornerRadius:20))
+                                    .background(message.role=="user" ? Color.mint.opacity(0.16) : Color(uiColor:.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:20))
                                 if message.role != "user" {Spacer(minLength:36)}
                             }.id(message.id)
                         }
@@ -58,9 +65,9 @@ struct Dashboard:View {
                     .onChange(of:bridge.chatMessages.count) { _,_ in withAnimation {proxy.scrollTo("bottom",anchor:.bottom)} }
                     .onChange(of:inputFocused) { _,focused in if focused {withAnimation {proxy.scrollTo("bottom",anchor:.bottom)}} }
             }
-            .background(Color(red:0.035,green:0.045,blue:0.065))
+            .background(Color(uiColor:.systemGroupedBackground))
             .safeAreaInset(edge:.bottom,spacing:0) {composer}
-            .overlay(alignment:.top) {chatHeader}
+            .overlay(alignment:.top) {if !compactHeader {chatHeader}}
             .overlay {NativeVirtualPip(bridge:bridge)}
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden,for:.navigationBar)
@@ -93,7 +100,7 @@ struct Dashboard:View {
                 } label:{Image(systemName:"ellipsis").font(.title3).frame(width:44,height:44).background(.ultraThinMaterial,in:Circle())}.accessibilityLabel("更多")
             }.padding(.horizontal,18).padding(.top,12)
             VStack(spacing:0) {
-                AoraAnimatedAvatar(phase:bridge.snapshot.phase,active:true).frame(width:80.08,height:80.08).allowsHitTesting(false)
+                AoraAnimatedAvatar(phase:bridge.snapshot.phase,active:true,shape:avatarShape,hue:avatarHue).frame(width:80.08,height:80.08).allowsHitTesting(false)
                 Button {inputFocused=false;onRename?()} label:{Text(agentName).lineLimit(1).font(.system(size:14,weight:.semibold)).padding(.horizontal,15).padding(.vertical,5).background(.ultraThinMaterial,in:Capsule())}.buttonStyle(.plain).accessibilityLabel("修改 agent 名称")
             }.padding(.bottom,12)
         }.frame(height:123).frame(maxWidth:.infinity)
@@ -109,8 +116,11 @@ struct Dashboard:View {
     }
     private var composer:some View {
         HStack(alignment:.bottom,spacing:10) {
+
+
             TextField(bridge.snapshot.phase=="waiting" ? "回答 agent…" : "发消息给 agent…",text:$input,axis:.vertical)
                 .lineLimit(1...6).focused($inputFocused).padding(.vertical,12).padding(.leading,16)
+            PhotosPicker(selection:$photoItems,maxSelectionCount:4,matching:.images){Image(systemName:photoItems.isEmpty ? "plus.circle":"photo.fill").padding(8)}.disabled(uploading || bridge.snapshot.busy)
             if inputFocused {Button {inputFocused=false} label:{Image(systemName:"keyboard.chevron.compact.down")}.accessibilityLabel("收起键盘").padding(.bottom,12)}
             if bridge.snapshot.busy && bridge.snapshot.phase != "waiting" {
                 Button {inputFocused=false;Task{await bridge.command("stop")}} label:{Image(systemName:"stop.fill").frame(width:38,height:38).background(.white.opacity(0.12),in:Circle())}.accessibilityLabel("停止任务").disabled(bridge.sending)
@@ -119,14 +129,32 @@ struct Dashboard:View {
             }
         }.padding(8).modifier(AgentComposerGlass())
             .overlay(RoundedRectangle(cornerRadius:28).stroke(LinearGradient(colors:[.white.opacity(0.24),.mint.opacity(0.13),.white.opacity(0.04)],startPoint:.topLeading,endPoint:.bottomTrailing),lineWidth:0.6))
+            .alert("图片未发送",isPresented:Binding(get:{imageError != nil},set:{if !$0{imageError=nil}})){Button("好",role:.cancel){imageError=nil}}message:{Text(imageError ?? "")}
             .shadow(color:.black.opacity(0.18),radius:12,y:5).padding(.horizontal,14).padding(.vertical,10)
     }
     private func send() {
         guard canSend else{return}
         let text=input.trimmingCharacters(in:.whitespacesAndNewlines)
         let action=bridge.snapshot.phase=="waiting" ? "answer":"task"
-        input="";inputFocused=false
-        Task {await bridge.command(action,text:text)}
+        inputFocused=false;uploading=true
+        Task{@MainActor in
+            defer{uploading=false}
+            do{var payload=text
+                var expectedConversation:String?
+                if !photoItems.isEmpty {
+                    guard action=="task",let conversation=bridge.snapshot.currentConversationId,!conversation.isEmpty else{throw ModelFailure(message:"请先打开聊天，再发送图片")}
+                    expectedConversation=conversation
+                    for item in photoItems{
+                        guard let raw=try await item.loadTransferable(type:Data.self),let image=UIImage(data:raw),let data=image.jpegData(compressionQuality:0.8),data.count<=8*1024*1024 else{throw ModelFailure(message:"图片不可读取或超过 8 MB")}
+                        let body=try JSONSerialization.data(withJSONObject:["conversationId":conversation,"data":data.base64EncodedString()])
+                        let response=try await bridge.request("/attachments",body:body)
+                        guard let object=try JSONSerialization.jsonObject(with:response) as? [String:Any],let line=object["line"] as? String else{throw ModelFailure(message:"上传失败")}
+                        payload += "\n"+line
+                    }
+                }
+                if await bridge.command(action,text:payload,expectedConversation:expectedConversation){input="";photoItems=[]}else{imageError=bridge.commandStatus ?? "任务未接收，已保留草稿"}
+            }catch{imageError=error.localizedDescription}
+        }
     }
     private func sendReply(_ message:MessagePreview) {
         let payload=["app":message.app,"notificationTitle":message.title,"notificationPreview":message.text,"reply":reply]

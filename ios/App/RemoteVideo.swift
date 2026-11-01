@@ -16,6 +16,11 @@ struct VideoSurface:UIViewRepresentable {
     @Published var live=false
     @Published var controlling=false
     @Published var sending=false
+    @Published var canControlVirtual=false
+    @Published var virtualControlled=false
+    @Published var virtualControlledByOther=false
+    @Published var controlError:String?
+    private var virtualIdentity:[String:Any]=[:]
     let canvas=VideoCanvas()
     var lastFrame=Date.distantPast
     private var waitingKeyframe=true
@@ -31,9 +36,15 @@ struct VideoSurface:UIViewRepresentable {
             if !virtual {do {_ = try await bridge.request("/video/start",body:Data("{}".utf8))}catch{status=error.localizedDescription;return}}
             while !Task.isCancelled {
                 do {
-                    struct State:Decodable {var active:Bool;var width:Int;var height:Int;var error:String}
+                    struct State:Decodable {var active:Bool;var width:Int;var height:Int;var error:String;var canControl:Bool?;var controlled:Bool?;var controlledByOther:Bool?;var runId:String?;var conversationId:String?;var displayId:Int?}
                     let state=try JSONDecoder().decode(State.self,from:await bridge.request(virtual ? "/virtual/status":"/video/status"))
                     guard !Task.isCancelled else{return}
+                    if virtual {
+                        canControlVirtual=state.canControl ?? false
+                        virtualControlled=state.controlled ?? false
+                        virtualControlledByOther=state.controlledByOther ?? false
+                        virtualIdentity=["runId":state.runId ?? "","conversationId":state.conversationId ?? "","displayId":state.displayId ?? -1]
+                    }
                     if state.active && state.width>0 && state.height>0 {
                         aspect=CGFloat(state.width)/CGFloat(state.height)
                         if stream==nil {connect(bridge,virtual:virtual)}
@@ -45,7 +56,7 @@ struct VideoSurface:UIViewRepresentable {
         }
     }
     func stop(){run?.cancel();run=nil;disconnect()}
-    private func disconnect(){stream?.cancel();stream=nil;session?.invalidateAndCancel();session=nil;receiver=nil;live=false;controlling=false;format=nil;waitingKeyframe=true;sps=Data();pps=Data();canvas.display.flushAndRemoveImage()}
+    private func disconnect(){stream?.cancel();stream=nil;session?.invalidateAndCancel();session=nil;receiver=nil;live=false;controlling=false;canControlVirtual=false;virtualControlled=false;virtualControlledByOther=false;virtualIdentity=[:];format=nil;waitingKeyframe=true;sps=Data();pps=Data();canvas.display.flushAndRemoveImage()}
     private func connect(_ bridge:BridgeClient,virtual:Bool=false){
         guard let pairing=bridge.pairing,let url=URL(string:pairing.url+(virtual ? "/virtual/video":"/video")) else{return}
         status="连接视频流";lastFrame=Date()
@@ -98,6 +109,23 @@ struct VideoSurface:UIViewRepresentable {
         if canvas.display.status == .failed {canvas.display.flush()}
         canvas.display.videoGravity = .resizeAspect;canvas.display.enqueue(sample)
         lastFrame=Date();live=true;status="实时画面"
+    }
+    func virtualInput(_ bridge:BridgeClient,action:String,values:[String:Any]=[:]) async {
+        guard !sending else{return}
+        guard !virtualIdentity.isEmpty else{controlError="画面已变化，请重试";return}
+        if action != "release" {
+            guard live,canControlVirtual,Date().timeIntervalSince(lastFrame)<3 else{controlError="等待实时画面";return}
+            if action != "acquire" && action != "takeover", !virtualControlled {controlError="等待 agent 暂停";return}
+        }
+        sending=true;defer{sending=false}
+        var body=virtualIdentity
+        body["action"]=action
+        for (key,value) in values{body[key]=value}
+        do{
+            _ = try await bridge.request("/virtual/input",body:JSONSerialization.data(withJSONObject:body))
+            controlError=nil
+            if action=="release"{virtualControlled=false}
+        }catch{controlError=error.localizedDescription}
     }
     func input(_ bridge:BridgeClient,_ body:[String:Any]) async {
         guard live,controlling,!sending,Date().timeIntervalSince(lastFrame)<3 else{status="等待实时画面后再操作";return}
@@ -181,18 +209,54 @@ struct NativeVirtualPip:View {
         GeometryReader {geo in
             if video.live {
                 let width=min(expanded ? 220.0:96.0,geo.size.width-24)
-                let height=min(width/video.aspect,max(1,geo.size.height-24))
+                let controls:CGFloat=expanded && video.canControlVirtual ? 45:0
+                let height=min(width/video.aspect,max(1,geo.size.height-24-controls))
                 let w=height*video.aspect
-                VideoSurface(canvas:video.canvas).frame(width:w,height:height).background(.black).clipShape(RoundedRectangle(cornerRadius:12))
-                    .offset(x:max(12,min(geo.size.width-w-12,(cornerRight ? geo.size.width-w-12:12)+drag.width)),y:max(12,min(geo.size.height-height-12,(cornerBottom ? geo.size.height-height-12:12)+drag.height)))
-                    .onTapGesture {expanded.toggle()}
-                    .gesture(DragGesture(minimumDistance:8).updating($drag){v,s,_ in s=v.translation}.onEnded{v in
+                VirtualControlSurface(video:video,bridge:bridge,width:w,height:height,expanded:$expanded)
+                    .offset(x:max(12,min(geo.size.width-w-12,(cornerRight ? geo.size.width-w-12:12)+drag.width)),y:max(12,min(geo.size.height-height-controls-12,(cornerBottom ? geo.size.height-height-controls-12:12)+drag.height)))
+                    .gesture(DragGesture(minimumDistance:8).updating($drag){v,s,_ in if !video.virtualControlled{s=v.translation}}.onEnded{v in
+                        guard !video.virtualControlled else{return}
                         cornerRight=(cornerRight ? geo.size.width-w/2-12:w/2+12)+v.translation.width>geo.size.width/2
                         cornerBottom=(cornerBottom ? geo.size.height-height/2-12:height/2+12)+v.translation.height>geo.size.height/2
-                    })
+                    },including:video.virtualControlled ? .subviews:.all)
             }
         }.padding(.top,125).padding(.bottom,85)
         .task {video.start(bridge,virtual:true)}.onDisappear{video.stop()}
         .onChange(of:scenePhase){_,phase in if phase == .active{video.start(bridge,virtual:true)}else{video.stop()}}
+    }
+}
+
+struct VirtualControlSurface:View {
+    @ObservedObject var video:RemoteVideo
+    @ObservedObject var bridge:BridgeClient
+    let width:CGFloat
+    let height:CGFloat
+    @Binding var expanded:Bool
+    @State private var editing=false
+    @State private var confirmTakeover=false
+    @State private var text=""
+    var body:some View {
+        VStack(spacing:3){
+            ZStack{
+                VideoSurface(canvas:video.canvas).frame(width:width,height:height)
+                if video.virtualControlled {
+                    Color.clear.contentShape(Rectangle()).gesture(DragGesture(minimumDistance:0).onEnded{value in
+                        let x={ (point:CGPoint) in min(1,max(0,point.x/width)) }
+                        let y={ (point:CGPoint) in min(1,max(0,point.y/height)) }
+                        let duration=abs(value.translation.width)+abs(value.translation.height)<6 ? 80:350
+                        Task{await video.virtualInput(bridge,action:"gesture",values:["x":x(value.startLocation),"y":y(value.startLocation),"endX":x(value.location),"endY":y(value.location),"duration":duration])}
+                    })
+                }else{Color.clear.contentShape(Rectangle()).onTapGesture{expanded.toggle()}}
+            }.frame(width:width,height:height).background(.black).clipShape(RoundedRectangle(cornerRadius:12))
+            if expanded && video.canControlVirtual {
+                HStack{
+                    Button{if video.virtualControlledByOther{confirmTakeover=true}else{Task{await video.virtualInput(bridge,action:video.virtualControlled ? "release":"acquire")}}}label:{Image(systemName:video.virtualControlled ? "play.fill":"hand.tap")}.accessibilityLabel(video.virtualControlled ? "交回 agent":"接管虚拟屏")
+                    Button{editing=true}label:{Image(systemName:"keyboard")}.disabled(!video.virtualControlled).accessibilityLabel("输入文本")
+                }.buttonStyle(.bordered).disabled(video.sending)
+            }
+        }.frame(width:width)
+        .confirmationDialog("其他主控正在操作，接管此设备？",isPresented:$confirmTakeover,titleVisibility:.visible){Button("接管"){Task{await video.virtualInput(bridge,action:"takeover")}};Button("取消",role:.cancel){}}
+        .alert("输入文本",isPresented:$editing){TextField("文本",text:$text);Button("取消",role:.cancel){};Button("填入"){Task{await video.virtualInput(bridge,action:"text",values:["text":String(text.prefix(4000))])}}}
+        .alert("操作未完成",isPresented:Binding(get:{video.controlError != nil},set:{if !$0{video.controlError=nil}})){Button("好"){video.controlError=nil}}message:{Text(video.controlError ?? "")}
     }
 }

@@ -425,6 +425,19 @@ class ProviderStore(
      * 记作看图、轻量,服务商和模型是主模型那条配置的。这是 App 里建可调用模型的唯一入口。
      * [session] 是这次调用属于的对话(同一段对话里建的模型都给同一个);服务商声明了会话头的,每个请求都带上它。
      */
+    /** Controller-only routing: explicit selection, never changes execution roles. */
+    fun controllerModel(selection:String):ChatModel? {
+        val parts=selection.split("|",limit=3)
+        val cfg=if(parts.size==3 && parts[0]=="controller") {
+            val p=provider(parts[1]) ?: return null
+            val listed=p.models?.firstOrNull{it.id==parts[2]}
+            if(listed?.usable==false)return null
+            ProviderConfig("controller",p.kind,p.baseUrl,parts[2],Capabilities(false,false,listed?.contextTokens ?: 128000,listed?.reasoning ?: false),p.name,p.id)
+        } else configs.value.firstOrNull{it.id==selection} ?: return null
+        val provider=provider(cfg.providerId)
+        return modelFactory(cfg,providerKey(cfg.providerId),endpointOf(cfg),ClientSetup(headers(provider?.sessionHeader,ModelSession.fresh())))
+    }
+
     fun modelFor(role: ModelRole, session: ModelSession = ModelSession.fresh()): ChatModel? = configFor(role)?.let { cfg ->
         val p = provider(cfg.providerId)
         val source = UsageSource(cfg.providerId, p?.name ?: cfg.name, cfg.model, UsagePurpose.of(role))

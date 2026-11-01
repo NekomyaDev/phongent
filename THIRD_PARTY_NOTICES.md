@@ -223,3 +223,11 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
+
+## Aora Bot / Mood Mates
+
+- Source: https://github.com/sam70361/aora-bot
+- Author: sam70361
+- Usage: animated avatars and expression engine in Android and iOS.
+- These third-party resources are **not relicensed under Apache-2.0**. Their original community licenses and notices remain applicable.
+- Licenses: `ios/App/Resources/Aora/LICENSE`, `NOTICE.md`, `LICENSE-COMMERCIAL.md`, and `mood-mates/LICENSE`, `mood-mates/LICENSE-COMMERCIAL.md`; mirrored in `app/src/main/assets/agent/`.

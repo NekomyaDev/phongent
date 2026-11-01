@@ -26,7 +26,8 @@ class MessageListener : NotificationListenerService() {
     override fun onListenerDisconnected() { connected = false }
     override fun onDestroy() { connected = false; super.onDestroy() }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val appName = apps[sbn.packageName] ?: return
+        if(sbn.packageName !in NotificationPreferences.selected(this))return
+        val appName=apps[sbn.packageName] ?: runCatching{packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName,0)).toString()}.getOrDefault(sbn.packageName)
         if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()

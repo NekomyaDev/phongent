@@ -13,6 +13,22 @@ import org.junit.rules.TemporaryFolder
 class ConversationStoreTest {
     @get:Rule val tmp = TemporaryFolder()
 
+    @Test fun restoresSelectedChatAndExplicitNewChat() {
+        val dir = tmp.newFolder("selection")
+        val store = ConversationStore(dir)
+        val first = store.newConversation()
+        store.append(first, Turn("first", "done", "succeeded"))
+        assertEquals(first, store.selectedConversation())
+        val empty = store.newConversation()
+        store.selectConversation(empty)
+        assertEquals(empty, ConversationStore(dir).selectedConversation())
+        store.selectConversation(null)
+        assertEquals(null, ConversationStore(dir).selectedConversation())
+        store.selectConversation(first)
+        store.delete(first)
+        assertEquals(null, ConversationStore(dir).selectedConversation())
+    }
+
     @Test fun persistsAcrossInstances() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)

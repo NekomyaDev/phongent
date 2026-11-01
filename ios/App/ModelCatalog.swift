@@ -18,6 +18,23 @@ import Security
         }
         syncChatGPT()
     }
+    #if DEBUG
+    func importProviderForTesting() async {
+        let directory=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
+        let file=directory.appendingPathComponent("provider-import.json")
+        let result=directory.appendingPathComponent("provider-test.json")
+        do {
+            let data=try Data(contentsOf:file)
+            try FileManager.default.removeItem(at:file)
+            let provider=try JSONDecoder().decode(ModelProvider.self,from:data)
+            saved.providers.removeAll{$0.id==provider.id};saved.providers.append(provider)
+            saved.roles["main"] = .init(providerId:provider.id,model:provider.models[0].id)
+            try persist()
+            let response=try await reply(provider:provider,model:provider.models[0].id,messages:[["role":"user","content":"test"]],session:UUID().uuidString,onText:{_ in})
+            try JSONSerialization.data(withJSONObject:["result":"success","reply":response]).write(to:result)
+        }catch{try? JSONSerialization.data(withJSONObject:["result":"failed","error":error.localizedDescription]).write(to:result)}
+    }
+    #endif
     func diagnosticProbe() async {
         let target=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent("model-diagnostics.json")
         func record(_ values:[String:String]) {if let data=try? JSONSerialization.data(withJSONObject:values){try? data.write(to:target,options:[.atomic,.completeFileProtection])}}
@@ -45,10 +62,10 @@ import Security
         }
         do {try persist()}catch{errors["chatgpt"]=error.localizedDescription}
     }
-    func selection(_ role:ModelRole)->ModelSelection? {if role == .vision && saved.visionDisabled{return nil};return saved.roles[role.rawValue] ?? saved.roles["main"]}
+    func selection(_ role:ModelRole)->ModelSelection? {if role == .dispatch{return saved.roles[role.rawValue]};if role == .vision && saved.visionDisabled{return nil};return saved.roles[role.rawValue] ?? saved.roles["main"]}
     func label(_ role:ModelRole)->String {
         if role == .vision && saved.visionDisabled{return "不用"}
-        if role != .main && saved.roles[role.rawValue]==nil{return "用主模型"}
+        if role != .main && role != .dispatch && saved.roles[role.rawValue]==nil{return "用主模型"}
         return selection(role)?.model ?? "未选择"
     }
     func choose(_ role:ModelRole,provider:ModelProvider,model:String) {

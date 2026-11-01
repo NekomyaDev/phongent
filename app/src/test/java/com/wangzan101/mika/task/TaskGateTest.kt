@@ -25,6 +25,23 @@ class TaskGateTest {
     private val gate = TaskGate(locked, shellUp) { moveBackCalls++; moveBackResult }
     private val reported = mutableListOf<TaskState?>()
 
+    @Test fun remoteControlStopsToolsUntilExplicitRelease() = runTest {
+        gate.requestRemoteControl()
+        var passed=false
+        launch { gate.pass(phone={false}){reported+=it};passed=true }
+        runCurrent()
+        assertFalse(passed)
+        assertEquals("remote_control",(reported.last() as TaskState.Held).reason.code)
+        gate.releaseRemoteControl();runCurrent()
+        assertTrue(passed)
+    }
+    @Test fun normalResumeAlsoReleasesRemoteControl() = runTest {
+        gate.requestRemoteControl()
+        var passed=false
+        launch { gate.pass {reported+=it};passed=true }
+        runCurrent();assertFalse(passed)
+        gate.resume();runCurrent();assertTrue(passed)
+    }
     @Test
     fun passesImmediatelyWhenNothingBlocks() = runTest {
         gate.pass { reported += it }

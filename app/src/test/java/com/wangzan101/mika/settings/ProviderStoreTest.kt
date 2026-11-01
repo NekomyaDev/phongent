@@ -59,6 +59,22 @@ class ProviderStoreTest {
     private fun connected(s: ProviderStore, name: String = "P", key: String = "k") =
         s.connect(name, ProviderConfig.Kind.OpenAiCompat, "https://${name.lowercase()}.test/v1", key, listOf(ListedModel("m1"), ListedModel("m2")))
 
+    @Test
+    fun controllerSelectionSurvivesExecutionRoleChangesAndReload() {
+        val s=store()
+        val provider=connected(s)
+        s.use(ModelRole.Main,provider.id,"m1",none)
+        val selection="controller|${provider.id}|m2"
+        assertTrue(s.controllerModel(selection)!=null)
+        assertEquals("m1",s.configFor(ModelRole.Main)?.model)
+        s.use(ModelRole.Main,provider.id,"m3",none)
+        val reloaded=store()
+        assertTrue(reloaded.controllerModel(selection)!=null)
+        assertEquals("m2",built.last().first.model)
+        assertEquals("m3",reloaded.configFor(ModelRole.Main)?.model)
+        assertNull(reloaded.controllerModel("controller|missing|m2"))
+    }
+
     // ---------- 用途的选择 ----------
 
     @Test

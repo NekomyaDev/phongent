@@ -28,7 +28,7 @@ struct SingleDeviceDrawer:View {
         NavigationStack {
             VStack(spacing:0) {
                 HStack(spacing:12) {
-                    AoraAnimatedAvatar(phase:agent.phase,active:bridge.snapshot.busy).frame(width:52,height:52)
+                    AoraAnimatedAvatar(phase:agent.phase,active:bridge.snapshot.busy,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:52,height:52)
                     VStack(alignment:.leading,spacing:5) {
                         Text(agent.name).font(.title2.bold()).lineLimit(1)
                         HStack(spacing:5){Circle().fill(bridge.connected ? .green:.gray).frame(width:7,height:7);Text(bridge.connected ? bridge.snapshot.title:"未连接").font(.caption).foregroundStyle(.secondary)}

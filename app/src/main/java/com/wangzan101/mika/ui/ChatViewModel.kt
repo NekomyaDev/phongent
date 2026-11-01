@@ -379,6 +379,14 @@ class ChatViewModel(
     private var screenSeen = false
 
     init {
+        store.selectedConversation()?.let { id ->
+            _ui.update { it.copy(conversationId = id, exchanges = saved(id)) }
+        }
+        scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            _ui.map { it.conversationId }.distinctUntilChanged().collect { id ->
+                store.selectConversation(id)
+            }
+        }
         // 开关关着时也按状态带的对话认:别的对话的任务(悬浮胶囊、定时任务开始的)不接到屏上这个对话里
         scope.launch { taskState.collect { s -> if (!parallel()) shownTask.value?.let { onShown(it.first, s) } ?: onState(s) } }
         scope.launch { shownTask.collect { t -> if (t != null && parallel()) onShown(t.first, t.second) } }

@@ -4,6 +4,11 @@ struct NearbyRadar: View {
     @ObservedObject var hub: NearbyHub
     @State private var selected: NearbyAgent?
     @State private var page=0
+    @State private var renameDevice:NearbyAgent?
+    @State private var deviceName=""
+    @State private var showRename=false
+    @State private var showGroup=false
+    @State private var groupName=""
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var visible:[NearbyAgent]{Array(hub.agents.dropFirst(page*6).prefix(6))}
@@ -16,7 +21,7 @@ struct NearbyRadar: View {
                     GeometryReader{geo in
                         let w=geo.size.width;let center=CGPoint(x:w/2,y:215)
                         ZStack {
-                            ForEach([100.0,190.0,280.0,350.0],id:\.self){size in Circle().stroke(.white.opacity(0.055),lineWidth:1).frame(width:size,height:size).position(center)}
+                            ForEach([100.0,190.0,280.0,350.0],id:\.self){size in Circle().stroke(Color.primary.opacity(0.055),lineWidth:1).frame(width:size,height:size).position(center)}
                             if !reduceMotion {
                                 TimelineView(.animation(minimumInterval:1/30,paused:scenePhase != .active)){timeline in
                                     let phase=timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:7)/7
@@ -27,7 +32,7 @@ struct NearbyRadar: View {
                             ForEach(Array(visible.enumerated()),id:\.element.id){index,agent in
                                 let angle = -Double.pi/2 + Double(index)*2*Double.pi/Double(max(visible.count,3))
                                 let point=CGPoint(x:center.x+cos(angle)*min(w*0.36,143),y:center.y+sin(angle)*154)
-                                Button(action: { selected=agent }) { DeviceOrb(agent:agent,active:scenePhase == .active) }.buttonStyle(.plain).position(point)
+                                Button(action: { selected=agent }) { DeviceOrb(agent:agent,active:scenePhase == .active) }.buttonStyle(.plain).contextMenu{Button("修改设备名称",systemImage:"pencil"){renameDevice=agent;deviceName=agent.name;showRename=true};Button("设置分组",systemImage:"folder"){renameDevice=agent;groupName=hub.deviceGroups[agent.id] ?? "";showGroup=true}}.position(point)
                             }
                             VStack(spacing:4){
                                 ZStack {
@@ -46,8 +51,10 @@ struct NearbyRadar: View {
                     HStack{Label("\(hub.agents.filter{$0.approved && $0.available && $0.client.connected}.count) 已连接",systemImage:"link");Spacer();Text("\(hub.agents.filter{!$0.demo}.count) 附近设备")}.font(.caption).foregroundStyle(.secondary)
                     Button(hub.showingDemo ? "退出演示":"演示",systemImage:"sparkles"){Task{if hub.showingDemo{await hub.hideDemo();page=0}else{await hub.showDemo()}}}.font(.caption).tint(.secondary)
                 }.padding(.horizontal,22).padding(.vertical,12)
-            }.background(Color(red:0.035,green:0.045,blue:0.065))
+            }.background(Color(uiColor:.systemGroupedBackground))
                 .navigationTitle("agent").navigationBarTitleDisplayMode(.inline)
+                .alert("修改设备名称",isPresented:$showRename){TextField("设备名称",text:$deviceName);Button("取消",role:.cancel){};Button("保存"){if let device=renameDevice{hub.rename(device,to:deviceName)}}.disabled(deviceName.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)}
+                .alert("设备分组",isPresented:$showGroup){TextField("分组名称，留空取消分组",text:$groupName);Button("取消",role:.cancel){};Button("保存"){if let device=renameDevice{hub.setGroup(device.id,name:groupName)}}}
                 .sheet(item:$selected){agent in AgentPanel(agent:agent,hub:hub)}
                 .onChange(of: hub.requestedDevice) { _, id in if let id { selected = hub.agents.first { $0.id == id }; hub.requestedDevice = nil } }
         }
@@ -59,8 +66,8 @@ struct DeviceOrb:View {
     var body:some View {
         VStack(spacing:4){
             ZStack(alignment:.bottomTrailing){
-                Circle().stroke(agent.approved ? Color.mint.opacity(0.6):Color.white.opacity(0.12),lineWidth:1).frame(width:67,height:67)
-                AoraAnimatedAvatar(phase:agent.phase,active:active && agent.available).frame(width:67,height:67)
+                Circle().stroke(agent.approved ? Color.mint.opacity(0.6):Color.primary.opacity(0.12),lineWidth:1).frame(width:67,height:67)
+                AoraAnimatedAvatar(phase:agent.phase,active:active && agent.available,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:67,height:67)
                 Circle().fill(agent.demo ? Color.purple:agent.available && agent.client.connected ? Color.mint:agent.available ? Color.orange:Color.gray).frame(width:9,height:9).overlay(Circle().stroke(Color.black,lineWidth:2)).offset(x:-5,y:-4)
             }
             Text(agent.name).font(.caption.weight(.medium)).lineLimit(1).frame(width:104)
@@ -80,7 +87,7 @@ struct AgentPanel:View {
             NavigationStack {
                 VStack(spacing:22){
                     Spacer()
-                    AoraAnimatedAvatar(phase:agent.phase,active:scenePhase == .active).frame(width:190,height:190)
+                    AoraAnimatedAvatar(phase:agent.phase,active:scenePhase == .active,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:190,height:190)
                     Text(agent.name).font(.title.bold())
                     Text(agent.connection).foregroundStyle(.secondary)
                     Text("请在安卓端允许连接").multilineTextAlignment(.center).foregroundStyle(.secondary)

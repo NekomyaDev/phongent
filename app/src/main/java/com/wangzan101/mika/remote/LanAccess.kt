@@ -11,12 +11,18 @@ import java.security.SecureRandom
 
 /** One physical approval per trusted iPhone, independent of the main Activity. */
 class LanAccess(private val context: Context) {
+    data class PendingApproval(val id:String,val name:String)
+    companion object {
+        private val pendingState=kotlinx.coroutines.flow.MutableStateFlow<PendingApproval?>(null)
+        val pending:kotlinx.coroutines.flow.StateFlow<PendingApproval?> = pendingState
+        fun clearPending(){pendingState.value=null}
+    }
     private val prefs = context.getSharedPreferences("lan-peers", 0)
     private data class Offer(val id: String, val name: String, val deadline: Long, var status: String = "pending", var token: String? = null)
     private val offers = mutableMapOf<String, Offer>()
     private var lastRequest = -30_000L
     private val manager = context.getSystemService(NotificationManager::class.java)
-    init { manager.createNotificationChannel(NotificationChannel("mika-lan-approval", "iPhone 连接申请", NotificationManager.IMPORTANCE_HIGH)) }
+    init { manager.createNotificationChannel(NotificationChannel("mika-lan-approval", "设备连接申请", NotificationManager.IMPORTANCE_HIGH)) }
     @Synchronized fun authorized(header: String): Boolean = prefs.all.values.filterIsInstance<String>().any {
         MessageDigest.isEqual(header.toByteArray(), "Bearer $it".toByteArray())
     }
@@ -32,14 +38,18 @@ class LanAccess(private val context: Context) {
         if (!manager.areNotificationsEnabled()) return 409 to JSONObject().put("error", "enable_android_notifications")
         lastRequest = now
         offers[id] = Offer(id, name, now + 90_000)
+        pendingState.value=PendingApproval(id,name)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if(pendingState.value?.id==id)pendingState.value=null
+        },90_000)
         val open = PendingIntent.getActivity(context, 9201, Intent(context, LanApprovalActivity::class.java).putExtra("id", id), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         fun action(allow: Boolean) = PendingIntent.getBroadcast(context, if (allow) 9202 else 9203,
             Intent(context, LanApprovalReceiver::class.java).setAction(if (allow) "allow" else "deny").putExtra("id", id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notice = Notification.Builder(context, "mika-lan-approval").setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("$name 请求连接 Mika")
+            .setContentTitle("$name 请求连接 agent")
             .setContentText("允许后可读取消息预览、查看状态并控制此安卓助手")
-            .setStyle(Notification.BigTextStyle().bigText("允许后，$name 可读取消息预览、查看状态并控制此安卓助手。仅允许你自己的 iPhone。"))
+            .setStyle(Notification.BigTextStyle().bigText("允许后，$name 可读取消息预览、查看状态并控制此安卓助手。仅允许你信任的主控设备。"))
             .setContentIntent(open).setAutoCancel(true).setTimeoutAfter(90_000)
             .addAction(Notification.Action.Builder(null, "拒绝", action(false)).build())
             .addAction(Notification.Action.Builder(null, "允许连接", action(true)).build()).build()
@@ -54,6 +64,7 @@ class LanAccess(private val context: Context) {
             if (prefs.edit().putString(id, token).commit()) { offer.token = token; offer.status = "approved" }
             else offer.status = "denied"
         } else offer.status = "denied"
+        if(pendingState.value?.id==id)pendingState.value=null
         manager.cancel(9201)
     }
     @Synchronized fun poll(id: String): JSONObject {

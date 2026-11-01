@@ -20,6 +20,27 @@ class RemoteKnowledge(private val app:MikaApp) {
         return JSONObject().put("items",rows).put("memoryEnabled",app.memory.settings().switches.value.useMemory)
     }
     @Synchronized fun add(body:JSONObject):JSONObject {
+        val action=body.optString("action","add")
+        if(action!="add") {
+            require(action in setOf("update","delete")){"unknown_action"}
+            val id=body.getString("id");require(id.length in 1..160)
+            when(body.getString("type")) {
+                "memory"->{val store=app.memory.store();check(store.reloadIfNeeded()){"unavailable"}
+                    if(action=="delete"){if(store.items.value.any{it.id==id})store.forget(id).getOrThrow()}
+                    else store.update(id,body.getString("text"),null,null).getOrThrow()
+                }
+                "skill"->{val skills=app.memory.skills()
+                    if(action=="delete")skills.remove(id)
+                    else{val markdown=body.getString("text");require(markdown.length<=65536)
+                        require(SkillDrafter.validate(markdown,knownToolNames(),knownTools().nameOf(Verb.RunBundledScript))==null){"invalid_skill"}
+                        check(skills.get(id)!=null){"not_found"};skills.update(id){it.copy(markdown=markdown)}
+                    }
+                }
+                else->error("invalid_type")
+            }
+            return list()
+        }
+
         val id=body.getString("id");require(id.matches(Regex("[a-fA-F0-9-]{36}"))) { "invalid_id" }
         val text=body.getString("text").trim();require(text.isNotEmpty() && text.length<=8000) { "invalid_content" }
         return when(body.getString("type")) {

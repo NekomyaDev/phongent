@@ -99,6 +99,7 @@ class McpTaskHub(
     /** 任务收尾(含排队时被取消、服务被系统停掉):记下终态,之后状态都从这里读。 */
     @Synchronized fun ended(id: String, end: TaskState) {
         records[id]?.final = end
+        com.wangzan101.mika.remote.RemoteTaskQueue.reportEnd(id,end)
         buses.remove(RunId(id))?.event(RunEvent.State(clock(), "mcp_task_ended", end::class.simpleName.orEmpty()))
     }
 

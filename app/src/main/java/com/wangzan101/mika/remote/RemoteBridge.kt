@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.collect
 /** Shared command handler. LAN transport is plain HTTP over TCP and requires explicit device approval. */
 class RemoteBridge(private val app: MikaApp) {
     private val chatRevision = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+    private val attachments by lazy { RemoteAttachments(app) }
+    private val automation by lazy { RemoteAutomation(app) }
+    private val models by lazy { RemoteModels(app) }
+    private val settings by lazy { RemoteSettings(app) }
     private val knowledge by lazy { RemoteKnowledge(app) }
     private val prefs = app.getSharedPreferences("remote-commands", 0)
     private val handler = Handler(Looper.getMainLooper())
@@ -64,7 +68,7 @@ class RemoteBridge(private val app: MikaApp) {
                         fun body(): JSONObject {
                             require(headers["transfer-encoding"] == null)
                             val length = headers["content-length"]?.toInt() ?: 0
-                            require(length in 1..(if (request[1] == "/knowledge") 65536 else 16384))
+                            require(length in 1..(if(request[1] in listOf("/attachments","/workspace")) 13*1024*1024 else if (request[1] in listOf("/knowledge","/routes","/plans")) 1048576 else 16384))
                             val bytes = ByteArray(length); var n = 0
                             while (n < length) { val r = input.read(bytes, n, length - n); require(r > 0); n += r }
                             return JSONObject(String(bytes, Charsets.UTF_8))
@@ -80,7 +84,33 @@ class RemoteBridge(private val app: MikaApp) {
                             MessageDigest.isEqual((headers["authorization"] ?: "").toByteArray(), "Bearer $token".toByteArray())
                         if (!authorized) { respond(401, JSONObject().put("error", "unauthorized")); return@use }
                         when {
-                            request[0] == "GET" && request[1] == "/virtual/status" -> respond(200,VirtualVideo.status(app))
+                            request[0] == "GET" && request[1] == "/models/settings" -> respond(200,models.read())
+                            request[0] == "POST" && request[1] == "/models/settings" -> {try{respond(200,models.update(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "invalid_model_setting"))}}
+
+                            request[0] == "POST" && request[1] == "/files" -> {
+                                try{respond(200,attachments.download(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "file_unavailable"))}
+                            }
+
+                            request[0] == "POST" && request[1] == "/attachments" -> {
+                                try{respond(200,attachments.upload(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "image_upload_failed"))}
+                            }
+
+                            request[0] == "GET" && request[1] == "/plans" -> respond(200,automation.plans())
+                            request[0] == "GET" && request[1] == "/routes" -> respond(200,automation.routes())
+                            request[0] == "POST" && request[1] in listOf("/plans","/routes") -> {
+                                try{respond(200,if(request[1]=="/plans")automation.plan(body()) else automation.route(body()))}
+                                catch(e:Exception){respond(422,JSONObject().put("error",e.message?.take(160) ?: "invalid_automation"))}
+                            }
+
+                            request[0] == "GET" && request[1] == "/browser" -> respond(200,RemoteBrowser(app).read())
+                            request[0] == "POST" && request[1] == "/browser" -> {try{respond(200,RemoteBrowser(app).update(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "browser_unavailable"))}}
+                            request[0] == "GET" && request[1] == "/settings" -> respond(200,settings.read())
+                            request[0] == "POST" && request[1] == "/settings" -> {try{respond(200,settings.patch(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "invalid_settings"))}}
+                            request[0] == "POST" && request[1] == "/virtual/input" -> {
+                                try{val data=body();check(runBlocking{withTimeout(4000){RemoteScreen.virtualInput(app,data,RemoteScreen.peer(headers["authorization"] ?: ""))}}){"input_rejected"};respond(200,JSONObject().put("status","accepted"))}
+                                catch(e:Exception){respond(409,JSONObject().put("error",e.message ?: "input_rejected"))}
+                            }
+                            request[0] == "GET" && request[1] == "/virtual/status" -> respond(200,VirtualVideo.status(app,RemoteScreen.peer(headers["authorization"] ?: "")))
                             request[0] == "GET" && request[1] == "/virtual/video" -> {
                                 if(VirtualVideo.frame(app)==null){respond(409,JSONObject().put("error","virtual_screen_closed"));return@use}
                                 val out=java.io.DataOutputStream(s.getOutputStream())
@@ -182,6 +212,11 @@ class RemoteBridge(private val app: MikaApp) {
                                 try { MessageListener.open(id); respond(200, JSONObject().put("status", "dispatched")) }
                                 catch (_: Exception) { respond(409, JSONObject().put("error", "notification_expired_or_blocked")) }
                             }
+                            request[0] == "POST" && request[1] == "/workspace" -> {try{respond(200,RemoteWorkspace(app).request(body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message ?: "file_operation_failed"))}}
+                            request[0] == "GET" && request[1] == "/usage" -> respond(200,RemoteDiagnostics(app).usage())
+                            request[0] == "GET" && request[1] == "/diagnostics" -> respond(200,RemoteDiagnostics(app).diagnostics())
+                            request[0] == "GET" && request[1] == "/tasks" -> respond(200,RemoteTaskQueue.get(app).list())
+                            request[0] == "POST" && request[1] == "/tasks" -> {try{val command=body();val queue=RemoteTaskQueue.get(app);respond(200,if(command.optString("action")=="cancel")queue.cancel(command.getString("id")) else if(command.optString("action")=="acknowledge")queue.acknowledge(command.getString("id")) else if(command.optString("action")=="retry")queue.retry(command.getString("id")) else queue.enqueue(command))}catch(e:Exception){respond(409,JSONObject().put("error",e.message ?: "queue_failed"))}}
                             request[0] == "GET" && request[1] == "/state" -> respond(200, snapshot())
                             request[0] == "POST" && request[1] == "/command" -> synchronized(prefs) {
                                 val command = body()
@@ -272,7 +307,7 @@ class RemoteBridge(private val app: MikaApp) {
         }
         return JSONObject().put("chats", JSONArray(values.sortedByDescending { it.optDouble("updatedAt") }))
     }
-    private fun snapshot(): JSONObject {
+    fun snapshot(): JSONObject {
         val state = app.taskState.state.value
         val phase: String
         val detail: String
@@ -294,6 +329,7 @@ class RemoteBridge(private val app: MikaApp) {
             .put("conversationId", app.taskState.shownRun?.conversationId ?: "")
             .put("currentConversationId", app.chat.ui.value.conversationId ?: "")
             .put("exchanges",NativeChat.exchanges(app,app.chat.ui.value.conversationId ?: ""))
+            .put("taskQueueVersion",1).put("queuedTasks",RemoteTaskQueue.get(app).status())
             .put("knowledgeVersion", 1).put("chatRoutingVersion", 3).put("chatRevision", chatRevision.get())
             .put("busy", app.taskState.busy.value).put("device", android.os.Build.MODEL)
             .put("updatedAt", System.currentTimeMillis() / 1000.0)

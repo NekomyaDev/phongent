@@ -17,6 +17,7 @@
 		18D3DE3086C4A37D3E46BAAB /* SingleDeviceDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E27E76F415EE89A1F429872 /* SingleDeviceDrawer.swift */; };
 		1DD9B3715A0FA36376F275CA /* ModelSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD4B3FD47021AF1922759C /* ModelSettingsView.swift */; };
 		255B7FE57910B1CA600852A3 /* MessageAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7918EFBA91B3E0B7C2E727C /* MessageAlerts.swift */; };
+		33377B962D557534095214E8 /* FleetWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442745202CD128EF72825B07 /* FleetWorkspace.swift */; };
 		52409B6591A772F32A25E30E /* AoraAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3319619080CE97739DAE0150 /* AoraAvatar.swift */; };
 		546531FC5A32B0EDE155E328 /* AoraAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3319619080CE97739DAE0150 /* AoraAvatar.swift */; };
 		6BC0A7B03537584669586C33 /* NativeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DA8BBAC6053DD19C58DBDC /* NativeChatView.swift */; };
@@ -40,6 +41,7 @@
 		E8F61B058F5E3894017F1E5C /* MikaRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DA726A8CFC1EF122BF8A3FB /* MikaRemoteApp.swift */; };
 		F374FFDB3ED5C23EC52AF8A5 /* DeviceChatHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5BC09B993EB0DB925BA0E7 /* DeviceChatHistory.swift */; };
 		F575B31A7870659C1436E321 /* BridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAEFD9626B7638F37AA4BD0 /* BridgeClient.swift */; };
+		FC51AEE53903035D63EA23AB /* FleetChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479FF2130457FEC6D5C79F91 /* FleetChatStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +81,8 @@
 		2A53E0C769C68B7785DB8754 /* ModelChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelChat.swift; sourceTree = "<group>"; };
 		2E64412777187FFECDBEF058 /* Mika.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mika.entitlements; sourceTree = "<group>"; };
 		3319619080CE97739DAE0150 /* AoraAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AoraAvatar.swift; sourceTree = "<group>"; };
+		442745202CD128EF72825B07 /* FleetWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetWorkspace.swift; sourceTree = "<group>"; };
+		479FF2130457FEC6D5C79F91 /* FleetChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetChatStore.swift; sourceTree = "<group>"; };
 		4995B853E002A50B91779B5C /* RemoteVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteVideo.swift; sourceTree = "<group>"; };
 		5A7075A18AD45F4C396BC224 /* ModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalog.swift; sourceTree = "<group>"; };
 		5F8ED87B67B36BCEEDCFD0AE /* AgentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentState.swift; sourceTree = "<group>"; };
@@ -136,6 +140,8 @@
 				CC5BC09B993EB0DB925BA0E7 /* DeviceChatHistory.swift */,
 				C1022EF4D9D958124E4E1526 /* DeviceConversations.swift */,
 				85DA543DCBC7EF4406481DB7 /* DeviceWorkspace.swift */,
+				479FF2130457FEC6D5C79F91 /* FleetChatStore.swift */,
+				442745202CD128EF72825B07 /* FleetWorkspace.swift */,
 				CB97A47E4A1B2F2FF0A76891 /* Info.plist */,
 				E0638AD8500E3154E0D81B14 /* KnowledgeView.swift */,
 				A7918EFBA91B3E0B7C2E727C /* MessageAlerts.swift */,
@@ -292,6 +298,8 @@
 				F374FFDB3ED5C23EC52AF8A5 /* DeviceChatHistory.swift in Sources */,
 				73CC266328D439FCA6282E58 /* DeviceConversations.swift in Sources */,
 				D21DE65305C64CDA44D522E9 /* DeviceWorkspace.swift in Sources */,
+				FC51AEE53903035D63EA23AB /* FleetChatStore.swift in Sources */,
+				33377B962D557534095214E8 /* FleetWorkspace.swift in Sources */,
 				7E521367D89261E3C8DD877D /* KnowledgeView.swift in Sources */,
 				255B7FE57910B1CA600852A3 /* MessageAlerts.swift in Sources */,
 				D79C6EB890B628B13FFA936C /* MessageGrouping.swift in Sources */,

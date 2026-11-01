@@ -265,6 +265,8 @@ class TaskRun(
         }
     }
 
+    fun requestRemoteControl(): Boolean = gate?.let { it.requestRemoteControl(); true } ?: false
+    fun releaseRemoteControl() { gate?.releaseRemoteControl() }
     fun resume() { gate?.resume() }
     fun takeOver(waitKey: Int?) { takeover?.let { t -> scope.launch { t.handOver(waitKey) } } }
     fun handBack(waitKey: Int?) { takeover?.let { t -> scope.launch { t.handBack(waitKey) } } }

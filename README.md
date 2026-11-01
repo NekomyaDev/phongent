@@ -1,3 +1,32 @@
+# agent-fleet
+
+基于 [wangzan101/Mika](https://github.com/wangzan101/Mika) 开发的多设备 agent 主控。
+
+iOS 负责控制已连接的安卓设备；Android 既可作为主控，也可执行本机任务。
+
+- 局域网发现、安卓确认连接、多设备聊天与独立彩色头像。
+- 主控任务下发模型独立配置，支持自然语言指定设备与 `@` 快捷输入。
+- 为不同设备生成独立文案和文字图卡，支持上传图片及结果文件。
+- 设备/应用/来源分层消息列表，以及按设备或批量配置通知来源。
+- 记忆、技能、定时任务、操作路线、执行设置和任务队列管理。
+- 安卓虚拟画面传输及接管控制。
+
+## 开发与验证
+
+Android 源码位于 `app/`、`core/`；iOS 工程为 `ios/MikaRemote.xcodeproj`。开发构建需要 Android SDK、JDK 17，以及 macOS/Xcode。模型登录与密钥由用户在应用中配置，不包含在仓库中。
+
+已验证：安卓 A 作为主控，将不同回复任务分别下发到本机与安卓 B，两台均完成并返回各自标记。详细功能差异与验证边界见 [功能对照](docs/controller-parity.md)。
+
+文字图卡不是摄影图片；当前没有接入照片生成模型。局域网通信按本项目设计使用明文 TCP，连接需安卓确认。
+
+## 许可证
+
+沿用 Mika 的 **Apache License 2.0**，详见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。第三方头像等资源继续适用各自许可证，详见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+
+---
+
+以下保留 Mika 原项目说明，原项目的下载链接指向上游版本。
+
 <div align="center">
 
 <img src="docs/media/logo.png" alt="Mika" width="120" />

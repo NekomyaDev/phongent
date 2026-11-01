@@ -22,6 +22,8 @@ struct AgentSnapshot: Codable {
     var updatedAt: Double
     var messages: [MessagePreview]
     var currentConversationId: String? = nil
+    var queuedTasks:[RemoteQueuedTask]?=nil
+    var taskQueueVersion:Int?=nil
     var knowledgeVersion: Int? = nil
     var chatRevision: Int64? = nil
     var chatRoutingVersion: Int? = nil
@@ -83,6 +85,7 @@ enum SharedState {
 }
 
 struct NativeChatExchange:Codable,Identifiable {
+    var conversationId:String?
     var id:String;var goal:String;var phase:String;var body:String;var draft:String;var progress:String
     var startedAt:Double;var elapsed:Double?;var title:String;var verification:String;var evidence:String
     var options:[String];var steps:[NativeChatStep];var steers:[NativeChatSteer];var notes:[String];var files:[NativeChatFile]
@@ -91,3 +94,5 @@ struct NativeChatExchange:Codable,Identifiable {
 struct NativeChatStep:Codable {var number:Int;var title:String;var subtitle:String;var state:String;var reason:String}
 struct NativeChatSteer:Codable {var text:String;var state:String}
 struct NativeChatFile:Codable {var name:String;var size:Int64;var savedAs:String}
+
+struct RemoteQueuedTask:Codable,Identifiable {var id:String;var text:String;var conversation:String;var state:String;var error:String;var result:String?}

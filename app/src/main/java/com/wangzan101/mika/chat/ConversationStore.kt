@@ -26,6 +26,23 @@ class ConversationStore(private val dir: File) {
 
     fun newConversation(): String = UUID.randomUUID().toString()
 
+    /** Persist selection separately from history, including an explicitly empty new chat. */
+    @Synchronized
+    fun selectedConversation(): String? {
+        val selected = File(dir, ".selected")
+        return if (selected.isFile) selected.readText().trim().takeIf { it.isNotEmpty() }
+        else list().firstOrNull()?.id
+    }
+
+    @Synchronized
+    fun selectConversation(id: String?) {
+        require(id == null || id.matches(Regex("[A-Za-z0-9-]+")))
+        dir.mkdirs()
+        val temp = File(dir, ".selected.tmp")
+        temp.writeText(id.orEmpty())
+        check(temp.renameTo(File(dir, ".selected"))) { "Unable to persist conversation selection" }
+    }
+
     private val _changes = MutableSharedFlow<String>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /**
@@ -65,6 +82,7 @@ class ConversationStore(private val dir: File) {
      */
     @Synchronized
     fun delete(conversationId: String) {
+        if (File(dir, ".selected").isFile && selectedConversation() == conversationId) selectConversation(null)
         deleted += safe(conversationId)
         val main = file(conversationId).name
         dir.listFiles { f -> f.isFile && (f.name == main || f.name.startsWith("$main.") || f.name == titleFile(conversationId).name || f.name == pinFile(conversationId).name) }

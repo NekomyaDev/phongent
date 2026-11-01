@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NativeExchangeView:View {
     let exchange:NativeChatExchange
+    var client:BridgeClient?=nil
     var answer:((String)->Void)?=nil
     @State private var expanded=false
     private var e:NativeChatExchange {exchange}
@@ -33,7 +34,7 @@ struct NativeExchangeView:View {
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(.orange.opacity(0.08),in:RoundedRectangle(cornerRadius:16))
             }
             if !e.draft.isEmpty {AndroidMarkdown(text:e.draft).padding(14).frame(maxWidth:.infinity,alignment:.leading).background(Color.primary.opacity(0.065),in:RoundedRectangle(cornerRadius:20))}
-            ForEach(e.files.indices,id:\.self){i in HStack{Image(systemName:"doc");VStack(alignment:.leading){Text(e.files[i].name);Text(ByteCountFormatter.string(fromByteCount:e.files[i].size,countStyle:.file)).font(.caption).foregroundStyle(.secondary)}}.padding(12).frame(maxWidth:.infinity,alignment:.leading).background(Color.primary.opacity(0.05),in:RoundedRectangle(cornerRadius:12))}
+            ForEach(e.files.indices,id:\.self){i in RemoteFileCard(file:e.files[i],exchange:e,index:i,client:client)}
             ForEach(e.notes.indices,id:\.self){i in Text(e.notes[i]).font(.caption).foregroundStyle(.secondary)}
         }.textSelection(.enabled).padding(.vertical,6)
     }
@@ -80,4 +81,38 @@ struct AndroidMarkdown:View {
         default:inline(b.text).fixedSize(horizontal:false,vertical:true)
         }
     }}} 
+}
+
+private struct RemoteFileCard:View {
+    let file:NativeChatFile
+    let exchange:NativeChatExchange
+    let index:Int
+    var client:BridgeClient?
+    @State private var image:UIImage?
+    @State private var url:URL?
+    @State private var error:String?
+    @State private var loading=false
+    @State private var expanded=false
+    var body:some View {
+        VStack(alignment:.leading,spacing:8){
+            if let image{Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:260).onTapGesture{expanded=true}}
+            HStack{Image(systemName:"doc");Text(file.name);Spacer();if let url{ShareLink(item:url)}else{Button(loading ? "读取中…":"查看"){Task{await load()}}.disabled(loading || client==nil)}}
+            if let error{Text(error).font(.caption).foregroundStyle(.orange)}
+        }.padding(12).background(Color.primary.opacity(0.05),in:RoundedRectangle(cornerRadius:12))
+        .task{if ["jpg","jpeg","png","webp"].contains(URL(fileURLWithPath:file.name).pathExtension.lowercased()){await load()}}
+        .sheet(isPresented:$expanded){NavigationStack{if let image{ScrollView{Image(uiImage:image).resizable().scaledToFit()}.toolbar{Button("完成"){expanded=false};if let url{ShareLink(item:url)}}}}}
+    }
+    private func load()async{
+        guard !loading,url==nil,let client,let conversation=exchange.conversationId else{return}
+        loading=true;defer{loading=false}
+        do{
+            let body=try JSONSerialization.data(withJSONObject:["conversationId":conversation,"exchangeId":exchange.id,"index":index])
+            let response=try await client.request("/files",body:body)
+            guard let object=try JSONSerialization.jsonObject(with:response) as? [String:Any],let raw=object["data"] as? String,let data=Data(base64Encoded:raw) else{throw ModelFailure(message:"附件格式无效")}
+            let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+            let destination=folder.appendingPathComponent(URL(fileURLWithPath:file.name).lastPathComponent)
+            try data.write(to:destination);url=destination;image=UIImage(data:data)
+        }catch{self.error=error.localizedDescription}
+    }
 }

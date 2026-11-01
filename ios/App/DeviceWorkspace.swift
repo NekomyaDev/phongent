@@ -15,12 +15,15 @@ struct DeviceWorkspace:View {
     private var selected:NearbyAgent? {hub.agents.first{$0.id==selectedDevice}}
     private var wide:Bool {sizeClass == .regular && !singleDevice}
     var body:some View {
+        if !singleDevice || hub.agents.filter({$0.approved && !$0.demo}).count>1 {FleetWorkspace(hub:hub,initialSelection:singleDevice ? selectedDevice:nil)}else{legacyBody}
+    }
+    private var legacyBody:some View {
         GeometryReader { geometry in
             ZStack(alignment:.leading) {
                 HStack(spacing:0) {
                     if wide {sidebar.frame(width:300);Divider()}
                     if let agent=selected {
-                        Dashboard(onShowSidebar:{withAnimation(.easeOut(duration:0.2)){drawer.toggle()}},agentName:agent.name,onRename:{renameText=agent.name;renameTarget=agent})
+                        Dashboard(onShowSidebar:{withAnimation(.easeOut(duration:0.2)){drawer.toggle()}},agentName:agent.name,avatarShape:agent.avatarShape,avatarHue:agent.avatarHue,onRename:{renameText=agent.name;renameTarget=agent})
                             .environmentObject(agent.client).id(agent.id)
                     } else {ContentUnavailableView("选择设备",systemImage:"iphone.gen3")}
                 }
@@ -128,7 +131,7 @@ private struct DeviceConversationGroup:View {
                 if chats.isEmpty && bridge.conversationError == nil {Text(bridge.connected ? "暂无历史聊天":"离线 · 暂无缓存").font(.caption).foregroundStyle(.secondary)}
             } label:{
                 HStack(spacing:10) {
-                    AoraAnimatedAvatar(phase:agent.phase,active:bridge.snapshot.busy).frame(width:38,height:38).background(color.opacity(0.16),in:Circle())
+                    AoraAnimatedAvatar(phase:agent.phase,active:bridge.snapshot.busy,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:38,height:38).background(color.opacity(0.16),in:Circle())
                     VStack(alignment:.leading,spacing:3) {
                         Text(agent.name).font(.headline).lineLimit(1)
                         Text(bridge.connected ? bridge.snapshot.title : "离线").font(.caption2).foregroundStyle(bridge.connected ? color : .gray)

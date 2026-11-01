@@ -12,10 +12,17 @@ struct RememberedAgent: Codable { var id: String; var name: String; var pairing:
     @Published var connection = "发现设备"
     @Published var available = true
     @Published var approved = false
+    let avatarShape:String
+    let avatarHue:Double
+    @Published var simulated=false
     let demo: Bool
     let client = BridgeClient(loadSaved: false)
     init(id: String, name: String, url: String = "", demo: Bool = false) {
-        self.id = id; self.name = name; self.url = url; self.demo = demo
+        self.id = id; self.name = name.replacingOccurrences(of:"模拟安卓 ",with:"设备 "); self.url = url; self.demo = demo
+        let identity=id.lowercased().utf8.reduce(UInt32(2166136261)){($0 ^ UInt32($1)) &* 16777619}
+        avatarHue=Double(identity % 360000)/1000
+        avatarShape=["blob","wedge","gem"][Int(identity % 3)]
+
         client.surfaceId = id; client.publishesWidget = false
     }
     var phase: String { !available ? "offline" : demo || (approved && client.connected) ? client.snapshot.phase : connection == "等待安卓允许" ? "waiting" : "idle" }
@@ -35,6 +42,10 @@ enum AgentTrustStore {
 }
 @MainActor final class NearbyHub: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
     @Published var agents:[NearbyAgent]=[]
+    @Published var deviceGroups:[String:String]=UserDefaults.standard.dictionary(forKey:"agentDeviceGroups") as? [String:String] ?? [:]
+    var groupNames:[String]{Array(Set(deviceGroups.values.filter{!$0.isEmpty})).sorted()}
+    func setGroup(_ device:String,name:String){let value=String(name.trimmingCharacters(in:.whitespacesAndNewlines).prefix(40));if value.isEmpty{deviceGroups.removeValue(forKey:device)}else{deviceGroups[device]=value};UserDefaults.standard.set(deviceGroups,forKey:"agentDeviceGroups")}
+    func members(of group:String)->Set<String>{Set(deviceGroups.filter{$0.value==group}.keys)}
     @Published var discoveryStatus="搜索中…"
     @Published var showingDemo=false
     private let browser=NetServiceBrowser()
@@ -48,6 +59,18 @@ enum AgentTrustStore {
     @Published var requestedDevice: String?
     override init() {
         super.init()
+        #if DEBUG
+        // Explicit maintenance launch arguments remove only the requested device IDs.
+        let removals=Set(ProcessInfo.processInfo.arguments.filter{$0.hasPrefix("--forget-device=")}.map{String($0.dropFirst("--forget-device=".count))})
+        if !removals.isEmpty {
+            remembered.removeAll{removals.contains($0.id)}
+            AgentTrustStore.save(remembered)
+            var shapes=UserDefaults.standard.dictionary(forKey:"deviceAvatarShapes") as? [String:String] ?? [:]
+            for id in removals {shapes.removeValue(forKey:id)}
+            UserDefaults.standard.set(shapes,forKey:"deviceAvatarShapes")
+            if let selected=UserDefaults.standard.string(forKey:"widgetDevice"),removals.contains(selected){UserDefaults.standard.removeObject(forKey:"widgetDevice")}
+        }
+        #endif
         for trust in remembered {
             let agent = NearbyAgent(id: trust.id, name: trust.name, url: trust.pairing.url)
             agent.client.snapshot.device = trust.name
@@ -104,7 +127,7 @@ enum AgentTrustStore {
         let name=String(value("name").prefix(60));let endpoint="http://\(host.trimmingCharacters(in:CharacterSet(charactersIn:"."))):\(service.port)"
         serviceIds[service.name]=id
         let agent=agents.first{$0.id==id} ?? NearbyAgent(id:id,name:name.isEmpty ? service.name:name,url:endpoint)
-        agent.url=endpoint;agent.available=true
+        agent.url=endpoint;agent.available=true;agent.simulated=value("simulation")=="1"
         if !agents.contains(where:{$0.id==id}) {agents.append(agent);observe(agent)}
         if let trust=remembered.first(where:{$0.id==id}) {
             var pairing=trust.pairing;pairing.url=endpoint;if agent.client.pairing?.url != pairing.url || agent.client.pairing?.token != pairing.token {agent.client.pairing=pairing;agent.client.configure()};agent.approved=true;agent.connection=agent.client.connected ? "已连接":"正在重连"
@@ -168,4 +191,13 @@ enum AgentTrustStore {
         agents.removeAll{$0.demo};showingDemo=false;publishWidgets()
     }
     func forget(_ agent:NearbyAgent){remembered.removeAll{$0.id==agent.id};AgentTrustStore.save(remembered);agent.approved=false;agent.client.pairing=nil;agent.client.configure();agent.connection="已断开";objectWillChange.send()}
+}
+
+
+struct FleetGroupPicker:View {
+    @ObservedObject var hub:NearbyHub
+    var select:(Set<String>)->Void
+    var body:some View {
+        if !hub.groupNames.isEmpty{Menu("按分组选择"){ForEach(hub.groupNames,id:\.self){group in Button(group){select(hub.members(of:group))}}}}
+    }
 }

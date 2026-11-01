@@ -23,6 +23,10 @@ class TaskGate(
     private val shellAvailable: StateFlow<Boolean>,
     private val moveBack: suspend () -> Boolean,
 ) {
+    private val remoteControl = MutableStateFlow(false)
+    fun requestRemoteControl() { remoteControl.value = true }
+    fun releaseRemoteControl() { remoteControl.value = false }
+
     private val movedAway = MutableStateFlow(false)
     private val resumes = MutableStateFlow(0)
     /** 发现被挪走那一刻的点击计数:之后点的「继续」都算数,哪怕 Agent 还没走到 gate。 */
@@ -37,12 +41,16 @@ class TaskGate(
     val movedAwayPending: Boolean get() = movedAway.value
 
     /** 用户点了「继续」。只对点击之后才开始的、或正在进行的暂停有效。 */
-    fun resume() { resumes.update { it + 1 } }
+    fun resume() { remoteControl.value = false; resumes.update { it + 1 } }
 
     suspend fun pass(phone: () -> Boolean = { true }, setWaiting: (TaskState?) -> Unit) {
         while (true) {
             val onPhone = phone()
             when {
+                remoteControl.value -> {
+                    setWaiting(TaskState.Held(GateReason("remote_control", "主控正在操作", resumable = true)))
+                    remoteControl.first { !it }
+                }
                 onPhone && !shellAvailable.value -> {
                     pauseUntilResume(SHELL_DOWN, setWaiting)
                 }

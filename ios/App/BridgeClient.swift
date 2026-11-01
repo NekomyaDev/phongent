@@ -16,6 +16,14 @@ struct BridgeServerError:LocalizedError {
         case "screen_protected":return "当前安卓页面禁止截屏"
         case "screen_unavailable":return "暂时无法读取安卓画面，请解锁后重试"
         case "screen_stale","screen_changed":return "画面已变化，请等待刷新后重试"
+        case "invalid_site":return "请填写有效的网站域名"
+        case "site_not_found":return "此设备没有该网站记录"
+        case "browser_login_busy":return "设备已有登录窗口，请先完成或关闭它"
+        case "controlled_by_other":return "其他主控正在操作，请确认接管后重试"
+        case "control_not_owned":return "控制权已变化，请重新接管"
+        case "waiting_for_agent_pause":return "等待 agent 暂停当前操作后再试"
+        case "virtual_screen_closed","task_ended":return "虚拟屏已关闭或任务已结束"
+        case "API Key 无效或没有权限","额度已用完","网络连接失败","服务地址无效","模型未通过工具调用测试，未保存":return code
         case "focus_input_first":return "请先点击安卓画面中的输入框"
         case "input_rejected":return "安卓未接受操作，请检查当前页面"
         case "agent_busy":return "安卓正在执行任务，请等待完成或先停止任务。"
@@ -103,6 +111,7 @@ enum PairingStore {
     func request(_ path: String, body: Data? = nil) async throws -> Data {
         guard let pairing, let session, let url = URL(string: pairing.url + path) else { throw URLError(.badURL) }
         var req = URLRequest(url: url); if path.hasPrefix("/messages?") { req.timeoutInterval = max(25,SyncPreferences.wait + 5) }; req.setValue("Bearer " + pairing.token, forHTTPHeaderField: "Authorization")
+        if path=="/models/settings", body != nil { req.timeoutInterval=30 }
         if let body { req.httpMethod = "POST"; req.httpBody = body; req.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let (data, response) = try await session.data(for: req)
         guard let http=response as? HTTPURLResponse else{throw URLError(.badServerResponse)}
@@ -326,17 +335,17 @@ enum PairingStore {
         } catch let error as BridgeServerError {notice=AgentNotice(text:error.localizedDescription);return false}
         catch {notice=AgentNotice(text:"新建聊天结果不确定，请先检查安卓当前聊天");return false}
     }
-    func command(_ action: String, text: String = "") async {
-        guard !demoMode, !sending, !switchingChat, connected else { return }
+    @discardableResult func command(_ action: String, text: String = "", commandId:String=UUID().uuidString, expectedConversation:String?=nil) async -> Bool {
+        guard !demoMode, !sending, !switchingChat, connected else { return false }
         sending = true; defer { sending = false }
         // The same ID is retained for one explicit attempt. Never auto-resend on a network error.
-        let commandId=UUID().uuidString
         loadChat()
+        chatMessages.removeAll{$0.id==commandId+"-user"}
         chatMessages.append(.init(id:commandId+"-user",role:"user",text:action == "stop" ? "停止任务" : text,status:"提交中",time:Date().timeIntervalSince1970))
         DeviceChatHistory.save(chatMessages,device:chatDevice)
-        let body: [String: String] = ["id": commandId, "action": action, "text": text, "runId": snapshot.runId,"conversationId":snapshot.currentConversationId ?? snapshot.conversationId ?? ""]
+        let body: [String: String] = ["id": commandId, "action": action, "text": text, "runId": snapshot.runId,"conversationId":expectedConversation ?? snapshot.currentConversationId ?? snapshot.conversationId ?? ""]
         do {
-            let data = try await request("/command", body: JSONEncoder().encode(body))
+            let data = try await request(action=="task" && snapshot.taskQueueVersion==1 ? "/tasks":"/command", body: JSONEncoder().encode(body))
             let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             if let current=result?["conversationId"] as? String,!current.isEmpty,current != snapshot.currentConversationId {
                 let pending=chatMessages.first{$0.id==commandId+"-user"}
@@ -344,10 +353,12 @@ enum PairingStore {
                 snapshot.currentConversationId=current;loadChat()
                 if let pending,!chatMessages.contains(where:{$0.id==pending.id}) {chatMessages.append(pending)}
             }
-            commandResult(commandId,result?["status"] as? String == "accepted" ? "已接收" : (result?["status"] as? String ?? "未知"))
+            commandResult(commandId,["accepted","queued","dispatching","running","completed","failed","cancelled","uncertain"].contains(result?["status"] as? String ?? "") ? ((result?["status"] as? String)=="queued" ? "已排队":"已接收") : (result?["status"] as? String ?? "未知"))
             commandStatus = "指令状态：" + (result?["status"] as? String ?? "未知")
+            return ["accepted","queued","dispatching","running","completed","failed","cancelled","uncertain"].contains(result?["status"] as? String ?? "")
         } catch let error as BridgeServerError {commandResult(commandId,error.localizedDescription);commandStatus=error.localizedDescription}
         catch { commandResult(commandId,"提交结果不确定");commandStatus = "提交结果不确定，请先核查安卓任务，不要重复发送" }
+        return false
     }
     func showDemo(_ phase: String, device: String? = nil) async {
         if !demoMode { demoRunId = "demo-" + UUID().uuidString }

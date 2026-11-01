@@ -23,3 +23,12 @@ ios/*.xcodeproj/xcuserdata/
 *.p8
 *.jks
 *.pem
+
+# Local credentials and generated Apple build output
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+DerivedData/
+*.xcarchive/
