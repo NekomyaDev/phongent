@@ -14,6 +14,8 @@ Assign tasks in natural language and view each device’s progress, notification
 
 [Demo videos](#demo-videos) · [Getting started](#getting-started) · [Device groups](#devices-and-groups) · [Development](#development-and-builds) · [Contact](#contact)
 
+**[Download Android APK · phongent.apk](https://github.com/mylea1/agent-fleet/releases/latest/download/phongent.apk)**
+
 </div>
 
 ## What is phongent?
