@@ -5,6 +5,7 @@ import PhotosUI
 struct FleetWorkspace:View {
     @ObservedObject var hub:NearbyHub
     @StateObject private var store=FleetChatStore()
+    @State private var collapsedGroups:Set<String>=[]
     @State private var selection:String?
     @State private var selectedGroup:String?
     @State private var input=""
@@ -25,26 +26,29 @@ struct FleetWorkspace:View {
     @FocusState private var focused:Bool
     init(hub:NearbyHub,initialSelection:String?=nil){self.hub=hub;_selection=State(initialValue:initialSelection)}
     private var allAgents:[NearbyAgent]{hub.agents.filter{$0.approved && !$0.demo}}
-    private var agents:[NearbyAgent]{allAgents.filter{selectedGroup==nil || hub.deviceGroups[$0.id]==selectedGroup}}
+    private var agents:[NearbyAgent]{allAgents.filter{selectedGroup==nil || hub.group(of:$0.id)==selectedGroup}}
     private var chosen:NearbyAgent?{agents.first{$0.id==selection}}
     var body:some View {
         HStack(spacing:0){
-            ScrollView{VStack(spacing:14){
+            ScrollView{LazyVStack(spacing:14){
                 Button{focused=false;selection=nil;selectedGroup=nil}label:{VStack(spacing:4){Image(systemName:"square.grid.2x2.fill").font(.title2).frame(width:52,height:52);Text("全部").font(.caption2)}.padding(4).background(selection==nil ? Color.mint.opacity(0.14):.clear,in:RoundedRectangle(cornerRadius:16))}.buttonStyle(.plain)
-                ForEach(agents){agent in
+                ForEach(hub.groupNames,id:\.self){group in
+                    HStack(spacing:0){Button{selection=nil;selectedGroup=group}label:{Text(group).font(.caption2).lineLimit(2)};Button{if !collapsedGroups.insert(group).inserted{collapsedGroups.remove(group)}}label:{Image(systemName:collapsedGroups.contains(group) ? "chevron.right":"chevron.down").font(.caption2).frame(width:22,height:32)}}
+                    if !collapsedGroups.contains(group){ForEach(allAgents.filter{hub.group(of:$0.id)==group}){agent in
                     VStack(spacing:1){AoraAnimatedAvatar(phase:agent.phase,active:agent.client.connected,shape:agent.avatarShape,hue:agent.avatarHue).frame(width:58,height:58);Text(agent.name).font(.caption2).lineLimit(2).frame(width:60);Circle().fill(agent.client.connected ? .green:.gray).frame(width:5,height:5)}.padding(.vertical,5).background(selection==agent.id ? Color.mint.opacity(0.14):.clear,in:RoundedRectangle(cornerRadius:16))
                     .frame(width:68,height:92)
                     .background(Color.mint.opacity(pressingDevice==agent.id || mentionedDevice==agent.id ? 0.18:0),in:RoundedRectangle(cornerRadius:16))
                     .animation(.spring(response:0.28,dampingFraction:0.65),value:pressingDevice)
                     .animation(.spring(response:0.28,dampingFraction:0.65),value:mentionedDevice)
-                    .overlay{AvatarTouchSurface(label:agent.name,onTap:{focused=false;selection=agent.id;hub.select(agent)},onPress:{down in pressingDevice=down ? agent.id:nil},onLongPress:{
+                    .overlay{AvatarTouchSurface(label:agent.name,onTap:{focused=false;selectedGroup=nil;selection=agent.id;hub.select(agent)},onPress:{down in pressingDevice=down ? agent.id:nil},onLongPress:{
                         guard !planning else{return}
-                        selection=nil;input += (input.isEmpty ? "":" ")+"@"+agent.name+" ";focused=true
+                        selection=nil;selectedGroup=nil;input += (input.isEmpty ? "":" ")+"@"+agent.name+" ";focused=true
                         mentionedDevice=agent.id
                         Task{@MainActor in try? await Task.sleep(for:.milliseconds(450));if mentionedDevice==agent.id{mentionedDevice=nil}}
                     })}
 
                 }
+                }}
             }.padding(.vertical,10)}.frame(width:74)
             Divider()
             VStack(spacing:0){
@@ -89,7 +93,7 @@ struct FleetWorkspace:View {
         Task{@MainActor in
             defer{planning=false}
             do{
-                let plan=try await FleetTaskRouter.plan(text,agents:devices,imageCount:photos.count)
+                let plan=try await FleetTaskRouter.plan(text,agents:devices,imageCount:photos.count,groups:hub.deviceGroups)
                 var tasks=try plan.validated(allowed:Set(devices.map(\.id)))
                 var generated:[String:[Data]]=[:]
                 for assignment in plan.assignments{
@@ -162,9 +166,9 @@ struct FleetWorkspace:View {
         ScrollViewReader{proxy in
             ScrollView{
                 LazyVStack(alignment:.leading,spacing:18){
-                    ForEach(store.batches.filter{selection==nil || $0.deliveries.contains{$0.deviceID==selection}}){batch in
+                    ForEach(store.batches.filter{($0.deliveries.contains{delivery in agents.contains{$0.id==delivery.deviceID} && (selection==nil || delivery.deviceID==selection)})}){batch in
                         HStack{Spacer(minLength:30);Text(batch.text).padding(12).foregroundStyle(.white).background(.blue,in:RoundedRectangle(cornerRadius:18))}
-                        ForEach(batch.deliveries.filter{selection==nil || $0.deviceID==selection}){delivery in
+                        ForEach(batch.deliveries.filter{delivery in agents.contains{$0.id==delivery.deviceID} && (selection==nil || delivery.deviceID==selection)}){delivery in
                             VStack(alignment:.leading,spacing:8){
                                 HStack(spacing:4){if let agent=agents.first(where:{$0.id==delivery.deviceID}){AoraAnimatedAvatar(phase:delivery.phase,active:delivery.phase=="running",shape:agent.avatarShape,hue:agent.avatarHue).frame(width:30,height:30)};Text(delivery.name).font(.caption.bold());Spacer();Text(delivery.status).font(.caption2).foregroundStyle(.secondary)}
                                 if let task=delivery.task {Text(task).font(.caption).foregroundStyle(.secondary)}
@@ -187,7 +191,8 @@ struct FleetWorkspace:View {
 }
 struct FleetPipStack:View {
     var agents:[NearbyAgent]
-    var body:some View {ScrollView(.horizontal){HStack(alignment:.bottom,spacing:8){ForEach(agents){agent in FleetPip(agent:agent)}}}.scrollClipDisabled().fixedSize(horizontal:false,vertical:true)}
+    @AppStorage("showAgentWindows") private var showWindows=true
+    var body:some View {if showWindows{ScrollView(.horizontal){HStack(alignment:.bottom,spacing:8){ForEach(agents){agent in FleetPip(agent:agent)}}}.scrollClipDisabled().fixedSize(horizontal:false,vertical:true)}}
 }
 struct FleetPip:View {
     @ObservedObject var agent:NearbyAgent

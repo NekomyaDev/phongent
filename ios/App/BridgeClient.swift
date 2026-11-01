@@ -216,10 +216,10 @@ enum PairingStore {
             commandStatus="已请求安卓打开原通知，请查看安卓屏幕"
         } catch {commandStatus="通知已失效或安卓阻止打开，请在安卓解锁后重试"}
     }
-    func refresh() async {
+    func refresh(force:Bool=false) async {
         guard !demoMode, pairing != nil else { return }
         if messageConfiguration != SyncPreferences.signature {stopMessages()}
-        if streaming {return}
+        if streaming && !force {return}
         do {
             var state = try JSONDecoder().decode(AgentSnapshot.self, from: await request("/state"))
             if messageTask != nil {state.messages=snapshot.messages}

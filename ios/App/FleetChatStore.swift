@@ -83,14 +83,15 @@ struct FleetTaskPlan:Decodable {
     }
 }
 @MainActor enum FleetTaskRouter {
-    static func plan(_ text:String,agents:[NearbyAgent],imageCount:Int=0) async throws -> FleetTaskPlan {
+    static func plan(_ text:String,agents:[NearbyAgent],imageCount:Int=0,groups:[String:String]=[:]) async throws -> FleetTaskPlan {
         let catalog=ModelCatalog.shared
         guard let selected=catalog.selection(.dispatch),let provider=catalog.saved.providers.first(where:{$0.id==selected.providerId}) else{throw ModelFailure(message:"请在设置 → 主控模型中选择任务下发模型")}
-        let devices=agents.map{["deviceID":$0.id,"name":$0.name]}
+        let devices=agents.map{["deviceID":$0.id,"name":$0.name,"group":groups[$0.id] ?? "默认组"]}
         let roster=String(data:try JSONSerialization.data(withJSONObject:devices),encoding:.utf8)!
         let system="""
         你是主控任务策划与内容创作 AI，负责先创作再分工，不直接操作设备。设备清单：\(roster)。用户附图数量：\(imageCount)，这些图会随任务下发；你不能凭空描述其内容。
         输出纯 JSON：{"assignments":[{"deviceID":"清单中的ID","task":"发给该设备的完整指令","cards":[{"title":"图卡标题","body":"图卡正文","accent":"#287A76"}]}],"clarification":""}。
+        清单包含设备组别。按组分配时展开到该组所有设备；组内点名任务优先于该组通用任务，其余成员执行组任务。可以同时给不同组不同任务；组名与设备名歧义时澄清。
         用户可以直接说“A干某事、B干某事”，不需要@；设备名或唯一简称均可，@只是快捷方式。其余设备指清单中未被明确指定的设备；@全部或所有设备表示全部。
         矩阵图文任务：由你先按各账号生成独立完整标题、正文、标签和1至4张文字图卡，在task中放入该设备的完整文案和执行要求。主控会将cards渲染成PNG并发给对应设备，不让执行设备重复创作。普通任务cards为空。
         图卡标题最多60字、正文最多400字。不要将图卡称为照片；若用户明确要求摄影或真实照片且未提供图片，clarification说明需要配图。只有用户要求创作图文才生成cards，不添加用户未要求的发布行为。

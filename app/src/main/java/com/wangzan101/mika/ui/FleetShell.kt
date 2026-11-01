@@ -41,6 +41,10 @@ fun FleetShell(localChat:@Composable ()->Unit) {
             dismissButton={TextButton(onClick={decide(false)}){Text("拒绝")}})
     }
     val devices by controller.devices.collectAsState()
+    val connecting by controller.connecting.collectAsState()
+    var collapsedGroups by remember{mutableStateOf(setOf<String>())}
+    var connectionError by remember{mutableStateOf<String?>(null)}
+    connectionError?.let{message->AlertDialog(onDismissRequest={connectionError=null},title={Text("连接提醒")},text={Text(message)},confirmButton={TextButton(onClick={connectionError=null}){Text("好")}})}
     val snapshots by controller.snapshots.collectAsState()
     val history by controller.history.rows.collectAsState()
     var showDeliveries by remember{mutableStateOf(false)}
@@ -104,12 +108,15 @@ fun FleetShell(localChat:@Composable ()->Unit) {
     Column(Modifier.fillMaxSize().statusBarsPadding()){
         Box(Modifier.weight(1f)){
             when(tab){
-                0->FleetRadar(devices,busy,status,onChat={device->target=if(device.id=="local")null else device.id;tab=1},onEdit={device->renaming=device;newName=device.name;newGroup=groups[device.id] ?: ""},onConnect={device->request{controller.connect(device);status="已连接 ${device.name}"}})
+                0->FleetRadar(devices,busy,status,onChat={device->target=if(device.id=="local")null else device.id;tab=1},onEdit={device->renaming=device;newName=device.name;newGroup=groups[device.id] ?: ""},onConnect={device->request{try{controller.connect(device);status="已连接 ${device.name}";target=device.id;tab=1}catch(e:Exception){connectionError=e.message ?: "重连失败"}}},connecting=connecting,groups=groups,onGroup={ids,name->ids.forEach{controller.setGroup(it,name)}},onConnectAll={targets->request{val failures=controller.connectAll(targets);if(failures.isNotEmpty())connectionError="连接失败："+failures.joinToString("、")}})
                 1->if(target==null)localChat() else Column(Modifier.fillMaxSize()){
                 Row(Modifier.weight(1f)){
                     LazyColumn(Modifier.width(76.dp)){
                         item{TextButton(onClick={target="all";activeGroup=null}){Text("全部")}}
-                        items(devices.filter{it.connected},key={it.id}){device->FleetAvatarButton(device.id,device.name,target==device.id,onClick={target=device.id},onMention={target="all";activeGroup=null;input+=" @${device.name} "})}
+                        devices.filter{it.connected}.groupBy{groups[it.id] ?: "默认组"}.toSortedMap().forEach{(group,members)->
+                            item(key="group:$group"){Row{TextButton(onClick={target="all";activeGroup=group},modifier=Modifier.weight(1f),contentPadding=PaddingValues(0.dp)){Text(group,style=MaterialTheme.typography.labelSmall)};TextButton(onClick={collapsedGroups=if(group in collapsedGroups)collapsedGroups-group else collapsedGroups+group},modifier=Modifier.width(24.dp),contentPadding=PaddingValues(0.dp)){Text(if(group in collapsedGroups)"›" else "⌄")}}}
+                            if(group !in collapsedGroups)items(members,key={it.id}){device->FleetAvatarButton(device.id,device.name,target==device.id,onClick={target=device.id},onMention={target="all";activeGroup=null;input+=" @${device.name} "})}
+                        }
                     }
                     if(target==null)localChat() else Column(Modifier.fillMaxSize().padding(16.dp)){
 
@@ -136,7 +143,7 @@ fun FleetShell(localChat:@Composable ()->Unit) {
                         }
                     }
 
-                    FleetVideoWindows(controller,devices.filter{(target=="all" && (activeGroup==null || groups[it.id]==activeGroup)) || it.id==target})
+                    FleetVideoWindows(controller,devices.filter{(target=="all" && (activeGroup==null || (groups[it.id] ?: "默认组")==activeGroup)) || it.id==target})
                 }}
                 Column(Modifier.fillMaxWidth().imePadding().padding(horizontal=14.dp,vertical=8.dp)){
                     if(status.isNotBlank())Text(status,style=MaterialTheme.typography.labelSmall)
@@ -151,7 +158,7 @@ fun FleetShell(localChat:@Composable ()->Unit) {
                     Button(enabled=!busy && pendingSends.isEmpty() && input.isNotBlank(),onClick={
                         val text=input
                         val images=photos.toList()
-                        val targets=devices.filter{it.connected && ((target=="all" && (activeGroup==null || groups[it.id]==activeGroup)) || it.id==target)}
+                        val targets=devices.filter{it.connected && ((target=="all" && (activeGroup==null || (groups[it.id] ?: "默认组")==activeGroup)) || it.id==target)}
                         request{
                             require(targets.isNotEmpty()){"没有可用设备"}
                             val planned=controller.distribute(text,targets,images.size)

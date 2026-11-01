@@ -12,6 +12,7 @@ enum SyncPreferences {
     static var signature:String {"\(push)-\(heartbeat)-\(longPolling)-\(wait)-\(interval)"}
 }
 struct SyncSettings:View {
+    @AppStorage("showAgentWindows") private var showWindows=true
     @AppStorage("syncPush") private var push=true
     @AppStorage("syncHeartbeat") private var heartbeat=30.0
     @AppStorage("syncLongPolling") private var longPolling=true
@@ -20,6 +21,7 @@ struct SyncSettings:View {
     @AppStorage("syncStateInterval") private var stateInterval=2.0
     var body:some View {
         Form {
+            Section("小窗"){Toggle("显示安卓小窗",isOn:$showWindows)}
             Section("连接方式") {
                 Toggle("TCP 主动推送",isOn:$push)
                 if push {

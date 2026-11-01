@@ -43,9 +43,11 @@ enum AgentTrustStore {
 @MainActor final class NearbyHub: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
     @Published var agents:[NearbyAgent]=[]
     @Published var deviceGroups:[String:String]=UserDefaults.standard.dictionary(forKey:"agentDeviceGroups") as? [String:String] ?? [:]
-    var groupNames:[String]{Array(Set(deviceGroups.values.filter{!$0.isEmpty})).sorted()}
-    func setGroup(_ device:String,name:String){let value=String(name.trimmingCharacters(in:.whitespacesAndNewlines).prefix(40));if value.isEmpty{deviceGroups.removeValue(forKey:device)}else{deviceGroups[device]=value};UserDefaults.standard.set(deviceGroups,forKey:"agentDeviceGroups")}
-    func members(of group:String)->Set<String>{Set(deviceGroups.filter{$0.value==group}.keys)}
+    func group(of id:String)->String{deviceGroups[id] ?? "默认组"}
+    var groupNames:[String]{Array(Set(agents.map{group(of:$0.id)})).sorted()}
+    @Published var connecting:Set<String>=[]
+    func setGroup(_ device:String,name:String){let value=String(name.trimmingCharacters(in:.whitespacesAndNewlines).prefix(40));if value.isEmpty || value=="默认组"{deviceGroups.removeValue(forKey:device)}else{deviceGroups[device]=value};UserDefaults.standard.set(deviceGroups,forKey:"agentDeviceGroups")}
+    func members(of group:String)->Set<String>{Set(agents.filter{self.group(of:$0.id)==group}.map(\.id))}
     @Published var discoveryStatus="搜索中…"
     @Published var showingDemo=false
     private let browser=NetServiceBrowser()
@@ -136,15 +138,38 @@ enum AgentTrustStore {
     }
     private func observe(_ agent:NearbyAgent){observers[agent.id]=agent.client.objectWillChange.sink{[weak self] _ in self?.objectWillChange.send()}}
     var refreshInterval:Double {
-        let live=agents.filter{$0.approved && !$0.demo}
+        let live=agents.filter{$0.approved && !$0.demo && !connecting.contains($0.id)}
         return SyncPreferences.push && !live.isEmpty && live.allSatisfy{$0.client.snapshot.eventStream == true} ? 30 : SyncPreferences.stateInterval
     }
     func refresh() async {
-        let live=agents.filter{$0.approved && !$0.demo}
+        let live=agents.filter{$0.approved && !$0.demo && !connecting.contains($0.id)}
         await withTaskGroup(of:Void.self){ group in
             for agent in live{group.addTask{@MainActor in await agent.client.refresh();agent.available=agent.client.connected;agent.connection=agent.client.connected ? "已连接":"连接中断"}}
         }
         publishWidgets(); objectWillChange.send()
+    }
+    func connect(_ agent:NearbyAgent) async -> Bool {
+        guard !connecting.contains(agent.id) else{return false}
+        if agent.client.connected{return true}
+        connecting.insert(agent.id);defer{connecting.remove(agent.id);objectWillChange.send()}
+        if agent.approved {
+            agent.connection="连接中…"
+            await agent.client.refresh(force:true)
+            agent.available=agent.client.connected
+            agent.connection=agent.client.connected ? "已连接":"重连失败，请检查设备网络和服务"
+        }else{await invite(agent)}
+        return agent.client.connected
+    }
+    func connectAll(_ targets:[NearbyAgent]) async -> [String] {
+        var failures:[String]=[]
+        for start in stride(from:0,to:targets.count,by:3){
+            let batch=Array(targets.dropFirst(start).prefix(3))
+            await withTaskGroup(of:String?.self){group in
+                for agent in batch{group.addTask{@MainActor in await self.connect(agent) ? nil:agent.name}}
+                for await failure in group{if let failure{failures.append(failure)}}
+            }
+        }
+        return failures
     }
     func invite(_ agent:NearbyAgent) async {
         guard agent.available,!agent.approved,!agent.demo,agent.connection != "等待安卓允许" else{return}

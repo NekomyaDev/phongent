@@ -68,17 +68,17 @@ struct FleetManagement:View {
 }
 struct FleetNotifications:View {
     @ObservedObject var hub:NearbyHub
-    @State private var reply:MessagePreview?
-    @State private var replyingDevice:NearbyAgent?
+    private struct ReplyContext:Identifiable {let id=UUID();let device:NearbyAgent;let message:MessagePreview}
+    @State private var reply:ReplyContext?
     var body:some View {
         NavigationStack{List{
             ForEach(hub.agents.filter{$0.approved && !$0.demo}){agent in
                 NavigationLink{
-                    ScrollView{MessageInbox(bridge:agent.client,reply:{message in replyingDevice=agent;reply=message}).padding()}.navigationTitle(agent.name)
+                    ScrollView{MessageInbox(bridge:agent.client,reply:{message in reply=ReplyContext(device:agent,message:message)}).padding()}.navigationTitle(agent.name)
                 }label:{FleetNotificationDeviceLabel(agent:agent)}
             }
         }.navigationTitle("消息")}
-        .sheet(item:$reply){message in if let device=replyingDevice{FleetNotificationReply(agent:device,message:message)}}
+        .sheet(item:$reply){context in FleetNotificationReply(agent:context.device,message:context.message)}
     }
 }
 
@@ -92,6 +92,7 @@ private struct FleetNotificationReply:View {
     @State private var result:String?
     var body:some View {
         NavigationStack{Form{
+            if !agent.client.connected{Section{Text("设备连接中断");Button("重试连接"){Task{await agent.client.refresh(force:true)}}}}
             Section(agent.name+" · "+message.app){Text(message.title);Text(message.text).foregroundStyle(.secondary)}
             Section{TextField("回复内容",text:$text,axis:.vertical).lineLimit(3...8)}
             Button("通过 agent 发送"){

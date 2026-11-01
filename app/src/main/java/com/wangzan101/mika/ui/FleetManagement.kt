@@ -156,6 +156,7 @@ fun FleetManagementHome(controller:FleetController,devices:List<FleetController.
     val providers=com.wangzan101.mika.settings.ProviderStore.get(context)
     val connected by providers.providers.collectAsState()
     val configs by providers.configs.collectAsState()
+    val showWindows by controller.showWindows.collectAsState()
     var dispatch by remember{mutableStateOf(controller.dispatchModel)}
     var page by remember{mutableStateOf<String?>(null)}
     androidx.activity.compose.BackHandler(page!=null){page=null}
@@ -163,6 +164,7 @@ fun FleetManagementHome(controller:FleetController,devices:List<FleetController.
         "localModels"->ModelSetupScreen(providers,false,onBack={page=null},onDone={page=null})
         null->LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             item{Text("设置",style=MaterialTheme.typography.headlineMedium)}
+            item{Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){Text("显示安卓小窗",Modifier.weight(1f));Switch(checked=showWindows,onCheckedChange=controller::setShowWindows)}}
             item{Text("当前主控端",style=MaterialTheme.typography.labelLarge)}
             item{TextButton(onClick={page="localModels"}){Text("模型服务商与本机执行模型")}}
             item{Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){

@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 
 struct Dashboard:View {
+    @AppStorage("showAgentWindows") private var showWindows=true
     var showConnectionButton=false
     var onShowSidebar:(()->Void)?=nil
     var agentName="agent"
@@ -68,7 +69,7 @@ struct Dashboard:View {
             .background(Color(uiColor:.systemGroupedBackground))
             .safeAreaInset(edge:.bottom,spacing:0) {composer}
             .overlay(alignment:.top) {if !compactHeader {chatHeader}}
-            .overlay {NativeVirtualPip(bridge:bridge)}
+            .overlay {if showWindows{NativeVirtualPip(bridge:bridge)}}
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden,for:.navigationBar)
             .toolbar {

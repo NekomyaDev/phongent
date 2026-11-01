@@ -23,6 +23,8 @@ import java.io.DataInputStream
 /** Subscribe only while this UI is visible; one hardware decoder per visible remote window. */
 @Composable
 fun FleetVideoWindows(controller:FleetController,devices:List<FleetController.Device>){
+    val enabled by controller.showWindows.collectAsState()
+    if(!enabled)return
     var visible by remember{mutableStateOf(false)}
     androidx.lifecycle.compose.LifecycleStartEffect(Unit){visible=true;onStopOrDispose{visible=false}}
     if(!visible)return

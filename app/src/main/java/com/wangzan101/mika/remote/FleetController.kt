@@ -19,7 +19,14 @@ class FleetController(context:Context) {
     private val prefs=this.context.getSharedPreferences("fleet-controller",0)
     private val groupState=MutableStateFlow(prefs.all.filterKeys{it.startsWith("group:")}.mapKeys{it.key.removePrefix("group:")}.mapValues{it.value.toString()})
     val groups=groupState.asStateFlow()
-    fun setGroup(id:String,name:String){val clean=name.trim().take(40);if(clean.isEmpty()){prefs.edit().remove("group:$id").apply();groupState.value=groupState.value-id}else{prefs.edit().putString("group:$id",clean).apply();groupState.value=groupState.value+(id to clean)}}
+    private val windowState=MutableStateFlow(prefs.getBoolean("showWindows",true))
+    val showWindows=windowState.asStateFlow()
+    fun setShowWindows(value:Boolean){prefs.edit().putBoolean("showWindows",value).apply();windowState.value=value}
+    private val connectingState=MutableStateFlow<Set<String>>(emptySet())
+    val connecting=connectingState.asStateFlow()
+    private val connectLock=Any()
+
+    fun setGroup(id:String,name:String){val clean=name.trim().take(40);if(clean.isEmpty() || clean=="默认组"){prefs.edit().remove("group:$id").apply();groupState.value=groupState.value-id}else{prefs.edit().putString("group:$id",clean).apply();groupState.value=groupState.value+(id to clean)}}
     private val nsd=this.context.getSystemService(NsdManager::class.java)
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val mutable=MutableStateFlow<List<Device>>(listOf(Device("local", prefs.getString("name:local",null) ?: "本机","local",true)))
@@ -171,11 +178,28 @@ class FleetController(context:Context) {
     }
     suspend fun refresh(device:Device){if(device.id!="local" && !prefs.contains("token:${device.id}"))return;try{val state=request(device,"/state");if(mutable.value.firstOrNull{it.id==device.id}?.url!=device.url)return;saveState(device.id,state);update(device.copy(name=prefs.getString("name:${device.id}",device.name) ?: device.name,connected=true,error=null))}catch(e:CancellationException){throw e}catch(e:Exception){if(mutable.value.firstOrNull{it.id==device.id}?.url!=device.url)return;update(device.copy(name=prefs.getString("name:${device.id}",device.name) ?: device.name,connected=false,error=e.message))}}
     suspend fun connect(device:Device){
+        synchronized(connectLock){check(device.id !in connectingState.value){"设备正在连接"};connectingState.value=connectingState.value+device.id}
+        try{
+            if(prefs.contains("token:${device.id}")){
+                refresh(device)
+                check(mutable.value.firstOrNull{it.id==device.id}?.connected==true){mutable.value.firstOrNull{it.id==device.id}?.error ?: "重连失败"}
+                return
+            }
+            pairDevice(device)
+        }catch(e:CancellationException){throw e}catch(e:Exception){mutable.value.firstOrNull{it.id==device.id && it.url==device.url}?.let{update(it.copy(connected=false,error=e.message))};throw e}
+        finally{synchronized(connectLock){connectingState.value=connectingState.value-device.id}}
+    }
+    suspend fun connectAll(targets:List<Device>):List<String> = coroutineScope {
+        val failed=java.util.Collections.synchronizedList(mutableListOf<String>())
+        for(batch in targets.chunked(3)){batch.map{device->async{try{connect(device)}catch(e:CancellationException){throw e}catch(_:Exception){failed.add(device.name)}}}.awaitAll()}
+        failed.toList()
+    }
+    private suspend fun pairDevice(device:Device){
         val nonce=UUID.randomUUID().toString()+UUID.randomUUID().toString()
         request(device,"/pair",JSONObject().put("requestId",nonce).put("name",Build.MODEL),false)
         repeat(85){delay(1000);val result=request(device,"/pair/$nonce",authenticated=false)
             when(result.optString("status")){
-                "approved"->{prefs.edit().putString("token:${device.id}",result.getString("token")).commit();refresh(device);return}
+                "approved"->{prefs.edit().putString("token:${device.id}",result.getString("token")).commit();refresh(device);check(mutable.value.firstOrNull{it.id==device.id}?.connected==true){"已授权，但设备连接失败"};return}
                 "denied","expired"->error("连接申请被拒绝或已过期")
             }
         };error("等待授权超时")
@@ -187,8 +211,8 @@ class FleetController(context:Context) {
     suspend fun distribute(text:String,targets:List<Device>,imageCount:Int=0):Dispatch {
         val store=com.wangzan101.mika.settings.ProviderStore.get(context)
         val model=store.controllerModel(dispatchModel) ?: error("请在设置中选择任务下发模型")
-        val roster=org.json.JSONArray(targets.map{JSONObject().put("id",it.id).put("name",it.name)})
-        val reply=model.complete("你是主控任务策划与内容创作 AI。设备清单：$roster。用户附图数量：$imageCount，会随任务下发，不可凭空描述图片内容。输出纯JSON对象，键为设备id，值为对象{task:完整任务文字,cards:[{title:图卡标题,body:图卡正文,accent:十六进制颜色}]}。普通任务cards为空。用户可以说A做什么B做什么，不需要@；结合名称和唯一简称解析对象，@只是快捷方式。其余指尚未指定的设备。无指定对象默认全部。矩阵图文任务由你先按每个账号生成独立完整标题、正文、标签和1至4张图文卡片，然后把各自完整文案和执行要求写入task；主控会将cards渲染成PNG并附给对应设备，不要让执行设备重复创作文案。每张标题最多60字、正文最多400字，可分成多张。只有用户要求图文创作时才生成cards，不添加用户没要求的发布行为。不要声称这些文字图卡是照片；如用户明确要求摄影或真实图片且未附图片，返回error说明需要配图。名字歧义或设备不存在返回{error:说明}。同一设备任务合并，不能给未指派设备发送其他设备专属任务。",listOf(com.wangzan101.mika.core.model.Message(com.wangzan101.mika.core.model.Role.User,listOf(com.wangzan101.mika.core.model.Part.Text(text)),com.wangzan101.mika.core.model.Author.User)),emptyList())
+        val roster=org.json.JSONArray(targets.map{JSONObject().put("id",it.id).put("name",it.name).put("group",groups.value[it.id] ?: "默认组")})
+        val reply=model.complete("你是主控任务策划与内容创作 AI。设备清单：$roster。清单包含group分组：组任务分配给组内所有设备，组内点名任务优先，其余成员执行组任务。不同组可以执行不同任务，歧义时澄清。用户附图数量：$imageCount，会随任务下发，不可凭空描述图片内容。输出纯JSON对象，键为设备id，值为对象{task:完整任务文字,cards:[{title:图卡标题,body:图卡正文,accent:十六进制颜色}]}。普通任务cards为空。用户可以说A做什么B做什么，不需要@；结合名称和唯一简称解析对象，@只是快捷方式。其余指尚未指定的设备。无指定对象默认全部。矩阵图文任务由你先按每个账号生成独立完整标题、正文、标签和1至4张图文卡片，然后把各自完整文案和执行要求写入task；主控会将cards渲染成PNG并附给对应设备，不要让执行设备重复创作文案。每张标题最多60字、正文最多400字，可分成多张。只有用户要求图文创作时才生成cards，不添加用户没要求的发布行为。不要声称这些文字图卡是照片；如用户明确要求摄影或真实图片且未附图片，返回error说明需要配图。名字歧义或设备不存在返回{error:说明}。同一设备任务合并，不能给未指派设备发送其他设备专属任务。",listOf(com.wangzan101.mika.core.model.Message(com.wangzan101.mika.core.model.Role.User,listOf(com.wangzan101.mika.core.model.Part.Text(text)),com.wangzan101.mika.core.model.Author.User)),emptyList())
         val raw=reply.parts.filterIsInstance<com.wangzan101.mika.core.model.Part.Text>().joinToString(""){it.text}.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
         val objectValue=JSONObject(raw)
         if(objectValue.has("error"))error(objectValue.getString("error"))
