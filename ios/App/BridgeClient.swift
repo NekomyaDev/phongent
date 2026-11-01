@@ -177,7 +177,8 @@ enum PairingStore {
                     throw URLError(.networkConnectionLost)
                 } catch {
                     if Task.isCancelled{return}
-                    self.connected=false;self.status="连接中断 · 自动重连中"
+                    await self.refresh(force:true)
+                    if !self.connected {self.status="连接中断 · 自动重连中"}
                     failures=min(failures+1,5)
                     try? await Task.sleep(for:.seconds(min(30,pow(2,Double(failures-1)))))
                 }
@@ -219,7 +220,7 @@ enum PairingStore {
     func refresh(force:Bool=false) async {
         guard !demoMode, pairing != nil else { return }
         if messageConfiguration != SyncPreferences.signature {stopMessages()}
-        if streaming && !force {return}
+        if streaming && connected && !force {return}
         do {
             var state = try JSONDecoder().decode(AgentSnapshot.self, from: await request("/state"))
             if messageTask != nil {state.messages=snapshot.messages}
@@ -335,8 +336,23 @@ enum PairingStore {
         } catch let error as BridgeServerError {notice=AgentNotice(text:error.localizedDescription);return false}
         catch {notice=AgentNotice(text:"新建聊天结果不确定，请先检查安卓当前聊天");return false}
     }
+    @Published var stopping=false
+    @discardableResult func stopAllTasks() async -> Bool {
+        guard !stopping else{return false}
+        stopping=true;defer{stopping=false}
+        await refresh(force:true)
+        guard connected else{commandStatus="设备未连接，结束任务未送达";return false}
+        do {
+            _ = try await request("/tasks",body:JSONSerialization.data(withJSONObject:["action":"stop_all"]))
+            await refresh(force:true)
+            commandStatus="已请求结束该设备全部任务"
+            return true
+        } catch {commandStatus="结束任务失败："+error.localizedDescription;return false}
+    }
     @discardableResult func command(_ action: String, text: String = "", commandId:String=UUID().uuidString, expectedConversation:String?=nil) async -> Bool {
-        guard !demoMode, !sending, !switchingChat, connected else { return false }
+        guard !demoMode, !sending, !switchingChat else {commandStatus="正在提交，请稍后重试";return false}
+        if !connected {await refresh(force:true)}
+        guard connected else{commandStatus="设备未连接，请重试连接";return false}
         sending = true; defer { sending = false }
         // The same ID is retained for one explicit attempt. Never auto-resend on a network error.
         loadChat()
@@ -355,9 +371,23 @@ enum PairingStore {
             }
             commandResult(commandId,["accepted","queued","dispatching","running","completed","failed","cancelled","uncertain"].contains(result?["status"] as? String ?? "") ? ((result?["status"] as? String)=="queued" ? "已排队":"已接收") : (result?["status"] as? String ?? "未知"))
             commandStatus = "指令状态：" + (result?["status"] as? String ?? "未知")
+            await refresh(force:true)
             return ["accepted","queued","dispatching","running","completed","failed","cancelled","uncertain"].contains(result?["status"] as? String ?? "")
         } catch let error as BridgeServerError {commandResult(commandId,error.localizedDescription);commandStatus=error.localizedDescription}
-        catch { commandResult(commandId,"提交结果不确定");commandStatus = "提交结果不确定，请先核查安卓任务，不要重复发送" }
+        catch {
+            // A lost HTTP reply does not mean the durable enqueue failed.
+            if action=="task",snapshot.taskQueueVersion==1,
+               let data=try? await request("/tasks"),
+               let root=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any],
+               let tasks=root["items"] as? [[String:Any]],
+               let task=tasks.first(where:{$0["id"] as? String==commandId}) {
+                let state=task["state"] as? String ?? "queued"
+                let label=["queued":"已排队","dispatching":"正在启动","running":"执行中","completed":"已完成","failed":"执行失败","cancelled":"已取消","uncertain":"待核实"][state] ?? "已接收"
+                commandResult(commandId,"已接收");commandStatus=label
+                return true
+            }
+            commandResult(commandId,"提交结果不确定");commandStatus = "提交结果不确定，请先核查安卓任务，不要重复发送"
+        }
         return false
     }
     func showDemo(_ phase: String, device: String? = nil) async {

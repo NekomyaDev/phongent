@@ -50,8 +50,9 @@ struct FleetBatch:Codable,Identifiable {var id:String;var text:String;var time:D
         sending=true;defer{sending=false}
         let batch=FleetBatch(id:UUID().uuidString,text:text,time:Date().timeIntervalSince1970,deliveries:targets.map{.init(id:UUID().uuidString,deviceID:$0.id,name:$0.name,status:"提交中",task:tasks?[$0.id],conversation:conversations[$0.id] ?? $0.client.snapshot.currentConversationId)})
         batches.append(batch);save()
+        for start in stride(from:0,to:batch.deliveries.count,by:3){
         await withTaskGroup(of:Void.self){group in
-            for target in batch.deliveries {
+            for target in batch.deliveries.dropFirst(start).prefix(3) {
                 guard let agent=targets.first(where:{$0.id==target.deviceID}) else{continue}
                 group.addTask{@MainActor in
                     let client=agent.client
@@ -62,6 +63,7 @@ struct FleetBatch:Codable,Identifiable {var id:String;var text:String;var time:D
                     if let i=self.batches.firstIndex(where:{$0.id==batch.id}),let j=self.batches[i].deliveries.firstIndex(where:{$0.id==target.id}),self.batches[i].deliveries[j].phase.isEmpty{self.batches[i].deliveries[j].status=result;self.batches[i].deliveries[j].needsRetry = !["已接收","已排队","completed","failed","cancelled","uncertain"].contains(result);self.save()}
                 }
             }
+        }
         }
     }
 }
@@ -89,12 +91,12 @@ struct FleetTaskPlan:Decodable {
         let devices=agents.map{["deviceID":$0.id,"name":$0.name,"group":groups[$0.id] ?? "默认组"]}
         let roster=String(data:try JSONSerialization.data(withJSONObject:devices),encoding:.utf8)!
         let system="""
-        你是主控任务策划与内容创作 AI，负责先创作再分工，不直接操作设备。设备清单：\(roster)。用户附图数量：\(imageCount)，这些图会随任务下发；你不能凭空描述其内容。
+        你是任务路由器，只识别目标设备、拆分并转述任务，不执行任务，也不创作任务要求的正文或图片。目标安卓 agent 拥有执行工具；你的输出会由程序下发给它们。你没有工具不是无法分发的理由，不要以直接对话模式回答或要求用户为你授予设备权限。设备清单：\(roster)。用户附图数量：\(imageCount)，这些图会随任务下发；你不能凭空描述其内容。
         输出纯 JSON：{"assignments":[{"deviceID":"清单中的ID","task":"发给该设备的完整指令","cards":[{"title":"图卡标题","body":"图卡正文","accent":"#287A76"}]}],"clarification":""}。
         清单包含设备组别。按组分配时展开到该组所有设备；组内点名任务优先于该组通用任务，其余成员执行组任务。可以同时给不同组不同任务；组名与设备名歧义时澄清。
         用户可以直接说“A干某事、B干某事”，不需要@；设备名或唯一简称均可，@只是快捷方式。其余设备指清单中未被明确指定的设备；@全部或所有设备表示全部。
-        矩阵图文任务：由你先按各账号生成独立完整标题、正文、标签和1至4张文字图卡，在task中放入该设备的完整文案和执行要求。主控会将cards渲染成PNG并发给对应设备，不让执行设备重复创作。普通任务cards为空。
-        图卡标题最多60字、正文最多400字。不要将图卡称为照片；若用户明确要求摄影或真实照片且未提供图片，clarification说明需要配图。只有用户要求创作图文才生成cards，不添加用户未要求的发布行为。
+        搜索、打开应用、截图、查找或发送图片、写文案、制作图卡等均作为任务交给目标 agent，不能在分发阶段自行完成。cards 必须为空数组。
+        用户要求去应用查找图片时，原样保留查找与回传要求，不要误认为必须先上传图片。素材不足或执行权限问题由执行端核实并询问；你只澄清目标设备或任务分工的真实歧义。
         不要把某台设备的专属任务发给其他设备。不添加用户未要求的操作。保留截图、汇报等要求。
         同一设备多个任务合并成一条。无指定对象的普通指令默认全部设备执行。
         名称重复、提及不存在的设备或分工不明确时，assignments为空，clarification说明需要澄清什么。不得猜测对象。
@@ -103,6 +105,7 @@ struct FleetTaskPlan:Decodable {
         var json=raw.trimmingCharacters(in:.whitespacesAndNewlines)
         if json.hasPrefix("```"){json=json.components(separatedBy:"\n").dropFirst().dropLast().joined(separator:"\n")}
         let plan=try JSONDecoder().decode(FleetTaskPlan.self,from:Data(json.utf8))
+        guard plan.assignments.allSatisfy({$0.cards?.isEmpty != false}) else{throw ModelFailure(message:"分发模型返回了创作内容，任务未发送，请重试")}
         _ = try plan.validated(allowed:Set(agents.map(\.id)))
         return plan
     }

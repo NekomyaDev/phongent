@@ -256,7 +256,12 @@ class TaskRun(
         val t = takeover
         when {
             t != null -> scope.launch { t.cancel() }
-            running != null -> inbox.cancel()
+            running != null -> {
+                inbox.cancel()
+                // A held gate can be waiting outside the inbox consumer.
+                // Cancel its coroutine so the normal finally block releases the run.
+                if (state.value is TaskState.Held) { cancelRequested = true; job?.cancel() }
+            }
             else -> {
                 // 刚从队里放出来、协程还没挂上时点的取消:挂上时立即取消
                 cancelRequested = true

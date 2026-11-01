@@ -116,7 +116,7 @@ class FleetController(context:Context) {
                 "/diagnostics"->RemoteDiagnostics(app).diagnostics()
                 "/device/name"->DeviceIdentity.rename(app,body!!)
                 "/state"->localBridge.snapshot()
-                "/tasks"->RemoteTaskQueue.get(app).let{if(body==null)it.list() else if(body.optString("action")=="cancel")it.cancel(body.getString("id")) else if(body.optString("action")=="acknowledge")it.acknowledge(body.getString("id")) else if(body.optString("action")=="retry")it.retry(body.getString("id")) else it.enqueue(body)}
+                "/tasks"->RemoteTaskQueue.get(app).let{if(body==null)it.list() else if(body.optString("action")=="stop_all")it.stopAll() else if(body.optString("action")=="cancel")it.cancel(body.getString("id")) else if(body.optString("action")=="acknowledge")it.acknowledge(body.getString("id")) else if(body.optString("action")=="retry")it.retry(body.getString("id")) else it.enqueue(body)}
                 "/attachments"->RemoteAttachments(app).upload(body!!)
                 "/files"->RemoteAttachments(app).download(body!!)
                 "/notification/open"->{MessageListener.open(body!!.getString("id"));JSONObject().put("status","dispatched")}
@@ -126,7 +126,7 @@ class FleetController(context:Context) {
                     val history=app.getSharedPreferences("remote-commands",0)
                     if(history.contains(id))return@local JSONObject().put("status",history.getString(id,"uncertain"))
                     val action=command.getString("action")
-                    require(action in listOf("task","stop","answer"))
+                    require(action in listOf("task","stop","answer","resume"))
                     if(action=="task"){
                         val expected=command.optString("conversationId")
                         check(expected.isEmpty() || expected==app.chat.ui.value.conversationId){"聊天已切换，请重新发送"}
@@ -138,6 +138,7 @@ class FleetController(context:Context) {
                         val key=command.getString("runId")
                         val run=app.taskState.runs.value.firstOrNull{it.key==key} ?: error("任务已结束")
                         if(action=="stop")com.wangzan101.mika.task.TaskService.cancel(app,key)
+                        else if(action=="resume"){check(run.state.value is com.wangzan101.mika.core.agent.TaskState.Held);com.wangzan101.mika.task.TaskService.resume(app,key)}
                         else{check(run.state.value is com.wangzan101.mika.core.agent.TaskState.WaitingInput);com.wangzan101.mika.task.TaskService.answer(app,command.getString("text"),key)}
                     }
                     history.edit().putString(id,"accepted").commit()
@@ -220,10 +221,12 @@ class FleetController(context:Context) {
         set(value){prefs.edit().putString("dispatchModel",value).apply()}
     data class Dispatch(val tasks:Map<String,String>,val images:Map<String,List<ByteArray>>)
     suspend fun distribute(text:String,targets:List<Device>,imageCount:Int=0):Dispatch {
+        // Local execution must never depend on a controller/dispatch model.
+        if(targets.size==1 && targets[0].id=="local")return Dispatch(mapOf("local" to text),emptyMap())
         val store=com.wangzan101.mika.settings.ProviderStore.get(context)
         val model=store.controllerModel(dispatchModel) ?: error("请在设置中选择任务下发模型")
         val roster=org.json.JSONArray(targets.map{JSONObject().put("id",it.id).put("name",it.name).put("group",groups.value[it.id] ?: "默认组")})
-        val reply=model.complete("你是主控任务策划与内容创作 AI。设备清单：$roster。清单包含group分组：组任务分配给组内所有设备，组内点名任务优先，其余成员执行组任务。不同组可以执行不同任务，歧义时澄清。用户附图数量：$imageCount，会随任务下发，不可凭空描述图片内容。输出纯JSON对象，键为设备id，值为对象{task:完整任务文字,cards:[{title:图卡标题,body:图卡正文,accent:十六进制颜色}]}。普通任务cards为空。用户可以说A做什么B做什么，不需要@；结合名称和唯一简称解析对象，@只是快捷方式。其余指尚未指定的设备。无指定对象默认全部。矩阵图文任务由你先按每个账号生成独立完整标题、正文、标签和1至4张图文卡片，然后把各自完整文案和执行要求写入task；主控会将cards渲染成PNG并附给对应设备，不要让执行设备重复创作文案。每张标题最多60字、正文最多400字，可分成多张。只有用户要求图文创作时才生成cards，不添加用户没要求的发布行为。不要声称这些文字图卡是照片；如用户明确要求摄影或真实图片且未附图片，返回error说明需要配图。名字歧义或设备不存在返回{error:说明}。同一设备任务合并，不能给未指派设备发送其他设备专属任务。",listOf(com.wangzan101.mika.core.model.Message(com.wangzan101.mika.core.model.Role.User,listOf(com.wangzan101.mika.core.model.Part.Text(text)),com.wangzan101.mika.core.model.Author.User)),emptyList())
+        val reply=model.complete("你是任务路由器，只识别目标设备、拆分并转述任务，不执行任务，不创作正文或图片。目标安卓agent拥有执行工具，程序将把你的输出下发给它们。你没有工具不是无法分发的理由，不得以直接对话模式回答或要求为你授予设备权限。设备清单：$roster。group表示组别；组任务分配给全部成员，组内点名任务优先，其余成员执行组任务。用户可直接点名设备或组，也可使用@；未指定目标默认全部，其余表示尚未指派的设备。输出纯JSON，键为设备id，值为{task:完整任务指令,cards:[]}。搜索、截图、查找或发送图片、文案创作等均交给执行端，不要代做；用户要求去应用查找图片时不得误认为必须先上传素材。附图数量：$imageCount，由程序随任务发送。执行权限或素材问题由执行端核实。只在目标或分工有真实歧义时返回{error:澄清问题}。保留用户的截图、回传与发布范围，不添加额外操作。同设备任务合并，不能把专属任务发给别的设备。cards必须为空数组。",listOf(com.wangzan101.mika.core.model.Message(com.wangzan101.mika.core.model.Role.User,listOf(com.wangzan101.mika.core.model.Part.Text(text)),com.wangzan101.mika.core.model.Author.User)),emptyList())
         val raw=reply.parts.filterIsInstance<com.wangzan101.mika.core.model.Part.Text>().joinToString(""){it.text}.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
         val objectValue=JSONObject(raw)
         if(objectValue.has("error"))error(objectValue.getString("error"))
@@ -234,7 +237,7 @@ class FleetController(context:Context) {
             val task=value?.getString("task") ?: objectValue.getString(id)
             require(task.isNotBlank() && task.length<=8000){"任务内容无效"};tasks[id]=task
             val cards=value?.optJSONArray("cards")
-            require((cards?.length() ?: 0)<=4){"单设备图卡最多4张"}
+            require((cards?.length() ?: 0)==0){"分发模型返回了创作内容，任务未发送，请重试"}
             images[id]=if(cards==null)emptyList() else (0 until cards.length()).map{ContentCard.render(cards.getJSONObject(it))}
         }
         require(tasks.isNotEmpty()){"没有可下发的任务"}
@@ -249,5 +252,19 @@ class FleetController(context:Context) {
         require(conversation.isNotEmpty()){"请先在 ${device.name} 打开聊天"}
         return AttachmentBundle(conversation, images.map{bytes->request(device,"/attachments",JSONObject().put("conversationId",conversation).put("data",android.util.Base64.encodeToString(bytes,android.util.Base64.NO_WRAP))).getString("line")}.joinToString("\n"))
     }
-    suspend fun task(device:Device,text:String,conversationId:String="",id:String=UUID.randomUUID().toString()):JSONObject=request(device,if(states.value[device.id]?.optInt("taskQueueVersion")==1)"/tasks" else "/command",JSONObject().put("id",id).put("action","task").put("text",text).put("conversationId",conversationId))
+    suspend fun task(device:Device,text:String,conversationId:String="",id:String=UUID.randomUUID().toString()):JSONObject {
+        val queued=states.value[device.id]?.optInt("taskQueueVersion")==1
+        try{return request(device,if(queued)"/tasks" else "/command",JSONObject().put("id",id).put("action","task").put("text",text).put("conversationId",conversationId))}
+        catch(e:CancellationException){throw e}
+        catch(e:Exception){
+            if(queued){
+                val receipt=try{
+                    val items=request(device,"/tasks").getJSONArray("items")
+                    (0 until items.length()).map{items.getJSONObject(it)}.firstOrNull{it.optString("id")==id}
+                }catch(cancel:CancellationException){throw cancel}catch(_:Exception){null}
+                if(receipt!=null)return JSONObject().put("id",id).put("status",receipt.optString("state")).put("conversationId",receipt.optString("conversation"))
+            }
+            throw e
+        }
+    }
 }

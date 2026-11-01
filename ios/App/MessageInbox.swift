@@ -90,7 +90,7 @@ struct NotificationDetail:View {
         List {
             if let latest=messages.first {
                 Section {
-                    if app=="微信" || app=="QQ" {Button("通过 agent 回复") {reply(latest)}.disabled(!bridge.connected || bridge.snapshot.busy)}
+                    if app=="微信" || app=="QQ" {Button("通过 agent 回复") {reply(latest)}}
                     if let status=bridge.commandStatus {Text(status).font(.caption).foregroundStyle(.secondary)}
                 }
             }

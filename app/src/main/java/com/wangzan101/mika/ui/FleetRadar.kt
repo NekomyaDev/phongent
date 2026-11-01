@@ -39,7 +39,7 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
     val color=MaterialTheme.colorScheme.primary
     val line=MaterialTheme.colorScheme.onSurface.copy(alpha=.06f)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=22.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
-        Text("agent",style=MaterialTheme.typography.titleLarge,modifier=Modifier.align(Alignment.CenterHorizontally))
+        Text("设备",style=MaterialTheme.typography.titleLarge,modifier=Modifier.align(Alignment.CenterHorizontally))
         Row(Modifier.fillMaxWidth()){Text("附近",style=MaterialTheme.typography.labelMedium,color=color);Spacer(Modifier.weight(1f));Text("局域网",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)}
         Row(Modifier.fillMaxWidth()){Button(enabled=!busy && remotes.any{!it.connected},onClick={onConnectAll(remotes.filter{!it.connected && it.id !in connecting})}){Text(if(busy)"连接中…" else "一键连接")};Spacer(Modifier.weight(1f));TextButton(onClick={checked=emptySet();groupName="";targetGroup="默认组";groupEditor=true}){Text("批量分组")}}
         BoxWithConstraints(Modifier.fillMaxWidth().height(425.dp)){

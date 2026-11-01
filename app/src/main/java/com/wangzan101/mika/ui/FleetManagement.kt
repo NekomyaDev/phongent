@@ -179,7 +179,7 @@ fun FleetManagementHome(controller:FleetController,devices:List<FleetController.
                 Text("仅此主控调用，用于把任务分配给设备。",style=MaterialTheme.typography.bodySmall)
             }}}
             item{Text("设备设置",style=MaterialTheme.typography.labelLarge)}
-            items(listOf("notifications" to "通知来源","queue" to "任务队列","browser" to "浏览器与网站登录","files" to "文件","usage" to "模型用量","diagnostics" to "设备诊断","mcp" to "电脑连接 MCP","models" to "设备执行模型","plans" to "定时任务","routes" to "操作路线","settings" to "执行设置","memory" to "记忆","skill" to "技能")){(key,label)->
+            items(listOf("notifications" to "通知来源","queue" to "任务队列","browser" to "浏览器与网站登录","files" to "文件","usage" to "模型用量","diagnostics" to "设备诊断","mcp" to "电脑连接 MCP","plans" to "定时任务","routes" to "操作路线","settings" to "执行设置","memory" to "记忆","skill" to "技能")){(key,label)->
                 Card(onClick={page=key},modifier=Modifier.fillMaxWidth(),shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)){
                     Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=18.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
                         Text(label,Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)

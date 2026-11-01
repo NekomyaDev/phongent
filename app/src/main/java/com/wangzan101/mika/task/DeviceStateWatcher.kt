@@ -27,6 +27,9 @@ class DeviceStateWatcher(
     private val power = appContext.getSystemService(PowerManager::class.java)
     private val keyguard = appContext.getSystemService(KeyguardManager::class.java)
 
+    private val handler=android.os.Handler(android.os.Looper.getMainLooper())
+    private val refresh=object:Runnable{override fun run(){_locked.value=readLocked();handler.postDelayed(this,1000)}}
+
     private val _locked = MutableStateFlow(readLocked())
     val locked: StateFlow<Boolean> = _locked.asStateFlow()
 
@@ -49,6 +52,7 @@ class DeviceStateWatcher(
             appContext.registerReceiver(receiver, filter)
         }
         _locked.value = readLocked() // 注册前后之间的变化
+        handler.postDelayed(refresh,1000)
     }
 
     private fun readLocked() = isLocked(power.isInteractive, keyguard.isKeyguardLocked)
@@ -72,6 +76,7 @@ class DeviceStateWatcher(
     }
 
     fun close() {
+        handler.removeCallbacks(refresh)
         runCatching { appContext.unregisterReceiver(receiver) }
     }
 

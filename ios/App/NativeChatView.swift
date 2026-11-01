@@ -4,11 +4,18 @@ struct NativeExchangeView:View {
     let exchange:NativeChatExchange
     var client:BridgeClient?=nil
     var answer:((String)->Void)?=nil
+    @State private var resumeError:String?
     @State private var expanded=false
     private var e:NativeChatExchange {exchange}
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
             if !e.goal.isEmpty {user(e.goal)}
+            if e.active,let client {
+                HStack {Spacer();Button {Task {
+                    if !(await client.stopAllTasks()){resumeError=client.commandStatus}
+                }} label:{Image(systemName:"stop.circle").foregroundStyle(.red)}.accessibilityLabel("结束该 agent 的任务")}
+                if let resumeError {Text(resumeError).font(.caption).foregroundStyle(.orange)}
+            }
             if e.active && e.draft.isEmpty {
                 HStack(spacing:10){if e.phase=="working"{ProgressView().controlSize(.small)}else{Image(systemName:"pause.circle").foregroundStyle(.orange)};Text(e.progress).font(.subheadline);Spacer();if e.startedAt>0{Text(Date(timeIntervalSince1970:e.startedAt),style:.timer).font(.caption.monospacedDigit()).foregroundStyle(.secondary)}}
                 steps(live:true)
@@ -30,6 +37,14 @@ struct NativeExchangeView:View {
             } else if e.phase=="cancelled" {Text(e.title).foregroundStyle(.secondary)}
             else if e.phase != "working" {
                 VStack(alignment:.leading,spacing:10){Text(e.title).font(.headline);AndroidMarkdown(text:e.body)
+                    if e.phase=="unlock"{Text("等待安卓亮屏并解锁，解锁后自动继续").font(.caption)}
+                    if e.phase=="paused",let client {
+                        Button("继续任务"){Task{
+                            guard client.snapshot.exchanges?.last?.id==e.id, client.snapshot.conversationId==e.conversationId else{resumeError="当前已切换任务";return}
+                            if !(await client.command("resume")){resumeError=client.commandStatus ?? "继续任务失败"}
+                        }}
+                        if let resumeError{Text(resumeError).font(.caption).foregroundStyle(.orange)}
+                    }
                     if e.phase=="input",let answer {ForEach(e.options,id:\.self){option in Button(option){answer(option)}}}
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(.orange.opacity(0.08),in:RoundedRectangle(cornerRadius:16))
             }

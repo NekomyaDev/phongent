@@ -56,7 +56,6 @@ struct FleetManagement:View {
                 NavigationLink{FleetBrowserSettings(hub:hub)}label:{Label("浏览器与网站登录",systemImage:"globe").padding(.vertical,5)}
                 NavigationLink{FleetReports(hub:hub,usage:true)}label:{Label("模型用量",systemImage:"chart.bar").padding(.vertical,5)}
                 NavigationLink{FleetReports(hub:hub)}label:{Label("设备诊断",systemImage:"stethoscope").padding(.vertical,5)}
-                NavigationLink{FleetModelSettings(hub:hub)}label:{Label("设备执行模型",systemImage:"cpu").padding(.vertical,5)}
                 NavigationLink{FleetAutomationView(hub:hub)}label:{Label("定时任务",systemImage:"clock").padding(.vertical,5)}
                 NavigationLink{FleetAutomationView(hub:hub,routes:true)}label:{Label("操作路线",systemImage:"point.topleft.down.to.point.bottomright.curvepath").padding(.vertical,5)}
                 NavigationLink{FleetExecutionSettings(hub:hub)}label:{Label("执行设置",systemImage:"slider.horizontal.3").padding(.vertical,5)}
@@ -78,7 +77,7 @@ struct FleetNotifications:View {
                 }label:{FleetNotificationDeviceLabel(agent:agent)}
             }
         }.navigationTitle("消息")}
-        .sheet(item:$reply){context in FleetNotificationReply(agent:context.device,message:context.message)}
+        .sheet(item:$reply){context in FleetNotificationReply(agent:context.device,message:context.message).presentationDetents([.medium,.large]).presentationDragIndicator(.visible)}
     }
 }
 
@@ -86,27 +85,9 @@ struct FleetNotifications:View {
 private struct FleetNotificationReply:View {
     @ObservedObject var agent:NearbyAgent
     var message:MessagePreview
-    @Environment(\.dismiss) private var dismiss
-    @State private var text=""
-    @State private var submitting=false
-    @State private var result:String?
     var body:some View {
-        NavigationStack{Form{
-            if !agent.client.connected{Section{Text("设备连接中断");Button("重试连接"){Task{await agent.client.refresh(force:true)}}}}
-            Section(agent.name+" · "+message.app){Text(message.title);Text(message.text).foregroundStyle(.secondary)}
-            Section{TextField("回复内容",text:$text,axis:.vertical).lineLimit(3...8)}
-            Button("通过 agent 发送"){
-                submitting=true
-                Task{@MainActor in
-                    defer{submitting=false}
-                    let content=["app":message.app,"source":message.title,"notification":message.text,"reply":text]
-                    guard let data=try? JSONSerialization.data(withJSONObject:content),let payload=String(data:data,encoding:.utf8) else{return}
-                    await agent.client.command("task",text:"回复以下通知对应会话，仅发送 reply 字段内容。先核对应用及联系人，无法确定时请询问，不要发给其他人：\n"+payload)
-                    result=agent.client.commandStatus
-                }
-            }.disabled(submitting || text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !agent.client.connected || agent.client.snapshot.busy)
-            if let result{Text(result).foregroundStyle(.secondary)}
-        }.scrollDismissesKeyboard(.interactively).navigationTitle("回复").toolbar{ToolbarItem(placement:.cancellationAction){Button("关闭"){dismiss()}}}}
+        Dashboard(agentName:agent.name,avatarShape:agent.avatarShape,avatarHue:agent.avatarHue,notificationReply:message)
+            .environmentObject(agent.client)
     }
 }
 

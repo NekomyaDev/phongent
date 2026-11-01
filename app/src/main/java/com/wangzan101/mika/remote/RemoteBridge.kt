@@ -216,14 +216,14 @@ class RemoteBridge(private val app: MikaApp) {
                             request[0] == "GET" && request[1] == "/usage" -> respond(200,RemoteDiagnostics(app).usage())
                             request[0] == "GET" && request[1] == "/diagnostics" -> respond(200,RemoteDiagnostics(app).diagnostics())
                             request[0] == "GET" && request[1] == "/tasks" -> respond(200,RemoteTaskQueue.get(app).list())
-                            request[0] == "POST" && request[1] == "/tasks" -> {try{val command=body();val queue=RemoteTaskQueue.get(app);respond(200,if(command.optString("action")=="cancel")queue.cancel(command.getString("id")) else if(command.optString("action")=="acknowledge")queue.acknowledge(command.getString("id")) else if(command.optString("action")=="retry")queue.retry(command.getString("id")) else queue.enqueue(command))}catch(e:Exception){respond(409,JSONObject().put("error",e.message ?: "queue_failed"))}}
+                            request[0] == "POST" && request[1] == "/tasks" -> {try{val command=body();val queue=RemoteTaskQueue.get(app);respond(200,if(command.optString("action")=="stop_all")queue.stopAll() else if(command.optString("action")=="cancel")queue.cancel(command.getString("id")) else if(command.optString("action")=="acknowledge")queue.acknowledge(command.getString("id")) else if(command.optString("action")=="retry")queue.retry(command.getString("id")) else queue.enqueue(command))}catch(e:Exception){respond(409,JSONObject().put("error",e.message ?: "queue_failed"))}}
                             request[0] == "POST" && request[1] == "/device/name" -> {try{respond(200,DeviceIdentity.rename(app,body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message))}}
                             request[0] == "GET" && request[1] == "/state" -> respond(200, snapshot())
                             request[0] == "POST" && request[1] == "/command" -> synchronized(prefs) {
                                 val command = body()
                                 val id = command.getString("id"); require(id.matches(Regex("[A-Za-z0-9-]{8,80}")))
                                 val action = command.getString("action")
-                                require(action in setOf("task", "stop", "answer", "new_chat", "select_chat", "delete_chat"))
+                                require(action in setOf("task", "stop", "answer", "resume", "new_chat", "select_chat", "delete_chat"))
                                 val text = command.optString("text").trim(); require(text.length <= 8000)
                                 if (action in setOf("task", "answer")) require(text.isNotEmpty())
                                 if (prefs.contains(id)) respond(200, JSONObject().put("id", id).put("status", prefs.getString(id, "uncertain")).put("conversationId", prefs.getString("conversation:$id", "")))
@@ -271,6 +271,7 @@ class RemoteBridge(private val app: MikaApp) {
                                                 val key = command.getString("runId")
                                                 val run = app.taskState.runs.value.firstOrNull { it.key == key } ?: error("stale_run")
                                                 if (action == "stop") TaskService.cancel(app, key)
+                                                else if(action=="resume"){check(run.state.value is TaskState.Held){"not_paused"};TaskService.resume(app,key)}
                                                 else { check(run.state.value is TaskState.WaitingInput) { "not_waiting_for_input" }; TaskService.answer(app, text, key) }
                                             }
                                             prefs.edit().putString(id, "accepted").commit()

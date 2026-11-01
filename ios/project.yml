@@ -28,7 +28,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: agent
+        CFBundleDisplayName: phongent
         UILaunchScreen: {}
         NSSupportsLiveActivities: true
         NSLocalNetworkUsageDescription: 发现并连接附近的安卓 agent。
@@ -54,7 +54,7 @@ targets:
     info:
       path: Widgets/Info.plist
       properties:
-        CFBundleDisplayName: agent 状态
+        CFBundleDisplayName: phongent 状态
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:

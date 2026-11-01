@@ -15,7 +15,13 @@ class RemoteAttachments(private val app:MikaApp) {
         val exchange=body.getString("exchangeId")
         val rows=app.chat.remoteExchanges(conversation)
         val item=rows.mapIndexed{index,ex->(ex.runId ?: "$conversation-$index") to ex}.firstOrNull{it.first==exchange}?.second ?: error("exchange_not_found")
-        val index=body.getInt("index");require(index in item.files.indices)
+        val index=body.getInt("index");require(index>=0)
+        if(index>=item.files.size){
+            val screens=ResultScreenshots.files(app,item)
+            val image=screens.getOrNull(index-item.files.size) ?: error("screenshot_unavailable")
+            val bytes=image.inputStream().use{it.readLimited(8*1024*1024)}
+            return JSONObject().put("name","执行截图-"+image.name).put("data",Base64.encodeToString(bytes,Base64.NO_WRAP))
+        }
         val file=item.files[index];require(file.size in 1..8*1024*1024){"file_too_large"}
         val uri=android.net.Uri.parse(file.uri);require(uri.scheme=="content")
         val bytes=app.contentResolver.openInputStream(uri)?.use{it.readLimited(8*1024*1024)} ?: error("file_unavailable")

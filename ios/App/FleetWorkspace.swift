@@ -13,6 +13,7 @@ struct FleetWorkspace:View {
     @State private var photos:[Data]=[]
     @State private var loadingPhotos=false
     @State private var planning=false
+    @State private var stoppingAll=false
     @State private var pressingDevice:String?
     @State private var mentionedDevice:String?
     @State private var routingError:String?
@@ -55,6 +56,13 @@ struct FleetWorkspace:View {
                 HStack{
                     Button(chosen?.name ?? selectedGroup ?? "全部设备"){if let chosen{name=chosen.name;rename=true}}.font(.headline).foregroundStyle(.primary).disabled(chosen==nil)
                     Spacer()
+                    Button {stoppingAll=true;Task {
+                        var failed:[String]=[]
+                        for agent in allAgents {if !(await agent.client.stopAllTasks()){failed.append(agent.name)}}
+                        stoppingAll=false
+                        if !failed.isEmpty{routingError="结束任务未成功："+failed.joined(separator:"、")}
+                    }} label:{Image(systemName:"stop.circle.fill").foregroundStyle(.red).frame(width:36,height:36)}
+                    .disabled(stoppingAll).accessibilityLabel("结束所有 agent 的任务")
                     Menu{
                         if !templates.isEmpty{Menu("任务模板"){ForEach(templates.keys.sorted(),id:\.self){title in Menu(title){Button("使用"){input=templates[title] ?? "";selection=nil};Button("删除",role:.destructive){templates.removeValue(forKey:title);UserDefaults.standard.set(templates,forKey:"fleetTaskTemplates")}}}}}
                         Button("保存输入为模板"){templateName=String(input.prefix(24));savingTemplate=true}.disabled(input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)

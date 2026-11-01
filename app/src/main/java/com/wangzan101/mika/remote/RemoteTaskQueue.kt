@@ -44,6 +44,13 @@ class RemoteTaskQueue private constructor(private val app:MikaApp){
         when(state){is TaskState.Succeeded->queue.update(id,"completed",result=state.answer);is TaskState.Failed->queue.update(id,"failed",state.reason);TaskState.Cancelled->queue.update(id,"cancelled");else->{}}
     }
     fun acknowledge(id:String):JSONObject{queue.acknowledge(id);return list()}
+    fun stopAll():JSONObject {
+        // Cancel queued work before signalling running tasks, so nothing new starts.
+        queue.snapshot().filter{it.state in setOf("queued","dispatching","running","uncertain")}.forEach{queue.update(it.id,"cancelled")}
+        app.taskState.runs.value.toList().forEach{TaskService.cancel(app,it.key)}
+        BridgeEvents.signal()
+        return JSONObject().put("status","accepted")
+    }
     fun cancel(id:String):JSONObject{queue.cancel(id);return list()}
     private fun tick(){
         for(task in queue.snapshot().filter{it.state in setOf("dispatching","running","uncertain")}){

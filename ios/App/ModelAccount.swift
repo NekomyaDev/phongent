@@ -77,7 +77,7 @@ struct ModelCredentials: Codable {
                         "ext_agent_host_id":host!,"response_type":"code","redirect_uri":redirect,
                         "scope":"openid profile email offline_access resource.invoke \(self.scope)","resource":"https://api.openai.com/v1",
                         "state":state,"nonce":nonce,"code_challenge_method":"S256","code_challenge":Self.b64(Data(SHA256.hash(data:Data(verifier.utf8))))]
-                    if self.credentials.clientId.isEmpty {fields["agent_name_hint"]="agent"}
+                    if self.credentials.clientId.isEmpty {fields["agent_name_hint"]="phongent"}
                     else if !self.credentials.idToken.isEmpty {fields["id_token_hint"]=self.credentials.idToken}
                     var url=URLComponents(string:self.issuer+"/api/accounts/authorize")!;url.queryItems=fields.map{URLQueryItem(name:$0.key,value:$0.value)}
                     let browser=ASWebAuthenticationSession(url:url.url!,callbackURLScheme:"agentauth") { [weak self] _,error in

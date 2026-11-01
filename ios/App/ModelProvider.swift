@@ -83,18 +83,20 @@ enum ModelRequests {
         }.sorted{$0.id<$1.id}
     }
     static func chat(provider:ModelProvider,model:String,messages:[[String:String]],bearer:String,session:String) throws -> URLRequest {
-        let instructions="你是用户 iPhone 上的 agent。当前仅进行直接对话，没有执行设备工具的权限；不要声称已操作安卓或发送消息。"
+        let supplied=messages.filter{$0["role"]=="system" || $0["role"]=="developer"}.compactMap{$0["content"]}.joined(separator:"\n")
+        let instructions=supplied.isEmpty ? "你是对话助手。没有设备执行工具，不要声称已操作设备。":supplied
+        let dialogue=messages.filter{$0["role"] != "system" && $0["role"] != "developer"}
         var path:String;var body:[String:Any]
         switch provider.kind {
         case .chatGPT,.responses:
-            path="/responses";body=["model":model,"store":false,"stream":true,"instructions":instructions,"input":messages.map{["type":"message","role":$0["role"]!,"content":[["type":$0["role"]=="assistant" ? "output_text":"input_text","text":$0["content"]!]]] as [String:Any]}]
+            path="/responses";body=["model":model,"store":false,"stream":true,"instructions":instructions,"input":dialogue.map{["type":"message","role":$0["role"]!,"content":[["type":$0["role"]=="assistant" ? "output_text":"input_text","text":$0["content"]!]]] as [String:Any]}]
         case .chatCompletions:
-            path="/chat/completions";body=["model":model,"stream":false,"messages":[["role":"system","content":instructions]]+messages]
+            path="/chat/completions";body=["model":model,"stream":false,"messages":[["role":"system","content":instructions]]+dialogue]
         case .anthropic:
-            path="/v1/messages";body=["model":model,"max_tokens":4096,"system":instructions,"messages":messages]
+            path="/v1/messages";body=["model":model,"max_tokens":4096,"system":instructions,"messages":dialogue]
         case .gemini:
             guard model.range(of:"^[A-Za-z0-9._-]+$",options:.regularExpression) != nil else{throw ModelFailure(message:"Gemini 模型 ID 无效")}
-            path="/v1beta/models/\(model):generateContent";body=["systemInstruction":["parts":[["text":instructions]]],"contents":messages.map{["role":$0["role"]=="assistant" ? "model":"user","parts":[["text":$0["content"]!]]] as [String:Any]}]
+            path="/v1beta/models/\(model):generateContent";body=["systemInstruction":["parts":[["text":instructions]]],"contents":dialogue.map{["role":$0["role"]=="assistant" ? "model":"user","parts":[["text":$0["content"]!]]] as [String:Any]}]
         }
         var request=try request(provider:provider,path:path,bearer:bearer,session:session);request.httpMethod="POST"
         request.httpBody=try JSONSerialization.data(withJSONObject:body)

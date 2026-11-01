@@ -19,6 +19,6 @@ object NativeChat {
             .put("steps",JSONArray(ex.steps.map{JSONObject().put("number",it.step).put("title",it.title).put("subtitle",it.subtitle).put("state",it.state.name).put("reason",it.reason)}))
             .put("steers",JSONArray(ex.steers.map{JSONObject().put("text",it.text).put("state",it.state.name)}))
             .put("notes",JSONArray(ex.memoryNotes.map{app.chat.noteText(it)}+ex.skillNotes.map{it.text}))
-            .put("files",JSONArray(ex.files.map{JSONObject().put("name",it.name).put("size",it.size).put("savedAs",it.savedAs)}))
+            .put("files",JSONArray(ex.files.map{JSONObject().put("name",it.name).put("size",it.size).put("savedAs",it.savedAs)} + ResultScreenshots.files(app,ex).map{JSONObject().put("name","执行截图-"+it.name).put("size",it.length()).put("savedAs","任务运行记录")}))
     })
 }

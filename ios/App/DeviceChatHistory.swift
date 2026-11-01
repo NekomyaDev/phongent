@@ -22,6 +22,10 @@ enum DeviceChatHistory {
             let key=(snapshot.commandId?.isEmpty == false ? snapshot.commandId! : snapshot.runId)+"-user"
             if !messages.contains(where:{$0.id==key || $0.id==snapshot.runId+"-agent"}) {messages.append(.init(id:key,role:"user",text:goal,status:"已接收",time:snapshot.updatedAt))}
         }
+        if let command=snapshot.commandId,!command.isEmpty,
+           let index=messages.firstIndex(where:{$0.id==command+"-user"}) {
+            messages[index].status=snapshot.title
+        }
         let key=snapshot.runId+"-agent"
         let text=snapshot.detail.isEmpty ? snapshot.title : snapshot.detail
         if let index=messages.firstIndex(where:{$0.id==key}) {messages[index].text=text;messages[index].status=snapshot.title}
