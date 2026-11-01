@@ -14,7 +14,7 @@
 
 [演示视频](#演示视频) · [快速开始](#快速开始) · [设备分组](#设备与分组) · [开发](#开发与构建) · [联系作者](#联系作者)
 
-**[下载安卓安装包 · phongent.apk](https://github.com/mylea1/agent-fleet/releases/latest/download/phongent.apk)**
+**[下载安卓安装包 · phongent.apk](https://github.com/mylea1/phongent/releases/latest/download/phongent.apk)**
 
 </div>
 
