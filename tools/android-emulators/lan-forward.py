@@ -37,8 +37,11 @@ async def follow_port():
             if len(ports) != 1:
                 raise ConnectionError('LAN service not ready or ambiguous')
             port = ports.pop()
-            # Reapply even if unchanged: emulator restarts may clear ADB forwards.
-            await adb('forward', f'tcp:{a.target}', f'tcp:{port}')
+            # Preserve active connections; repair only missing or changed mappings.
+            mappings = await adb('forward', '--list')
+            expected = f'{a.serial} tcp:{a.target} tcp:{port}'
+            if expected not in {line.strip() for line in mappings.splitlines()}:
+                await adb('forward', f'tcp:{a.target}', f'tcp:{port}')
             if previous != port:
                 print(f'{a.name}: LAN forwarding updated to {port}', flush=True)
                 previous = port

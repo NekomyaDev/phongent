@@ -47,7 +47,17 @@ class FleetController(context:Context) {
         val prior=mutable.value
         mutable.value=if(prior.any{it.id==device.id})prior.map{if(it.id==device.id)device else it}else prior+device
     }
-    fun rename(id:String,name:String){val clean=name.trim().take(40);require(clean.isNotEmpty());prefs.edit().putString("name:$id",clean).apply();mutable.value.firstOrNull{it.id==id}?.let{update(it.copy(name=clean))}}
+    suspend fun rename(id:String,name:String){
+        val clean=name.trim().take(40);require(clean.isNotEmpty())
+        val device=mutable.value.first{it.id==id}
+        request(device,"/device/name",JSONObject().put("name",clean))
+        prefs.edit().putString("name:$id",clean).apply()
+        mutable.value.firstOrNull{it.id==id}?.let{update(it.copy(name=clean))}
+    }
+    private val nameListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener{_,key->
+        if(key=="name:local")mutable.value.firstOrNull{it.id=="local"}?.let{update(it.copy(name=DeviceIdentity.name(this.context)))}
+    }
+    init{prefs.registerOnSharedPreferenceChangeListener(nameListener)}
     fun start(){
         if(discovery!=null)return
         val listener=object:NsdManager.DiscoveryListener{
@@ -104,6 +114,7 @@ class FleetController(context:Context) {
                 "/workspace"->RemoteWorkspace(app).request(body!!)
                 "/usage"->RemoteDiagnostics(app).usage()
                 "/diagnostics"->RemoteDiagnostics(app).diagnostics()
+                "/device/name"->DeviceIdentity.rename(app,body!!)
                 "/state"->localBridge.snapshot()
                 "/tasks"->RemoteTaskQueue.get(app).let{if(body==null)it.list() else if(body.optString("action")=="cancel")it.cancel(body.getString("id")) else if(body.optString("action")=="acknowledge")it.acknowledge(body.getString("id")) else if(body.optString("action")=="retry")it.retry(body.getString("id")) else it.enqueue(body)}
                 "/attachments"->RemoteAttachments(app).upload(body!!)

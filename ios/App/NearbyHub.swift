@@ -81,8 +81,16 @@ enum AgentTrustStore {
             agents.append(agent); observe(agent)
         }
     }
+    @Published var renameError:String?
     func rename(_ agent:NearbyAgent,to name:String) {
+        Task {
+            do {try await renameOnDevice(agent,to:name)}
+            catch {renameError="重命名失败，请确认安卓已更新并保持连接："+error.localizedDescription}
+        }
+    }
+    private func renameOnDevice(_ agent:NearbyAgent,to name:String) async throws {
         let value=String(name.trimmingCharacters(in:.whitespacesAndNewlines).prefix(40));guard !value.isEmpty else{return}
+        _ = try await agent.client.request("/device/name",body:JSONEncoder().encode(["name":value]))
         agent.name=value
         if let index=remembered.firstIndex(where:{$0.id==agent.id}) {remembered[index].name=value;AgentTrustStore.save(remembered)}
         objectWillChange.send()

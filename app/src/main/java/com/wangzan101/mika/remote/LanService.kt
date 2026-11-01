@@ -44,7 +44,7 @@ class LanService : Service() {
                     val id = prefs.getString("id", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("id", it).commit() }
                     val info = NsdServiceInfo().apply {
                         serviceName = "Mika-${id.take(8)}"; serviceType = "_mika-agent._tcp."; port = listener.localPort
-                        setAttribute("id", id); setAttribute("name", Build.MODEL); setAttribute("transport", "tcp-http-v1")
+                        setAttribute("id", id); setAttribute("name", DeviceIdentity.name(this@LanService)); setAttribute("transport", "tcp-http-v1")
                     }
                     register(info)
                 }

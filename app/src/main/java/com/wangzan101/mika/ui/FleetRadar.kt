@@ -53,7 +53,7 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
                 Box(Modifier.offset(x=centerX-55.dp,y=165.dp).size(110.dp,120.dp)){
                     Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.fillMaxSize()){
                         FleetAvatar(local.id,Modifier.size(96.dp))
-                        Text("本机",style=MaterialTheme.typography.labelLarge)
+                        Text(local.name,style=MaterialTheme.typography.labelLarge,maxLines=1)
                     }
                     Box(Modifier.matchParentSize().combinedClickable(onClick={onChat(local)},onLongClick={onEdit(local)}))
                 }
@@ -68,7 +68,7 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
                         }
                         Text(device.name,style=MaterialTheme.typography.labelSmall,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
                     }
-                    Box(Modifier.matchParentSize().combinedClickable(onClick={if(device.connected)onChat(device)else if(!busy && device.id !in connecting)onConnect(device)},onLongClick={onEdit(device)}))
+                    Box(Modifier.matchParentSize().combinedClickable(onClick={if(device.connected)onChat(device)else if(!busy && device.id !in connecting)onConnect(device)},onLongClick={selected=device.id}))
                 }
             }
             if(remotes.isEmpty())Text("暂无附近 agent",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.align(Alignment.TopCenter).padding(top=36.dp))
@@ -84,7 +84,7 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
                 remotes.filter{it.connected}.chunked(columns).forEach{row->
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         row.forEach{device->
-                            Surface(onClick={onChat(device)},modifier=Modifier.weight(1f),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainer){
+                            Surface(modifier=Modifier.weight(1f).combinedClickable(onClick={onChat(device)},onLongClick={selected=device.id}),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainer){
                                 Column(Modifier.padding(8.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)){
                                     FleetAvatar(device.id,Modifier.size(38.dp))
                                     Text(device.name,style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -126,7 +126,8 @@ fun FleetRadar(devices:List<FleetController.Device>,busy:Boolean,status:String,o
                 Text(if(device.connected)"已连接" else device.error ?: "附近设备",style=MaterialTheme.typography.bodySmall)
                 if(device.connected)Button(onClick={selected=null;onChat(device)}){Text("打开聊天")}
                 else Button(enabled=!busy,onClick={onConnect(device)}){Text(if(busy)"申请中…" else "申请连接")}
-                TextButton(onClick={selected=null;onEdit(device)}){Text("名称与分组")}
+                TextButton(onClick={selected=null;onEdit(device)}){Text("重命名设备")}
+                TextButton(enabled=device.connected,onClick={selected=null;checked=setOf(device.id);targetGroup=groups[device.id] ?: "默认组";groupName="";groupEditor=true}){Text("移动到分组")}
                 if(status.isNotBlank())Text(status,style=MaterialTheme.typography.bodySmall)
             }
         }

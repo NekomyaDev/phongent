@@ -28,6 +28,10 @@ struct NearbyRadar:View {
         let targets=devices.filter{!$0.client.connected && ($0.approved || $0.available) && !hub.connecting.contains($0.id)}
         Task{@MainActor in defer{batchBusy=false};let failed=await hub.connectAll(targets);if !failed.isEmpty{error="连接失败："+failed.joined(separator:"、")+"。可点击上方设备重试。"}}
     }
+    @ViewBuilder private func deviceMenu(_ agent:NearbyAgent)->some View {
+        Button("重命名设备",systemImage:"pencil"){renameDevice=agent;deviceName=agent.name;showRename=true}
+        Button("移动到分组",systemImage:"folder"){checked=[agent.id];groupName="";targetGroup=hub.group(of:agent.id);editingGroups=true}.disabled(!agent.client.connected)
+    }
     var body:some View {
         NavigationStack{
             ScrollView{
@@ -41,7 +45,7 @@ struct NearbyRadar:View {
                             ForEach(Array(visible.enumerated()),id:\.element.id){index,agent in
                                 let angle = -Double.pi/2+Double(index)*2*Double.pi/Double(max(visible.count,3))
                                 Button{open(agent)}label:{DeviceOrb(agent:agent,active:scenePhase == .active,size:devices.count>6 ? 42:62)}.buttonStyle(.plain)
-                                    .contextMenu{Button("修改名称"){renameDevice=agent;deviceName=agent.name;showRename=true}}
+                                    .contextMenu{deviceMenu(agent)}
                                     .position(x:center.x+cos(angle)*min(geo.size.width*0.39,148),y:center.y+sin(angle)*140)
                             }
                         }
@@ -58,11 +62,12 @@ struct NearbyRadar:View {
                                     Text(agent.name).font(.caption.weight(.medium)).lineLimit(1)
                                     Text(hub.group(of:agent.id)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                 }.frame(maxWidth:.infinity).padding(.vertical,10).background(Color(uiColor:.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:12))
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).contextMenu{deviceMenu(agent)}
                         }
                     }
                 }.padding(18)
             }.background(Color(uiColor:.systemGroupedBackground)).navigationTitle("设备").navigationBarTitleDisplayMode(.inline)
+            .onChange(of:hub.renameError){_,value in if let value{error=value;hub.renameError=nil}}
             .onChange(of:pages){_,value in page=min(page,value-1)}
             .sheet(item:$selected){agent in AgentPanel(agent:agent,hub:hub)}
             .sheet(isPresented:$editingGroups){NavigationStack{Form{

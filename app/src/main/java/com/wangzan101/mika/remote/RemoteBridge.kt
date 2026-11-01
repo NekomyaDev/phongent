@@ -217,6 +217,7 @@ class RemoteBridge(private val app: MikaApp) {
                             request[0] == "GET" && request[1] == "/diagnostics" -> respond(200,RemoteDiagnostics(app).diagnostics())
                             request[0] == "GET" && request[1] == "/tasks" -> respond(200,RemoteTaskQueue.get(app).list())
                             request[0] == "POST" && request[1] == "/tasks" -> {try{val command=body();val queue=RemoteTaskQueue.get(app);respond(200,if(command.optString("action")=="cancel")queue.cancel(command.getString("id")) else if(command.optString("action")=="acknowledge")queue.acknowledge(command.getString("id")) else if(command.optString("action")=="retry")queue.retry(command.getString("id")) else queue.enqueue(command))}catch(e:Exception){respond(409,JSONObject().put("error",e.message ?: "queue_failed"))}}
+                            request[0] == "POST" && request[1] == "/device/name" -> {try{respond(200,DeviceIdentity.rename(app,body()))}catch(e:Exception){respond(422,JSONObject().put("error",e.message))}}
                             request[0] == "GET" && request[1] == "/state" -> respond(200, snapshot())
                             request[0] == "POST" && request[1] == "/command" -> synchronized(prefs) {
                                 val command = body()
@@ -331,7 +332,7 @@ class RemoteBridge(private val app: MikaApp) {
             .put("exchanges",NativeChat.exchanges(app,app.chat.ui.value.conversationId ?: ""))
             .put("taskQueueVersion",1).put("queuedTasks",RemoteTaskQueue.get(app).status())
             .put("knowledgeVersion", 1).put("chatRoutingVersion", 3).put("chatRevision", chatRevision.get())
-            .put("busy", app.taskState.busy.value).put("device", android.os.Build.MODEL)
+            .put("busy", app.taskState.busy.value).put("device", DeviceIdentity.name(app))
             .put("updatedAt", System.currentTimeMillis() / 1000.0)
             .put("messages", MessageListener.snapshot())
             .put("messageWaitConfig", true).put("eventStream", true)
