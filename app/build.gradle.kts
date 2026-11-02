@@ -14,11 +14,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.wangzan101.mika"
+        applicationId = "com.mylea.phongent"
         minSdk = 30
         targetSdk = 35
-        versionCode = 10012
-        versionName = "1.0.12-phongent"
+        versionCode = 10013
+        versionName = "1.0.13-phongent"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
